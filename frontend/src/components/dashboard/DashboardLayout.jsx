@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Sidebar from './Sidebar'; // 1. Importa o novo componente
+import Sidebar from './Sidebar.jsx'; // 1. Importa o novo componente
 
 const DashboardLayout = () => {
   return (
