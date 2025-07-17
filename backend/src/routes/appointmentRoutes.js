@@ -9,13 +9,15 @@ import {
 
 const router = express.Router();
 
-// Aplicar o middleware de proteção a todas as rotas de agendamento
+// Aplica o middleware de proteção a todas as rotas de agendamento
 router.use(protect);
 
+// Rota para LER a lista (GET) e CRIAR um novo (POST)
 router.route('/')
-  .post(createAppointment)
-  .get(listAppointments);
+  .get(listAppointments)
+  .post(createAppointment);
 
+// Rota para EDITAR (PUT) e DELETAR (DELETE) um agendamento específico
 router.route('/:id')
   .put(updateAppointment)
   .delete(deleteAppointment);

@@ -10,6 +10,12 @@ api.interceptors.request.use(async (config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // --- LINHA DE DEPURAÇÃO ADICIONADA ---
+  // Isso vai nos mostrar no console do navegador o que está sendo enviado.
+  console.log('Enviando requisição com os seguintes cabeçalhos:', config.headers);
+  // ------------------------------------
+
   return config;
 });
 

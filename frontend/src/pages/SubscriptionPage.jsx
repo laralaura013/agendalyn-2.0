@@ -1,50 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import api from '../services/api';
 import PlanCard from '../components/subscription/PlanCard';
-import ManageSubscription from '../components/subscription/ManageSubscription';
-// import api from '../services/api';
 
 const SubscriptionPage = () => {
-  const [plans, setPlans] = useState([]);
-  const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // Mock de dados - Substituir com chamadas de API
-    setPlans([
-      { id: 'plan_basic', name: 'Básico', price: '29.90', features: ['5 Colaboradores', '200 Clientes', 'Agenda Online'], stripePriceId: 'price_1...' },
-      { id: 'plan_pro', name: 'Pro', price: '59.90', features: ['15 Colaboradores', '1000 Clientes', 'Relatórios'], stripePriceId: 'price_2...' },
-      { id: 'plan_premium', name: 'Premium', price: '99.90', features: ['Colaboradores Ilimitados', 'Clientes Ilimitados', 'Suporte VIP'], stripePriceId: 'price_3...' },
-    ]);
-    // Simula uma assinatura ativa
-    setCurrentSubscription({ plan: { name: 'Pro' }, status: 'ACTIVE', renews: '2025-08-15' });
-  }, []);
+  const plans = [
+    {
+      name: 'Plano Pro',
+      price: '27,00', // Valor real baseado no Stripe (2700 centavos = R$27,00)
+      stripePriceId: 'price_1Rlufh2MrsmBW59IYcYTHwcU', // ID real do Stripe
+      features: [
+        'Agendamentos Ilimitados',
+        'Cadastro de Clientes',
+        'Cadastro de Colaboradores e Serviços',
+        'Controle de Caixa',
+        'Relatórios de Faturamento',
+        'Suporte por Email',
+      ]
+    },
+  ];
 
-  const handleChoosePlan = async (stripePriceId) => {
+  const handleChoosePlan = async (priceId) => {
+    // Validação para garantir que o ID do preço foi inserido corretamente
+    if (!priceId || priceId.includes('COLE_AQUI')) {
+      alert("Erro de configuração: O ID do preço do Stripe não foi definido no código.");
+      return;
+    }
+
+    setLoading(true);
     try {
-      // const response = await api.post('/subscriptions/create-checkout-session', { priceId: stripePriceId });
-      // window.location.href = response.data.url;
-      console.log("Redirecionando para o checkout do Stripe para o plano:", stripePriceId);
-      alert("Redirecionando para o checkout...")
+      const response = await api.post('/subscriptions/create-checkout-session', { priceId });
+      window.location.href = response.data.url;
     } catch (error) {
-      console.error("Erro ao iniciar assinatura", error);
+      console.error("Erro ao iniciar assinatura:", error);
+      alert("Não foi possível iniciar o processo de assinatura. Tente novamente.");
+      setLoading(false);
     }
   };
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-8">Planos e Assinatura</h1>
-      {currentSubscription ? (
-        <ManageSubscription subscription={currentSubscription} />
-      ) : (
-        <div>
-          <h2 className="text-2xl font-semibold text-center mb-6">Escolha o plano ideal para você</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            {plans.map(plan => (
-              <PlanCard key={plan.id} plan={plan} onChoosePlan={handleChoosePlan} />
-            ))}
-          </div>
+    <div>
+      <h1 className="text-3xl font-bold text-center mb-4">Planos e Assinatura</h1>
+      <p className="text-center text-gray-600 mb-10">Escolha o plano que melhor se adapta ao seu negócio.</p>
+
+      <div className="flex justify-center">
+        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-8 max-w-sm">
+          {plans.map(plan => (
+            <PlanCard key={plan.name} plan={plan} onChoosePlan={handleChoosePlan} />
+          ))}
         </div>
-      )}
+      </div>
+      
+      {loading && <p className="text-center mt-4">A redirecionar para o portal de pagamento...</p>}
     </div>
   );
 };
+
 export default SubscriptionPage;

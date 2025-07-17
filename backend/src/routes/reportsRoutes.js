@@ -6,8 +6,5 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/revenue', getRevenueReport);
-// Adicionar rotas para outros relatórios
-// router.get('/revenue-by-user', getRevenueByUserReport);
-// router.get('/revenue-by-service', getRevenueByServiceReport);
 
 export default router;

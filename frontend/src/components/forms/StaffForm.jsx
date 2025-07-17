@@ -66,4 +66,4 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
   );
 };
 
-export default StaffForm;
+export default StaffForm; // A linha mais importante que estava faltando!

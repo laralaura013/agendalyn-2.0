@@ -1,33 +1,72 @@
-import React, { useState } from 'react';
-import GoalProgress from '../components/goals/GoalProgress';
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '../services/api';
 import Modal from '../components/dashboard/Modal';
-import GoalForm from '../components/goals/GoalForm';
+import GoalForm from '../components/forms/GoalForm';
+import GoalProgress from '../components/goals/GoalProgress';
 
 const GoalsPage = () => {
+  const [goals, setGoals] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [goals, setGoals] = useState([
-    { id: 1, type: 'TOTAL', targetValue: 10000, currentValue: 7500, month: 7, year: 2025 },
-    { id: 2, type: 'BY_USER', user: { name: 'João' }, targetValue: 4000, currentValue: 4100, month: 7, year: 2025 },
-    { id: 3, type: 'BY_SERVICE', service: { name: 'Corte Masculino' }, targetValue: 2000, currentValue: 1500, month: 7, year: 2025 },
-  ]);
+
+  const fetchGoals = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/goals');
+      setGoals(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar metas:", error);
+      alert("Não foi possível carregar as metas.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGoals();
+  }, [fetchGoals]);
+
+  const handleSave = async (data) => {
+    try {
+      await api.post('/goals', data);
+      fetchGoals();
+      setIsModalOpen(false);
+    } catch (error) {
+      alert(error.response?.data?.message || "Não foi possível salvar a meta.");
+    }
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Metas</h1>
-        <button onClick={() => setIsModalOpen(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
-          Nova Meta
+        <h1 className="text-3xl font-bold">Metas de Faturação</h1>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
+        >
+          Definir Nova Meta
         </button>
       </div>
-      <div className="space-y-6">
-        {goals.map(goal => (
-          <GoalProgress key={goal.id} goal={goal} />
-        ))}
-      </div>
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <GoalForm onSave={() => setIsModalOpen(false)} onCancel={() => setIsModalOpen(false)} />
-      </Modal>
+
+      {loading ? (
+        <p>A carregar metas...</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {goals.length > 0 ? goals.map(goal => (
+            <GoalProgress key={goal.id} goal={goal} />
+          )) : (
+            <p className="col-span-full text-center text-gray-500 py-8">Nenhuma meta definida ainda.</p>
+          )}
+        </div>
+      )}
+
+      {isModalOpen && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+          <GoalForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} />
+        </Modal>
+      )}
     </div>
   );
 };
+
 export default GoalsPage;

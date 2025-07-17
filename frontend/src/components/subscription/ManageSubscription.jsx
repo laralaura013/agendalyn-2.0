@@ -3,6 +3,7 @@ import React from 'react';
 const ManageSubscription = ({ subscription }) => {
   const handleManage = async () => {
     // Lógica para chamar a API que cria o portal do cliente no Stripe
+    // import api from '../../services/api';
     // const response = await api.post('/subscriptions/create-customer-portal');
     // window.location.href = response.data.url;
     console.log("Redirecionando para o portal do cliente...");

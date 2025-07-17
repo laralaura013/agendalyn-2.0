@@ -1,35 +1,122 @@
-import React, { useState } from 'react';
-import ResourceTable from '../components/dashboard/ResourceTable';
+import React, { useState, useEffect, useCallback } from 'react';
 import Modal from '../components/dashboard/Modal';
 import OrderForm from '../components/forms/OrderForm';
+import api from '../services/api';
 
+// --- COMPONENTE DO CARD ATUALIZADO COM O BOTÃO ---
+const OrderCard = ({ order, onFinish }) => {
+  const statusMap = {
+    OPEN: { text: 'ABERTA', style: 'bg-blue-100 text-blue-800' },
+    FINISHED: { text: 'FINALIZADA', style: 'bg-green-100 text-green-800' },
+    CANCELED: { text: 'CANCELADA', style: 'bg-red-100 text-red-800' },
+  };
+  const currentStatus = statusMap[order.status] || { text: 'DESCONHECIDO', style: 'bg-gray-100' };
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-md border flex flex-col">
+      <div className="flex justify-between items-center">
+        <h3 className="font-bold text-lg">Comanda #{order.id.substring(0, 8)}</h3>
+        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${currentStatus.style}`}>
+          {currentStatus.text}
+        </span>
+      </div>
+      <div className="mt-2 text-sm text-gray-600 flex-grow">
+        <p><strong>Cliente:</strong> {order.client.name}</p>
+        <p><strong>Colaborador:</strong> {order.user.name}</p>
+        <p><strong>Data:</strong> {new Date(order.createdAt).toLocaleDateString()}</p>
+      </div>
+      <div className="mt-3 border-t pt-3 flex justify-between items-center">
+        <p className="font-semibold text-lg">Total: <span className="text-green-600">R$ {Number(order.total).toFixed(2)}</span></p>
+        {order.status === 'OPEN' && (
+          <button 
+            onClick={() => onFinish(order.id)}
+            className="px-3 py-1 bg-green-500 text-white text-sm font-semibold rounded-md hover:bg-green-600"
+          >
+            Finalizar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- COMPONENTE DA PÁGINA ATUALIZADO COM A FUNÇÃO ---
 const Orders = () => {
-  const [orders, setOrders] = useState([
-    { id: 'cmd1', client: { name: 'João da Silva' }, user: { name: 'Maria' }, total: '150.00', status: 'FINISHED' },
-    { id: 'cmd2', client: { name: 'Ana Costa' }, user: { name: 'Pedro' }, total: '75.50', status: 'OPEN' }
-  ]);
+  const [orders, setOrders] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const columns = [
-    { header: 'Cliente', accessor: 'client.name' },
-    { header: 'Colaborador', accessor: 'user.name' },
-    { header: 'Total', accessor: 'total', render: (val) => `R$ ${val}` },
-    { header: 'Status', accessor: 'status' },
-  ];
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/orders');
+      setOrders(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar comandas:", error);
+      alert("Não foi possível carregar as comandas.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const handleSave = async (data) => {
+    try {
+      await api.post('/orders', data);
+      fetchOrders();
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Erro ao salvar comanda:", error);
+      alert("Não foi possível salvar a comanda.");
+    }
+  };
+
+  const handleFinishOrder = async (orderId) => {
+    if (window.confirm("Deseja realmente finalizar esta comanda e lançar o pagamento no caixa?")) {
+      try {
+        await api.put(`/orders/${orderId}/finish`);
+        fetchOrders(); // Atualiza a lista para mostrar o novo status
+      } catch (error) {
+        const errorMessage = error.response?.data?.message || "Não foi possível finalizar a comanda.";
+        console.error("Erro ao finalizar comanda:", error);
+        alert(errorMessage);
+      }
+    }
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Comandas</h1>
-        <button onClick={() => setIsModalOpen(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
+        >
           Nova Comanda
         </button>
       </div>
-      <ResourceTable columns={columns} data={orders} />
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <OrderForm onSave={() => { setIsModalOpen(false); }} onCancel={() => setIsModalOpen(false)} />
-      </Modal>
+      {loading ? (
+        <p>Carregando comandas...</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {orders.map(order => (
+            <OrderCard key={order.id} order={order} onFinish={handleFinishOrder} />
+          ))}
+        </div>
+      )}
+      {isModalOpen && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+          <OrderForm
+            onSave={handleSave}
+            onCancel={() => setIsModalOpen(false)}
+          />
+        </Modal>
+      )}
     </div>
   );
 };
+
 export default Orders;

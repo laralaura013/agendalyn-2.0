@@ -1,82 +1,117 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Calendar from '../components/schedule/Calendar';
 import AppointmentModal from '../components/schedule/AppointmentModal';
-// import axios from 'axios';
+import api from '../services/api';
+import { parseISO } from 'date-fns';
 
 const Schedule = () => {
   const [events, setEvents] = useState([]);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  
-  // Mock de dados - Substituir com chamadas de API
-  const [services, setServices] = useState([
-      {id: 'service1', name: 'Corte de Cabelo'},
-      {id: 'service2', name: 'Barba'}
-  ]);
-  const [staff, setStaff] = useState([
-      {id: 'user1', name: 'João'},
-      {id: 'user2', name: 'Maria'}
-  ]);
+
+  const [services, setServices] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const fetchAppointments = useCallback(async () => {
     try {
-      // Exemplo de chamada API - ajuste a URL e o token
-      // const response = await axios.get('/api/appointments');
-      // const formattedEvents = response.data.map(apt => ({
-      //   ...apt,
-      //   title: `${apt.clientName} - ${apt.service.name}`,
-      //   start: new Date(apt.start),
-      //   end: new Date(apt.end),
-      // }));
-      // setEvents(formattedEvents);
-      console.log("Buscando agendamentos...");
+      const response = await api.get('/appointments');
+      const formattedEvents = response.data.map(apt => ({
+        id: apt.id,
+        title: `${apt.clientName} - ${apt.service.name}`,
+        start: parseISO(apt.start),
+        end: parseISO(apt.end),
+        resource: apt, // Guarda o objeto original completo
+      }));
+      setEvents(formattedEvents);
     } catch (error) {
-      console.error("Erro ao buscar agendamentos", error);
+      console.error("Erro ao buscar agendamentos:", error);
     }
   }, []);
 
   useEffect(() => {
-    fetchAppointments();
+    const loadPageData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchAppointments(),
+          api.get('/services').then(res => setServices(res.data)),
+          api.get('/staff').then(res => setStaff(res.data))
+        ]);
+      } catch (error) {
+        console.error("Erro ao carregar dados da página:", error);
+        alert("Não foi possível carregar os dados necessários para a agenda.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadPageData();
   }, [fetchAppointments]);
 
   const handleSelectSlot = useCallback((slotInfo) => {
-    setSelectedSlot(slotInfo);
     setSelectedEvent(null);
-    setModalOpen(true);
+    setSelectedSlot(slotInfo);
+    setIsModalOpen(true);
   }, []);
 
+  // FUNÇÃO CORRIGIDA
   const handleSelectEvent = useCallback((event) => {
-    setSelectedEvent(event);
+    // A propriedade com os dados originais se chama 'resource'
+    const originalAppointment = event.resource;
     setSelectedSlot(null);
-    setModalOpen(true);
+    setSelectedEvent(originalAppointment);
+    setIsModalOpen(true);
   }, []);
 
-  const handleSave = async (appointmentData) => {
-    console.log("Salvando agendamento:", appointmentData);
-    // Lógica para salvar (criar ou atualizar) via API
-    // if(selectedEvent) { // Atualizar
-    //   await axios.put(`/api/appointments/${selectedEvent.id}`, appointmentData);
-    // } else { // Criar
-    //   await axios.post('/api/appointments', appointmentData);
-    // }
-    fetchAppointments(); // Re-buscar eventos
-    setModalOpen(false);
+  const handleSave = async (formData) => {
+    try {
+      const dataToSend = {
+        ...formData,
+        start: formData.start.toISOString(),
+      };
+      if (selectedEvent) {
+        await api.put(`/appointments/${selectedEvent.id}`, dataToSend);
+      } else {
+        await api.post('/appointments', dataToSend);
+      }
+      setIsModalOpen(false);
+      fetchAppointments();
+    } catch (error) {
+      console.error("Erro ao salvar agendamento:", error);
+      alert("Não foi possível salvar o agendamento.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Tem certeza que deseja excluir este agendamento?")) {
+      try {
+        await api.delete(`/appointments/${id}`);
+        setIsModalOpen(false);
+        fetchAppointments();
+      } catch (error) {
+        console.error("Erro ao deletar agendamento:", error);
+        alert("Não foi possível excluir o agendamento.");
+      }
+    }
   };
 
   return (
-    <div className="p-4 md:p-8">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Agenda</h1>
-      <Calendar
-        events={events}
-        onSelectSlot={handleSelectSlot}
-        onSelectEvent={handleSelectEvent}
-      />
-      {modalOpen && (
+    <div>
+      <h1 className="text-3xl font-bold mb-6">Agenda</h1>
+      {loading ? <p>Carregando dados da agenda...</p> : (
+        <Calendar
+          events={events}
+          onSelectSlot={handleSelectSlot}
+          onSelectEvent={handleSelectEvent}
+        />
+      )}
+      {isModalOpen && (
         <AppointmentModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
           onSave={handleSave}
+          onDelete={handleDelete}
           event={selectedEvent}
           slot={selectedSlot}
           services={services}
@@ -86,4 +121,5 @@ const Schedule = () => {
     </div>
   );
 };
+
 export default Schedule;

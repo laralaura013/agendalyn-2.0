@@ -1,16 +1,24 @@
 import express from 'express';
 import { protect } from '../middlewares/authMiddleware.js';
-import { createAnamnesisForm } from '../controllers/anamnesisController.js';
+import { 
+    listAnamnesisForms, 
+    createAnamnesisForm,
+    saveAnamnesisAnswer,
+    getClientAnamnesisHistory // Importa a nova função
+} from '../controllers/anamnesisController.js';
 
 const router = express.Router();
 router.use(protect);
 
-// Rotas para os modelos de ficha
-router.post('/forms', createAnamnesisForm);
-// router.get('/forms', listAnamnesisForms);
+// Rotas para os MODELOS de ficha
+router.route('/forms')
+    .get(listAnamnesisForms)
+    .post(createAnamnesisForm);
 
-// Rotas para as respostas dos clientes
-// router.post('/answers', saveAnamnesisAnswer);
-// router.get('/answers/client/:clientId', getClientAnamnesisHistory);
+// Rota para as RESPOSTAS
+router.post('/answers', saveAnamnesisAnswer);
+
+// --- NOVA ROTA PARA O HISTÓRICO ---
+router.get('/answers/client/:clientId', getClientAnamnesisHistory);
 
 export default router;

@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-// Importa as rotas
+// Importa todas as nossas rotas
 import authRoutes from './routes/authRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
@@ -26,15 +26,10 @@ const PORT = process.env.PORT || 3001;
 
 // Middlewares
 app.use(cors());
-
-// Rota de webhook do Stripe precisa do body em formato raw
-// Deve vir ANTES do express.json()
 app.use('/api/webhooks', webhookRoutes);
-
-// Middleware para parsear JSON para todas as outras rotas
 app.use(express.json());
 
-// Rotas da API
+// --- Uso das Rotas na API ---
 app.use('/api/auth', authRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/clients', clientRoutes);
@@ -48,7 +43,6 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/goals', goalsRoutes);
 app.use('/api/anamnesis', anamnesisRoutes);
 app.use('/api/packages', packageRoutes);
-
 
 // Rota de teste
 app.get('/api', (req, res) => {

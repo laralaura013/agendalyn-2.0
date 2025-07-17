@@ -1,14 +1,25 @@
 import express from 'express';
 import { protect } from '../middlewares/authMiddleware.js';
-import { createPackage } from '../controllers/packageController.js';
+import { 
+    listPackages, 
+    createPackage, 
+    sellPackageToClient,
+    listClientPackages,
+    usePackageSession
+} from '../controllers/packageController.js';
 
 const router = express.Router();
 router.use(protect);
 
-router.post('/', createPackage);
-// Adicionar rotas para listar pacotes, vender e usar sessões
-// router.get('/', listPackages);
-// router.post('/sell', sellPackageToClient);
-// router.post('/use-session', usePackageSession);
+// Rotas que já tínhamos
+router.route('/')
+  .get(listPackages)
+  .post(createPackage);
+
+router.post('/sell', sellPackageToClient);
+
+// --- ROTAS NOVAS E CORRIGIDAS ---
+router.get('/client/:clientId', listClientPackages);
+router.post('/use-session/:clientPackageId', usePackageSession);
 
 export default router;
