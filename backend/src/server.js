@@ -20,16 +20,10 @@ import packageRoutes from './routes/packageRoutes.js';
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 10000; // Render usa a porta 10000
+// Render define a porta automaticamente através da variável de ambiente PORT
+const PORT = process.env.PORT || 3001; 
 
-// --- NOVO MIDDLEWARE DE DEBUG ---
-// Este código vai rodar para TODA E QUALQUER requisição que chegar ao servidor.
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] Requisição recebida: ${req.method} ${req.originalUrl}`);
-    next(); // Continua para o próximo passo
-});
-// --------------------------------
-
+// Middlewares
 app.use(cors());
 app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
@@ -54,6 +48,9 @@ app.get('/api', (req, res) => {
   res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' });
 });
 
-app.listen(PORT, () => {
+// --- LINHA CORRIGIDA ---
+// Adicionamos '0.0.0.0' para que o servidor ouça em todas as interfaces de rede,
+// o que é necessário para plataformas como a Render.
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
