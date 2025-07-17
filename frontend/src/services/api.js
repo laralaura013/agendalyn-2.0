@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+// A URL base agora virá da variável de ambiente que configuramos na Netlify.
+// Em ambiente local, ele usará a URL do localhost como fallback.
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api', // A URL do seu backend
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
 });
 
 // Interceptor para adicionar o token JWT no cabeçalho de cada requisição
@@ -10,12 +12,6 @@ api.interceptors.request.use(async (config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-
-  // --- LINHA DE DEPURAÇÃO ADICIONADA ---
-  // Isso vai nos mostrar no console do navegador o que está sendo enviado.
-  console.log('Enviando requisição com os seguintes cabeçalhos:', config.headers);
-  // ------------------------------------
-
   return config;
 });
 
