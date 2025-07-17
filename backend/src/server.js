@@ -18,13 +18,18 @@ import goalsRoutes from './routes/goalsRoutes.js';
 import anamnesisRoutes from './routes/anamnesisRoutes.js';
 import packageRoutes from './routes/packageRoutes.js';
 
-// Carrega as variáveis de ambiente
 dotenv.config();
-
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 10000; // Render usa a porta 10000
 
-// Middlewares
+// --- NOVO MIDDLEWARE DE DEBUG ---
+// Este código vai rodar para TODA E QUALQUER requisição que chegar ao servidor.
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] Requisição recebida: ${req.method} ${req.originalUrl}`);
+    next(); // Continua para o próximo passo
+});
+// --------------------------------
+
 app.use(cors());
 app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
