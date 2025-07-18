@@ -116,9 +116,12 @@ const Sidebar = () => {
   );
 };
 
-// --- Componente App para demonstração (CORREÇÃO) ---
-// Este componente envolve a Sidebar com o BrowserRouter para corrigir o erro
-// quando este arquivo é visualizado isoladamente.
+
+// --- Componente App para demonstração ---
+// Adicionado para corrigir o erro "useLocation() may be used only in the context of a <Router>"
+// no ambiente de pré-visualização.
+// No seu projeto real, você deve importar e usar o componente <Sidebar />
+// dentro do seu DashboardLayout.jsx, que já está dentro de um BrowserRouter.
 const App = () => {
     return (
         <BrowserRouter>
