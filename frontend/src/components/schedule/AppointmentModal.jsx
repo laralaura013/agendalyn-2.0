@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const AppointmentModal = ({ isOpen, onClose, onSave, event, slot, services, staff }) => {
+const AppointmentModal = ({ isOpen, onClose, onSave, onDelete, event, slot, services, staff }) => {
   const [formData, setFormData] = useState({
     clientName: '',
     clientPhone: '',
@@ -11,6 +11,7 @@ const AppointmentModal = ({ isOpen, onClose, onSave, event, slot, services, staf
 
   useEffect(() => {
     if (event) {
+      // Se estamos a editar um evento existente
       setFormData({
         clientName: event.clientName || '',
         clientPhone: event.clientPhone || '',
@@ -19,7 +20,7 @@ const AppointmentModal = ({ isOpen, onClose, onSave, event, slot, services, staf
         notes: event.notes || ''
       });
     } else if (slot) {
-      // Reset form for new appointment
+      // Se estamos a criar um novo evento
       setFormData({ clientName: '', clientPhone: '', serviceId: '', userId: '', notes: '' });
     }
   }, [event, slot]);
@@ -33,7 +34,8 @@ const AppointmentModal = ({ isOpen, onClose, onSave, event, slot, services, staf
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const finalData = { ...formData, start: slot?.start || event.start };
+    // Garante que a data de início correta é usada, seja de um evento existente ou de um novo slot
+    const finalData = { ...formData, start: event?.start || slot?.start };
     onSave(finalData);
   };
 
@@ -61,7 +63,7 @@ const AppointmentModal = ({ isOpen, onClose, onSave, event, slot, services, staf
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Colaborador</label>
-            <select name="userId" value={formData.userId} onChange={handleChange} className="w-full p-2 border rounded" required>
+             <select name="userId" value={formData.userId} onChange={handleChange} className="w-full p-2 border rounded" required>
               <option value="">Selecione um colaborador</option>
               {staff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
@@ -71,9 +73,24 @@ const AppointmentModal = ({ isOpen, onClose, onSave, event, slot, services, staf
             <textarea name="notes" value={formData.notes} onChange={handleChange} className="w-full p-2 border rounded" rows="2"></textarea>
           </div>
 
-          <div className="flex justify-end gap-4 mt-8">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancelar</button>
-            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Salvar</button>
+          {/* --- BOTÕES DE AÇÃO CORRIGIDOS --- */}
+          <div className="flex justify-between items-center gap-4 mt-8">
+            <div>
+              {/* O botão de excluir só aparece se estivermos a editar um evento existente */}
+              {event && (
+                <button 
+                  type="button" 
+                  onClick={() => onDelete(event.id)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Excluir
+                </button>
+              )}
+            </div>
+            <div className="flex gap-4">
+              <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400">Cancelar</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Salvar</button>
+            </div>
           </div>
         </form>
       </div>
