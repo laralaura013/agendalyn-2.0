@@ -16,7 +16,9 @@ import ReportsPage from './pages/ReportsPage';
 import GoalsPage from './pages/GoalsPage';
 import AnamnesisPage from './pages/AnamnesisPage';
 import PackagesPage from './pages/PackagesPage';
-import ProductsPage from './pages/ProductsPage'; // Novo import
+import ProductsPage from './pages/ProductsPage';
+import CategoriesPage from './pages/CategoriesPage'; // Novo import
+import BrandsPage from './pages/BrandsPage';       // Novo import
 
 function App() {
   return (
@@ -46,7 +48,9 @@ function App() {
         <Route path="/goals" element={<GoalsPage />} />
         <Route path="/anamnesis" element={<AnamnesisPage />} />
         <Route path="/packages" element={<PackagesPage />} />
-        <Route path="/products" element={<ProductsPage />} /> {/* Nova rota adicionada */}
+        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/categories" element={<CategoriesPage />} /> {/* Nova rota adicionada */}
+        <Route path="/brands" element={<BrandsPage />} />       {/* Nova rota adicionada */}
       </Route>
     </Routes>
   );
