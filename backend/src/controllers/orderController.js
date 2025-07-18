@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
-// A função listOrders continua a mesma
+// LISTAR Comandas
 export const listOrders = async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
@@ -9,7 +9,12 @@ export const listOrders = async (req, res) => {
       include: {
         client: { select: { name: true } },
         user: { select: { name: true } },
-        items: { include: { service: { select: { name: true } } } }
+        items: {
+          include: {
+            service: { select: { name: true } },
+            product: { select: { name: true } }
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -20,7 +25,7 @@ export const listOrders = async (req, res) => {
   }
 };
 
-// --- FUNÇÃO CRIAR COMANDA CORRIGIDA ---
+// CRIAR Comanda
 export const createOrder = async (req, res) => {
   try {
     const { clientId, userId, items } = req.body;
@@ -30,63 +35,64 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Cliente, colaborador e pelo menos um item são obrigatórios." });
     }
 
-    // 1. Pega os IDs de todos os serviços na comanda
-    const serviceIds = items.map(item => item.serviceId);
-
-    // 2. Busca todos os serviços do banco de dados de uma só vez para ser mais eficiente
-    const services = await prisma.service.findMany({
-      where: {
-        id: { in: serviceIds },
-        companyId: companyId, // Garante que os serviços são da mesma empresa
-      },
-    });
-
-    // Mapeia os serviços por ID para fácil acesso
-    const servicesMap = new Map(services.map(s => [s.id, s]));
-
-    // 3. Valida os itens, prepara os dados para o banco e calcula o total
     let total = 0;
-    const preparedItems = items.map(item => {
-      const service = servicesMap.get(item.serviceId);
-      if (!service) {
-        // Lança um erro que será capturado pelo catch block
-        throw new Error(`Serviço com ID ${item.serviceId} não encontrado.`);
+    const stockUpdates = [];
+    const preparedItems = [];
+
+    for (const item of items) {
+      if (item.serviceId) {
+        const service = await prisma.service.findUnique({ where: { id: item.serviceId } });
+        if (!service) throw new Error(`Serviço com ID ${item.serviceId} não encontrado.`);
+        total += Number(service.price) * item.quantity;
+        preparedItems.push({
+          quantity: item.quantity,
+          price: Number(service.price),
+          serviceId: item.serviceId,
+        });
+      } else if (item.productId) {
+        const product = await prisma.product.findUnique({ where: { id: item.productId } });
+        if (!product) throw new Error(`Produto com ID ${item.productId} não encontrado.`);
+        if (product.stock < item.quantity) throw new Error(`Stock insuficiente para o produto: ${product.name}.`);
+        
+        total += Number(product.price) * item.quantity;
+        preparedItems.push({
+          quantity: item.quantity,
+          price: Number(product.price),
+          productId: item.productId,
+        });
+
+        stockUpdates.push(
+          prisma.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          })
+        );
       }
-      total += Number(service.price) * item.quantity;
+    }
 
-      return {
-        quantity: item.quantity,
-        price: Number(service.price), // Agora o preço unitário correto é salvo
-        serviceId: item.serviceId,
-      };
-    });
-
-    // 4. Cria a comanda e seus itens no banco de dados em uma única operação
-    const newOrder = await prisma.order.create({
-      data: {
-        total,
-        status: 'OPEN',
-        companyId,
-        clientId,
-        userId,
-        items: {
-          create: preparedItems, // Usa os itens preparados com o preço correto
+    const transactionResult = await prisma.$transaction([
+      prisma.order.create({
+        data: {
+          total,
+          status: 'OPEN',
+          companyId,
+          clientId,
+          userId,
+          items: { create: preparedItems },
         },
-      },
-      include: {
-        items: true,
-      }
-    });
+        include: { items: true }
+      }),
+      ...stockUpdates,
+    ]);
 
-    res.status(201).json(newOrder);
+    res.status(201).json(transactionResult[0]);
   } catch (error) {
     console.error("--- ERRO AO CRIAR COMANDA ---", error);
-    // Retorna a mensagem de erro específica (ex: serviço não encontrado) para o frontend
     res.status(400).json({ message: error.message || 'Erro ao criar comanda.' });
   }
 };
 
-// A função finishOrder continua a mesma
+// FINALIZAR Comanda (Lança no Caixa)
 export const finishOrder = async (req, res) => {
     const { id } = req.params;
     const companyId = req.company.id;
@@ -113,7 +119,6 @@ export const finishOrder = async (req, res) => {
                 where: { id: id },
                 data: { status: 'FINISHED' },
             });
-
             await tx.transaction.create({
                 data: {
                     type: 'INCOME',
@@ -129,5 +134,40 @@ export const finishOrder = async (req, res) => {
     } catch (error) {
         console.error("--- ERRO AO FINALIZAR COMANDA ---", error);
         res.status(500).json({ message: 'Erro ao finalizar a comanda.' });
+    }
+};
+
+// CANCELAR Comanda (Devolve o stock)
+export const cancelOrder = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const orderToCancel = await prisma.order.findUnique({
+            where: { id: id, companyId: req.company.id },
+            include: { items: true },
+        });
+
+        if (!orderToCancel || orderToCancel.status !== 'OPEN') {
+            return res.status(404).json({ message: "Apenas comandas abertas podem ser canceladas." });
+        }
+        
+        const stockRestores = orderToCancel.items
+            .filter(item => item.productId)
+            .map(item => prisma.product.update({
+                where: { id: item.productId },
+                data: { stock: { increment: item.quantity } },
+            }));
+
+        await prisma.$transaction([
+            ...stockRestores,
+            prisma.order.update({
+                where: { id: id },
+                data: { status: 'CANCELED' },
+            }),
+        ]);
+
+        res.status(200).json({ message: 'Comanda cancelada e stock devolvido com sucesso.' });
+    } catch (error) {
+        console.error("--- ERRO AO CANCELAR COMANDA ---", error);
+        res.status(500).json({ message: "Erro ao cancelar comanda." });
     }
 };
