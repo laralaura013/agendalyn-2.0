@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -21,36 +21,29 @@ function App() {
   return (
     <Routes>
       {/* Rotas Públicas */}
-      <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/" element={<Home />} />
       
       {/* Rotas Protegidas */}
-      <Route 
-        path="/*" // Rota "coringa" para todas as outras URLs
-        element={
-          <ProtectedRoute>
-            <Routes>
-              <Route path="/" element={<DashboardLayout />}>
-                <Route index element={<Dashboard />} /> {/* Rota inicial do painel */}
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="schedule" element={<Schedule />} />
-                <Route path="clients" element={<Clients />} />
-                <Route path="staff" element={<Staff />} />
-                <Route path="services" element={<Services />} />
-                <Route path="orders" element={<Orders />} />
-                <Route path="cashier" element={<Cashier />} />
-                <Route path="subscription" element={<SubscriptionPage />} />
-                <Route path="reports" element={<ReportsPage />} />
-                <Route path="goals" element={<GoalsPage />} />
-                <Route path="anamnesis" element={<AnamnesisPage />} />
-                <Route path="packages" element={<PackagesPage />} />
-                {/* Adicionar aqui outras rotas do painel que criarmos */}
-              </Route>
-            </Routes>
-          </ProtectedRoute>
-        } 
-      />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<DashboardLayout />}>
+          {/* A rota /dashboard será a página inicial após o login */}
+          <Route index element={<Navigate to="/dashboard" />} /> 
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="schedule" element={<Schedule />} />
+          <Route path="clients" element={<Clients />} />
+          <Route path="staff" element={<Staff />} />
+          <Route path="services" element={<Services />} />
+          <Route path="orders" element={<Orders />} />
+          <Route path="cashier" element={<Cashier />} />
+          <Route path="subscription" element={<SubscriptionPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="goals" element={<GoalsPage />} />
+          <Route path="anamnesis" element={<AnamnesisPage />} />
+          <Route path="packages" element={<PackagesPage />} />
+        </Route>
+      </Route>
     </Routes>
   );
 }
