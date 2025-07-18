@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, BrowserRouter } from 'react-router-dom'; // Importa o BrowserRouter
 import {
   LayoutDashboard,
   CalendarDays,
@@ -18,6 +18,7 @@ import {
   Target,
   FileText,
   ShoppingCart,
+  CreditCard, // Ícone para Assinatura
 } from 'lucide-react';
 
 // --- Estrutura de dados para os itens do menu ---
@@ -59,6 +60,13 @@ const menuGroups = [
       { name: 'Compras', icon: <ShoppingCart size={18} />, path: '/purchases' },
     ],
   },
+  // --- NOVA SECÇÃO ADICIONADA ---
+  {
+    title: 'CONTA',
+    items: [
+        { name: 'Assinatura', icon: <CreditCard size={18} />, path: '/subscription' },
+    ]
+  }
 ];
 
 // --- Componente para um único item do menu ---
@@ -78,7 +86,7 @@ const NavItem = ({ item }) => (
   </NavLink>
 );
 
-// --- Componente principal da Sidebar ---
+// --- Componente principal da Sidebar (para ser importado em outros arquivos) ---
 const Sidebar = () => {
   return (
     <aside className="hidden md:flex flex-col w-64 bg-gray-800 text-white">
@@ -104,13 +112,25 @@ const Sidebar = () => {
           </div>
         ))}
       </nav>
-
-      {/* Seção da Conta (opcional, pode ser adicionada no futuro) */}
-      <div className="p-4 border-t border-gray-700">
-        {/* Conteúdo do rodapé da sidebar, como configurações da conta */}
-      </div>
     </aside>
   );
 };
 
-export default Sidebar;
+// --- Componente App para demonstração (CORREÇÃO) ---
+// Este componente envolve a Sidebar com o BrowserRouter para corrigir o erro
+// quando este arquivo é visualizado isoladamente.
+const App = () => {
+    return (
+        <BrowserRouter>
+            <div className="flex h-screen bg-gray-100">
+                <Sidebar />
+                <main className="flex-1 p-8">
+                    <h1 className="text-2xl font-bold">Conteúdo Principal</h1>
+                    <p>Selecione um item no menu lateral.</p>
+                </main>
+            </div>
+        </BrowserRouter>
+    );
+};
+
+export default App;
