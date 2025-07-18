@@ -16,18 +16,17 @@ import ReportsPage from './pages/ReportsPage';
 import GoalsPage from './pages/GoalsPage';
 import AnamnesisPage from './pages/AnamnesisPage';
 import PackagesPage from './pages/PackagesPage';
+import ProductsPage from './pages/ProductsPage'; // Novo import
 
 function App() {
   return (
     <Routes>
       {/* --- ROTAS PÚBLICAS --- */}
-      {/* Estas rotas são acessíveis por qualquer um */}
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       
       {/* --- ROTAS PROTEGIDAS --- */}
-      {/* Todas as rotas aqui dentro exigirão login */}
       <Route 
         element={
           <ProtectedRoute>
@@ -47,6 +46,7 @@ function App() {
         <Route path="/goals" element={<GoalsPage />} />
         <Route path="/anamnesis" element={<AnamnesisPage />} />
         <Route path="/packages" element={<PackagesPage />} />
+        <Route path="/products" element={<ProductsPage />} /> {/* Nova rota adicionada */}
       </Route>
     </Routes>
   );

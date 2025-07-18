@@ -17,7 +17,8 @@ import reportsRoutes from './routes/reportsRoutes.js';
 import goalsRoutes from './routes/goalsRoutes.js';
 import anamnesisRoutes from './routes/anamnesisRoutes.js';
 import packageRoutes from './routes/packageRoutes.js';
-import dashboardRoutes from './routes/dashboardRoutes.js'; // Novo import
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import productRoutes from './routes/productRoutes.js'; // Novo import
 
 dotenv.config();
 const app = express();
@@ -31,7 +32,7 @@ app.use(express.json());
 
 // --- Uso das Rotas na API ---
 app.use('/api/auth', authRoutes);
-app.use('/api/dashboard', dashboardRoutes); // Nova rota adicionada
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/staff', staffRoutes);
@@ -44,6 +45,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/goals', goalsRoutes);
 app.use('/api/anamnesis', anamnesisRoutes);
 app.use('/api/packages', packageRoutes);
+app.use('/api/products', productRoutes); // Nova rota adicionada
 
 // Rota de teste
 app.get('/api', (req, res) => {
