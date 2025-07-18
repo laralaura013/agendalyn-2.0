@@ -81,7 +81,7 @@ const NavItem = ({ item }) => (
       }`
     }
   >
-    <span className="mr-3">{item.icon}</span>
+     <span className="mr-3">{item.icon}</span>
     {item.name}
   </NavLink>
 );
