@@ -20,7 +20,7 @@ export const listOrders = async (req, res) => {
   }
 };
 
-// A função createOrder continua a mesma
+// --- FUNÇÃO CRIAR COMANDA CORRIGIDA ---
 export const createOrder = async (req, res) => {
   try {
     const { clientId, userId, items } = req.body;
@@ -30,13 +30,38 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Cliente, colaborador e pelo menos um item são obrigatórios." });
     }
 
-    let total = 0;
-    for (const item of items) {
-        const service = await prisma.service.findUnique({ where: { id: item.serviceId } });
-        if (!service) return res.status(404).json({ message: `Serviço com ID ${item.serviceId} não encontrado.` });
-        total += Number(service.price) * item.quantity;
-    }
+    // 1. Pega os IDs de todos os serviços na comanda
+    const serviceIds = items.map(item => item.serviceId);
 
+    // 2. Busca todos os serviços do banco de dados de uma só vez para ser mais eficiente
+    const services = await prisma.service.findMany({
+      where: {
+        id: { in: serviceIds },
+        companyId: companyId, // Garante que os serviços são da mesma empresa
+      },
+    });
+
+    // Mapeia os serviços por ID para fácil acesso
+    const servicesMap = new Map(services.map(s => [s.id, s]));
+
+    // 3. Valida os itens, prepara os dados para o banco e calcula o total
+    let total = 0;
+    const preparedItems = items.map(item => {
+      const service = servicesMap.get(item.serviceId);
+      if (!service) {
+        // Lança um erro que será capturado pelo catch block
+        throw new Error(`Serviço com ID ${item.serviceId} não encontrado.`);
+      }
+      total += Number(service.price) * item.quantity;
+
+      return {
+        quantity: item.quantity,
+        price: Number(service.price), // Agora o preço unitário correto é salvo
+        serviceId: item.serviceId,
+      };
+    });
+
+    // 4. Cria a comanda e seus itens no banco de dados em uma única operação
     const newOrder = await prisma.order.create({
       data: {
         total,
@@ -45,29 +70,28 @@ export const createOrder = async (req, res) => {
         clientId,
         userId,
         items: {
-          create: items.map(item => ({
-            quantity: item.quantity,
-            price: Number(service.price), // Corrigido para salvar o preço do item
-            serviceId: item.serviceId,
-          })),
+          create: preparedItems, // Usa os itens preparados com o preço correto
         },
       },
-      include: { items: true }
+      include: {
+        items: true,
+      }
     });
+
     res.status(201).json(newOrder);
   } catch (error) {
     console.error("--- ERRO AO CRIAR COMANDA ---", error);
-    res.status(500).json({ message: 'Erro ao criar comanda.' });
+    // Retorna a mensagem de erro específica (ex: serviço não encontrado) para o frontend
+    res.status(400).json({ message: error.message || 'Erro ao criar comanda.' });
   }
 };
 
-// --- NOVA FUNÇÃO PARA FINALIZAR A COMANDA ---
+// A função finishOrder continua a mesma
 export const finishOrder = async (req, res) => {
     const { id } = req.params;
     const companyId = req.company.id;
 
     try {
-        // 1. Encontra o caixa aberto para esta empresa
         const activeCashier = await prisma.cashierSession.findFirst({
             where: { companyId: companyId, status: 'OPEN' },
         });
@@ -76,7 +100,6 @@ export const finishOrder = async (req, res) => {
             return res.status(400).json({ message: "Nenhum caixa aberto. Abra um caixa antes de finalizar a comanda." });
         }
 
-        // 2. Garante que a comanda existe e está aberta
         const orderToFinish = await prisma.order.findUnique({
             where: { id: id, companyId: companyId }
         });
@@ -85,15 +108,12 @@ export const finishOrder = async (req, res) => {
             return res.status(404).json({ message: "Comanda não encontrada ou já finalizada." });
         }
 
-        // 3. Usa uma transação para garantir que as duas operações ocorram com sucesso
         await prisma.$transaction(async (tx) => {
-            // Atualiza o status da comanda
             await tx.order.update({
                 where: { id: id },
                 data: { status: 'FINISHED' },
             });
 
-            // Cria a transação de entrada no caixa
             await tx.transaction.create({
                 data: {
                     type: 'INCOME',
