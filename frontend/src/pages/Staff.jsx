@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast'; // Importa a notificação
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import StaffForm from '../components/forms/StaffForm';
@@ -17,7 +18,7 @@ const Staff = () => {
       setStaff(response.data);
     } catch (error) {
       console.error("Erro ao buscar colaboradores:", error);
-      alert("Não foi possível carregar os colaboradores.");
+      toast.error("Não foi possível carregar os colaboradores."); // Substitui o alert
     } finally {
       setLoading(false);
     }
@@ -27,42 +28,40 @@ const Staff = () => {
     fetchStaff();
   }, [fetchStaff]);
 
-  // ATUALIZADO: Agora lida com criar e editar
   const handleSave = async (data) => {
     const dataToSave = { ...data };
-    // Remove o campo de senha se estiver vazio para não alterar a senha sem necessidade
     if (!dataToSave.password) {
       delete dataToSave.password;
     }
+    
+    const isEditing = selectedStaff && selectedStaff.id;
+    const savePromise = isEditing
+        ? api.put(`/staff/${selectedStaff.id}`, dataToSave)
+        : api.post('/staff', dataToSave);
 
-    try {
-      if (selectedStaff) {
-        // Lógica de Edição REAL
-        await api.put(`/staff/${selectedStaff.id}`, dataToSave);
-      } else {
-        // Lógica de Criação REAL
-        await api.post('/staff', dataToSave);
-      }
-      fetchStaff();
-      setIsModalOpen(false);
-      setSelectedStaff(null);
-    } catch (error) {
-      console.error("Erro ao salvar colaborador:", error);
-      const errorMessage = error.response?.data?.message || "Não foi possível salvar o colaborador.";
-      alert(errorMessage);
-    }
+    toast.promise(savePromise, {
+        loading: 'A salvar colaborador...',
+        success: () => {
+            fetchStaff();
+            setIsModalOpen(false);
+            setSelectedStaff(null);
+            return `Colaborador ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
+        },
+        error: (err) => err.response?.data?.message || "Não foi possível salvar o colaborador."
+    });
   };
 
-  // ATUALIZADO: Agora deleta de verdade
   const handleDelete = async (id) => {
     if (window.confirm("Tem certeza que deseja excluir este colaborador?")) {
-      try {
-        await api.delete(`/staff/${id}`);
-        fetchStaff(); // Atualiza a lista
-      } catch (error) {
-        console.error("Erro ao deletar colaborador:", error);
-        alert("Não foi possível excluir o colaborador.");
-      }
+      const deletePromise = api.delete(`/staff/${id}`);
+      toast.promise(deletePromise, {
+          loading: 'A excluir colaborador...',
+          success: () => {
+              fetchStaff();
+              return 'Colaborador excluído com sucesso!';
+          },
+          error: "Não foi possível excluir o colaborador."
+      });
     }
   };
 
@@ -78,13 +77,13 @@ const Staff = () => {
         <h1 className="text-3xl font-bold">Colaboradores</h1>
         <button
           onClick={() => { setSelectedStaff(null); setIsModalOpen(true); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
+          className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
         >
           Novo Colaborador
         </button>
       </div>
 
-      {loading ? (
+       {loading ? (
         <p>Carregando colaboradores...</p>
       ) : (
         <ResourceTable
@@ -96,7 +95,7 @@ const Staff = () => {
       )}
 
       {isModalOpen && (
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
           <StaffForm
             initialData={selectedStaff}
             onSave={handleSave}

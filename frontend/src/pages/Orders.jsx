@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast'; // Importa a notificação
 import Modal from '../components/dashboard/Modal';
 import OrderForm from '../components/forms/OrderForm';
 import api from '../services/api';
@@ -59,7 +60,7 @@ const Orders = () => {
       setOrders(response.data);
     } catch (error) {
       console.error("Erro ao buscar comandas:", error);
-      alert("Não foi possível carregar as comandas.");
+      toast.error("Não foi possível carregar as comandas.");
     } finally {
       setLoading(false);
     }
@@ -70,34 +71,43 @@ const Orders = () => {
   }, [fetchOrders]);
 
   const handleSave = async (data) => {
-    try {
-      await api.post('/orders', data);
-      fetchOrders();
-      setIsModalOpen(false);
-    } catch (error) {
-      alert(error.response?.data?.message || "Não foi possível salvar a comanda.");
-    }
+    const savePromise = api.post('/orders', data);
+    toast.promise(savePromise, {
+        loading: 'A criar comanda...',
+        success: () => {
+            fetchOrders();
+            setIsModalOpen(false);
+            return 'Comanda criada com sucesso!';
+        },
+        error: (err) => err.response?.data?.message || "Não foi possível salvar a comanda."
+    });
   };
 
   const handleFinishOrder = async (orderId) => {
     if (window.confirm("Deseja realmente finalizar esta comanda e lançar o pagamento no caixa?")) {
-      try {
-        await api.put(`/orders/${orderId}/finish`);
-        fetchOrders();
-      } catch (error) {
-        alert(error.response?.data?.message || "Não foi possível finalizar a comanda.");
-      }
+      const finishPromise = api.put(`/orders/${orderId}/finish`);
+      toast.promise(finishPromise, {
+          loading: 'A finalizar comanda...',
+          success: () => {
+              fetchOrders();
+              return 'Comanda finalizada com sucesso!';
+          },
+          error: (err) => err.response?.data?.message || "Não foi possível finalizar a comanda."
+      });
     }
   };
   
   const handleCancelOrder = async (orderId) => {
     if (window.confirm("Tem certeza que deseja cancelar esta comanda? O stock dos produtos será devolvido.")) {
-      try {
-        await api.delete(`/orders/${orderId}/cancel`);
-        fetchOrders();
-      } catch (error) {
-        alert(error.response?.data?.message || "Não foi possível cancelar a comanda.");
-      }
+      const cancelPromise = api.delete(`/orders/${orderId}/cancel`);
+      toast.promise(cancelPromise, {
+          loading: 'A cancelar comanda...',
+          success: () => {
+              fetchOrders();
+              return 'Comanda cancelada com sucesso!';
+          },
+          error: (err) => err.response?.data?.message || "Não foi possível cancelar a comanda."
+      });
     }
   };
 

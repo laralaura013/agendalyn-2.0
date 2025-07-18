@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast'; // Importa a notificação
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import ServiceForm from '../components/forms/ServiceForm';
@@ -17,7 +18,7 @@ const Services = () => {
       setServices(response.data);
     } catch (error) {
       console.error("Erro ao buscar serviços:", error);
-      alert("Não foi possível carregar os serviços.");
+      toast.error("Não foi possível carregar os serviços.");
     } finally {
       setLoading(false);
     }
@@ -28,36 +29,40 @@ const Services = () => {
   }, [fetchServices]);
 
   const handleSave = async (data) => {
-    try {
-      if (selectedService) {
-        await api.put(`/services/${selectedService.id}`, data);
-      } else {
-        await api.post('/services', data);
-      }
-      fetchServices();
-      setIsModalOpen(false);
-      setSelectedService(null);
-    } catch (error) {
-      console.error("Erro ao salvar serviço:", error);
-      alert("Não foi possível salvar o serviço.");
-    }
+    const isEditing = selectedService && selectedService.id;
+    const savePromise = isEditing
+        ? api.put(`/services/${selectedService.id}`, data)
+        : api.post('/services', data);
+    
+    toast.promise(savePromise, {
+        loading: 'A salvar serviço...',
+        success: () => {
+            fetchServices();
+            setIsModalOpen(false);
+            setSelectedService(null);
+            return `Serviço ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
+        },
+        error: "Não foi possível salvar o serviço."
+    });
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Tem certeza que deseja excluir este serviço?")) {
-      try {
-        await api.delete(`/services/${id}`);
-        fetchServices();
-      } catch (error) {
-        console.error("Erro ao deletar serviço:", error);
-        alert("Não foi possível excluir o serviço.");
-      }
+      const deletePromise = api.delete(`/services/${id}`);
+      toast.promise(deletePromise, {
+          loading: 'A excluir serviço...',
+          success: () => {
+              fetchServices();
+              return 'Serviço excluído com sucesso!';
+          },
+          error: (err) => err.response?.data?.message || "Não foi possível excluir o serviço."
+      });
     }
   };
 
   const columns = [
     { header: 'Nome', accessor: 'name' },
-    { header: 'Preço', accessor: 'price', render: (price) => `R$ ${price}` },
+    { header: 'Preço', accessor: 'price', render: (price) => `R$ ${Number(price).toFixed(2)}` },
     { header: 'Duração', accessor: 'duration', render: (dur) => `${dur} min` },
   ];
 
@@ -67,12 +72,13 @@ const Services = () => {
         <h1 className="text-3xl font-bold">Serviços</h1>
         <button
           onClick={() => { setSelectedService(null); setIsModalOpen(true); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
+          className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
         >
           Novo Serviço
         </button>
       </div>
-      {loading ? <p>Carregando...</p> : (
+   
+       {loading ? <p>Carregando...</p> : (
         <ResourceTable
           columns={columns}
           data={services}
@@ -82,7 +88,8 @@ const Services = () => {
       )}
       {isModalOpen && (
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <ServiceForm
+    
+           <ServiceForm
             initialData={selectedService}
             onSave={handleSave}
             onCancel={() => setIsModalOpen(false)}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast'; // 1. Importa a função de notificação
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import ClientForm from '../components/forms/ClientForm';
@@ -21,7 +22,7 @@ const Clients = () => {
       setClients(response.data);
     } catch (error) {
       console.error("Erro ao buscar clientes:", error);
-      alert("Não foi possível carregar os clientes.");
+      toast.error("Não foi possível carregar os clientes."); // 2. Substitui o alert
     } finally {
       setLoading(false);
     }
@@ -32,28 +33,34 @@ const Clients = () => {
   }, [fetchClients]);
 
   const handleSave = async (data) => {
-    try {
-      if (selectedClient && selectedClient.id) {
-        await api.put(`/clients/${selectedClient.id}`, data);
-      } else {
-        await api.post('/clients', data);
-      }
-      fetchClients();
-      setIsFormModalOpen(false);
-      setSelectedClient(null);
-    } catch (error) {
-      alert("Não foi possível salvar o cliente.");
-    }
+    const isEditing = selectedClient && selectedClient.id;
+    const savePromise = isEditing
+      ? api.put(`/clients/${selectedClient.id}`, data)
+      : api.post('/clients', data);
+
+    toast.promise(savePromise, {
+      loading: 'A salvar cliente...',
+      success: () => {
+        fetchClients();
+        setIsFormModalOpen(false);
+        setSelectedClient(null);
+        return `Cliente ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
+      },
+      error: 'Não foi possível salvar o cliente.',
+    });
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Tem certeza que deseja excluir este cliente e todo o seu histórico?")) {
-      try {
-        await api.delete(`/clients/${id}`);
-        fetchClients();
-      } catch (error) {
-        alert("Não foi possível excluir o cliente.");
-      }
+      const deletePromise = api.delete(`/clients/${id}`);
+      toast.promise(deletePromise, {
+        loading: 'A excluir cliente...',
+        success: () => {
+          fetchClients();
+          return 'Cliente excluído com sucesso!';
+        },
+        error: 'Não foi possível excluir o cliente.',
+      });
     }
   };
 
@@ -77,7 +84,7 @@ const Clients = () => {
       header: 'Nome',
       accessor: 'name',
       render: (name, client) => (
-        <button onClick={() => handleViewPackages(client)} className="text-blue-600 hover:underline font-semibold text-left">
+        <button onClick={() => handleViewPackages(client)} className="text-purple-700 hover:underline font-semibold text-left">
           {name}
         </button>
       )
@@ -98,35 +105,33 @@ const Clients = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Clientes</h1>
-        <button
-          onClick={() => { setSelectedClient(null); setIsFormModalOpen(true); }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
+        <button 
+          onClick={() => { setSelectedClient(null); setIsFormModalOpen(true); }} 
+          className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
         >
           Novo Cliente
         </button>
       </div>
-
+      
       {loading ? <p>A carregar...</p> : (
-        <ResourceTable
-          columns={columns}
-          data={clients}
+        <ResourceTable 
+          columns={columns} 
+          data={clients} 
           onEdit={handleEditClient}
-          onDelete={handleDelete}
+          onDelete={handleDelete} 
         />
       )}
 
-      {/* Modal para Criar/Editar Cliente */}
       {isFormModalOpen && (
         <Modal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)}>
-          <ClientForm
-            initialData={selectedClient}
-            onSave={handleSave}
-            onCancel={() => setIsFormModalOpen(false)}
+          <ClientForm 
+            initialData={selectedClient} 
+            onSave={handleSave} 
+            onCancel={() => setIsFormModalOpen(false)} 
           />
         </Modal>
       )}
 
-      {/* Modal para ver Pacotes do Cliente */}
       {isPackageModalOpen && selectedClient && (
         <ClientPackagesModal
           client={selectedClient}
@@ -134,7 +139,6 @@ const Clients = () => {
         />
       )}
 
-      {/* Modal para ver Histórico de Anamnese do Cliente */}
       {isHistoryModalOpen && selectedClient && (
         <AnamnesisHistoryModal
           client={selectedClient}
