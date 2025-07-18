@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast'; // 1. Importa o componente
+import { Toaster } from 'react-hot-toast';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -20,29 +20,24 @@ import PackagesPage from './pages/PackagesPage';
 import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BrandsPage from './pages/BrandsPage';
+import SettingsPage from './pages/SettingsPage'; // Novo import
 
 function App() {
   return (
-    <> {/* Usa um fragmento para envolver os dois componentes */}
-      {/* 2. Adiciona o componente que vai exibir as notificações */}
+    <>
       <Toaster 
         position="top-right"
         toastOptions={{
           duration: 5000,
-          style: {
-            background: '#333',
-            color: '#fff',
-          },
+          style: { background: '#333', color: '#fff' },
         }}
       />
       
       <Routes>
-        {/* --- ROTAS PÚBLICAS --- */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
-        {/* --- ROTAS PROTEGIDAS --- */}
         <Route 
           element={
             <ProtectedRoute>
@@ -65,6 +60,7 @@ function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/brands" element={<BrandsPage />} />
+          <Route path="/settings" element={<SettingsPage />} /> {/* Nova rota adicionada */}
         </Route>
       </Routes>
     </>

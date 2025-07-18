@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, CalendarDays, ClipboardList, Package, Users, UserCog,
   Scissors, Box, Folder, Bookmark, Truck, BarChart3, ArrowRightLeft,
-  Wallet, Target, FileText, ShoppingCart, CreditCard,
+  Wallet, Target, FileText, ShoppingCart, CreditCard, Settings // Novo ícone
 } from 'lucide-react';
 
 const menuGroups = [
@@ -48,12 +48,18 @@ const menuGroups = [
   {
     title: 'CONTA',
     items: [
-        { name: 'Assinatura', icon: <CreditCard size={18} />, path: '/subscription', allowedRoles: ['OWNER'] },
+      { name: 'Assinatura', icon: <CreditCard size={18} />, path: '/subscription', allowedRoles: ['OWNER'] },
+    ]
+  },
+  // --- NOVA SECÇÃO ADICIONADA ---
+  {
+    title: 'CONFIGURAÇÕES',
+    items: [
+      { name: 'Empresa', icon: <Settings size={18} />, path: '/settings', allowedRoles: ['OWNER'] },
     ]
   }
 ];
 
-// --- ESTE COMPONENTE FOI CORRIGIDO ---
 const NavItem = ({ item }) => (
   <NavLink
     to={item.path}
@@ -72,7 +78,6 @@ const NavItem = ({ item }) => (
 
 const Sidebar = () => {
   const { user } = useAuth();
-
   return (
     <aside className="hidden md:flex flex-col w-64 bg-gray-800 text-white">
       <div className="h-16 flex items-center justify-center text-2xl font-bold border-b border-gray-700">
