@@ -2,10 +2,11 @@ import express from 'express';
 import { protect } from '../middlewares/authMiddleware.js';
 import { createCheckoutSession, createCustomerPortal } from '../controllers/subscriptionController.js';
 
+console.log("--- DEBUG: subscriptionRoutes.js foi carregado ---");
+
 const router = express.Router();
 
-// ADICIONA A LINHA DE PROTEÇÃO QUE FALTAVA
-// Esta linha garante que apenas utilizadores logados possam aceder a estas rotas.
+// Aplica a proteção a todas as rotas deste arquivo
 router.use(protect);
 
 // Rota para criar a sessão de pagamento
