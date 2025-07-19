@@ -1,10 +1,10 @@
 import express from 'express';
-import { protect } from '../middlewares/authMiddleware.js'; // 1. Importa o protect
+import { protect } from '../middlewares/authMiddleware.js';
 import { createCheckoutSession, createCustomerPortal } from '../controllers/subscriptionController.js';
 
 const router = express.Router();
 
-// 2. ADICIONA A LINHA DE PROTEÇÃO QUE FALTAVA
+// ADICIONA A LINHA DE PROTEÇÃO QUE FALTAVA
 // Esta linha garante que apenas utilizadores logados possam aceder a estas rotas.
 router.use(protect);
 
