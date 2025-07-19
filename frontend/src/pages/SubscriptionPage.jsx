@@ -9,7 +9,7 @@ const SubscriptionPage = () => {
     {
       name: 'Plano Pro',
       price: '27,00', // Valor real baseado no Stripe (2700 centavos = R$27,00)
-      stripePriceId: 'price_1Rlufh2MrsmBW59IYcYTHwcU', // ID real do Stripe
+      stripePriceId: 'price_1RmO42Ru0UQiqSF4YzX9jB4O', // ID real do Stripe
       features: [
         'Agendamentos Ilimitados',
         'Cadastro de Clientes',
