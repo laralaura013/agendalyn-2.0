@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { addMinutes, parseISO } from 'date-fns';
+import { sendAppointmentConfirmationEmail } from '../services/emailService.js'; // Importa a função
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,7 @@ export const listAppointments = async (req, res) => {
   try {
     const appointments = await prisma.appointment.findMany({
       where: { companyId: req.company.id },
-      include: { // Inclui dados do serviço e colaborador para exibição
+      include: {
         service: true,
         user: true,
       },
@@ -23,17 +24,21 @@ export const listAppointments = async (req, res) => {
 // CRIAR Agendamento
 export const createAppointment = async (req, res) => {
   try {
-    const { clientName, clientPhone, start, serviceId, userId, notes } = req.body;
+    const { clientName, clientPhone, clientEmail, start, serviceId, userId, notes } = req.body;
     const companyId = req.company.id;
 
-    if (!start || !serviceId || !userId) {
-      return res.status(400).json({ message: "Data, serviço e colaborador são obrigatórios." });
+    if (!start || !serviceId || !userId || !clientName) {
+      return res.status(400).json({ message: "Nome do cliente, data, serviço e colaborador são obrigatórios." });
     }
 
-    // Busca a duração do serviço para calcular a hora de término
     const service = await prisma.service.findUnique({ where: { id: serviceId } });
     if (!service) {
       return res.status(404).json({ message: "Serviço não encontrado." });
+    }
+    
+    const staff = await prisma.user.findUnique({ where: { id: userId } });
+    if (!staff) {
+      return res.status(404).json({ message: "Colaborador não encontrado." });
     }
 
     const startDate = parseISO(start);
@@ -52,6 +57,18 @@ export const createAppointment = async (req, res) => {
         status: 'SCHEDULED',
       },
     });
+
+    // Envia o email de confirmação se um email for fornecido
+    if (clientEmail) {
+      sendAppointmentConfirmationEmail({
+        toEmail: clientEmail,
+        clientName: clientName,
+        serviceName: service.name,
+        staffName: staff.name,
+        appointmentDate: startDate,
+      });
+    }
+
     res.status(201).json(newAppointment);
   } catch (error) {
     console.error("--- ERRO AO CRIAR AGENDAMENTO ---", error);
@@ -65,7 +82,6 @@ export const updateAppointment = async (req, res) => {
         const { id } = req.params;
         const { clientName, clientPhone, start, serviceId, userId, notes, status } = req.body;
         const companyId = req.company.id;
-
         const service = await prisma.service.findUnique({ where: { id: serviceId } });
         if (!service) {
             return res.status(404).json({ message: "Serviço não encontrado." });
@@ -73,7 +89,6 @@ export const updateAppointment = async (req, res) => {
 
         const startDate = parseISO(start);
         const endDate = addMinutes(startDate, service.duration);
-
         const updatedAppointment = await prisma.appointment.update({
             where: { id: id, companyId: companyId },
             data: {
