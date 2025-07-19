@@ -19,8 +19,8 @@ import anamnesisRoutes from './routes/anamnesisRoutes.js';
 import packageRoutes from './routes/packageRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import productRoutes from './routes/productRoutes.js';
-import categoryRoutes from './routes/categoryRoutes.js'; // Novo import
-import brandRoutes from './routes/brandRoutes.js';       // Novo import
+import categoryRoutes from './routes/categoryRoutes.js';
+import brandRoutes from './routes/brandRoutes.js';
 
 dotenv.config();
 const app = express();
@@ -48,8 +48,8 @@ app.use('/api/goals', goalsRoutes);
 app.use('/api/anamnesis', anamnesisRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/categories', categoryRoutes); // Nova rota adicionada
-app.use('/api/brands', brandRoutes);       // Nova rota adicionada
+app.use('/api/categories', categoryRoutes);
+app.use('/api/brands', brandRoutes);
 
 // Rota de teste
 app.get('/api', (req, res) => {

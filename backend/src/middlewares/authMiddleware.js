@@ -1,9 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-console.log("--- DEBUG: authMiddleware.js foi carregado ---");
-
 export const protect = (req, res, next) => {
-  console.log("--- DEBUG: A função 'protect' foi chamada ---");
   let token;
   const authHeader = req.headers.authorization;
 
@@ -15,16 +12,14 @@ export const protect = (req, res, next) => {
       req.user = { id: decoded.userId, role: decoded.role };
       req.company = { id: decoded.companyId };
 
-      console.log(`--- DEBUG: Token verificado com sucesso para companyId: ${req.company.id} ---`);
       next();
     } catch (error) {
-      console.error('--- DEBUG: Erro de autenticação no protect ---', error.message);
+      console.error('Erro de autenticação:', error.message);
       return res.status(401).json({ message: 'Não autorizado, token inválido.' });
     }
   }
 
   if (!token) {
-    console.log("--- DEBUG: Token não fornecido no cabeçalho ---");
     return res.status(401).json({ message: 'Não autorizado, token não fornecido.' });
   }
 };
