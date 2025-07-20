@@ -4,10 +4,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, CalendarDays, ClipboardList, Package, Users, UserCog,
   Scissors, Box, Folder, Bookmark, Truck, BarChart3, ArrowRightLeft,
-  Wallet, Target, FileText, ShoppingCart, CreditCard, Settings // Novo ícone
+  Wallet, Target, FileText, ShoppingCart, CreditCard, Settings
 } from 'lucide-react';
 
 const menuGroups = [
+  // ... (o conteúdo de menuGroups continua exatamente o mesmo de antes)
   {
     title: 'PRINCIPAL',
     items: [
@@ -51,7 +52,6 @@ const menuGroups = [
       { name: 'Assinatura', icon: <CreditCard size={18} />, path: '/subscription', allowedRoles: ['OWNER'] },
     ]
   },
-  // --- NOVA SECÇÃO ADICIONADA ---
   {
     title: 'CONFIGURAÇÕES',
     items: [
@@ -76,10 +76,11 @@ const NavItem = ({ item }) => (
   </NavLink>
 );
 
-const Sidebar = () => {
+const Sidebar = ({ isMobileMenuOpen }) => { // Recebe o estado do menu
   const { user } = useAuth();
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-gray-800 text-white">
+    // As classes foram atualizadas para lidar com a visualização em telemóvel
+    <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 text-white transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
       <div className="h-16 flex items-center justify-center text-2xl font-bold border-b border-gray-700">
         Agendalyn
       </div>
