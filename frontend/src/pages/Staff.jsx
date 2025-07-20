@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast'; // Importa a notificação
+import toast from 'react-hot-toast';
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import StaffForm from '../components/forms/StaffForm';
@@ -17,8 +17,7 @@ const Staff = () => {
       const response = await api.get('/staff');
       setStaff(response.data);
     } catch (error) {
-      console.error("Erro ao buscar colaboradores:", error);
-      toast.error("Não foi possível carregar os colaboradores."); // Substitui o alert
+      toast.error("Não foi possível carregar os colaboradores.");
     } finally {
       setLoading(false);
     }
@@ -65,10 +64,20 @@ const Staff = () => {
     }
   };
 
+  // --- COLUNAS ATUALIZADAS ---
   const columns = [
     { header: 'Nome', accessor: 'name' },
     { header: 'Email', accessor: 'email' },
     { header: 'Função', accessor: 'role' },
+    {
+        header: 'Visível Agendamento',
+        accessor: 'showInBooking',
+        render: (show) => (
+            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${show ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                {show ? 'Sim' : 'Não'}
+            </span>
+        )
+    }
   ];
 
   return (
@@ -83,7 +92,7 @@ const Staff = () => {
         </button>
       </div>
 
-       {loading ? (
+      {loading ? (
         <p>Carregando colaboradores...</p>
       ) : (
         <ResourceTable

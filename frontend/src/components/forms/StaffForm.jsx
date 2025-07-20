@@ -6,6 +6,7 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
     email: '',
     role: 'STAFF',
     password: '',
+    showInBooking: true, // Novo campo
   });
 
   useEffect(() => {
@@ -14,16 +15,21 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
         name: initialData.name || '',
         email: initialData.email || '',
         role: initialData.role || 'STAFF',
-        password: '', // Senha não é preenchida na edição por segurança
+        password: '',
+        showInBooking: typeof initialData.showInBooking === 'boolean' ? initialData.showInBooking : true, // Novo campo
       });
     } else {
-      setFormData({ name: '', email: '', role: 'STAFF', password: '' });
+      setFormData({ name: '', email: '', role: 'STAFF', password: '', showInBooking: true });
     }
   }, [initialData]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    // Lógica especial para lidar com o checkbox
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -37,33 +43,45 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
       
       <div>
         <label className="block text-sm font-medium text-gray-700">Nome</label>
-        <input type="text" name="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border rounded" required />
+        <input type="text" name="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required />
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700">Email</label>
-        <input type="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border rounded" required />
+        <input type="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required />
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700">Função</label>
-        <select name="role" value={formData.role} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border rounded">
+        <select name="role" value={formData.role} onChange={handleChange} className="mt-1 block w-full p-2 border rounded">
           <option value="STAFF">Colaborador(a)</option>
           <option value="OWNER">Dono(a) / Admin</option>
         </select>
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700">Senha</label>
-        <input type="password" name="password" value={formData.password} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border rounded" placeholder={initialData ? 'Deixe em branco para não alterar' : ''} required={!initialData} />
+        <input type="password" name="password" value={formData.password} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" placeholder={initialData ? 'Deixe em branco para não alterar' : ''} required={!initialData} />
+      </div>
+
+      {/* --- NOVO CAMPO CHECKBOX --- */}
+      <div className="flex items-center">
+        <input
+            id="showInBooking"
+            name="showInBooking"
+            type="checkbox"
+            checked={formData.showInBooking}
+            onChange={handleChange}
+            className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+        />
+        <label htmlFor="showInBooking" className="ml-2 block text-sm text-gray-900">
+            Visível na página de agendamento público
+        </label>
       </div>
 
       <div className="flex justify-end gap-4 pt-4">
         <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 rounded-md">Cancelar</button>
-        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md">Salvar</button>
+        <button type="submit" className="px-4 py-2 bg-purple-700 text-white rounded-md">Salvar</button>
       </div>
     </form>
   );
 };
 
-export default StaffForm; // A linha mais importante que estava faltando!
+export default StaffForm;
