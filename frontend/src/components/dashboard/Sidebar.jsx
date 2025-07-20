@@ -65,8 +65,8 @@ const NavItem = ({ item }) => (
     className={({ isActive }) =>
       `flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors duration-200 ${
         isActive
-          ? 'bg-gray-900 text-white' // Estilo do item ativo
-          : 'text-gray-300 hover:bg-gray-700 hover:text-white' // CORRIGIDO: Estilo do item inativo
+          ? 'bg-gray-900 text-white'
+          : 'text-gray-300 hover:bg-gray-700 hover:text-white'
       }`
     }
   >
@@ -78,10 +78,12 @@ const NavItem = ({ item }) => (
 const Sidebar = ({ isMobileMenuOpen }) => {
   const { user } = useAuth();
   return (
-    <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 text-white transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
-      <div className="h-16 flex items-center justify-center text-2xl font-bold border-b border-gray-700">
+    // CORREÇÃO: Adicionamos 'flex flex-col' para garantir que a sidebar ocupe 100% da altura.
+    <aside className={`fixed inset-y-0 left-0 z-30 flex flex-col w-64 bg-gray-800 text-white transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
+      <div className="h-16 flex items-center justify-center text-2xl font-bold border-b border-gray-700 flex-shrink-0">
         Agendalyn
       </div>
+      {/* A <nav> agora expande corretamente e a rolagem funciona dentro dela. */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         {menuGroups.map((group) => (
           <div key={group.title} className="mb-6">
