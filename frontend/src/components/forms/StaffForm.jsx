@@ -58,9 +58,41 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
     <form onSubmit={handleSubmit} className="space-y-6">
       <h2 className="text-2xl font-bold mb-4">{initialData ? 'Editar Colaborador' : 'Novo Colaborador'}</h2>
       
-      {/* ... (campos existentes: Nome, Email, Função, Senha, Checkbox de Visibilidade) ... */}
+      {/* --- CAMPOS RESTAURADOS --- */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Nome</label>
+        <input type="text" name="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Email</label>
+        <input type="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Função</label>
+        <select name="role" value={formData.role} onChange={handleChange} className="mt-1 block w-full p-2 border rounded">
+          <option value="STAFF">Colaborador(a)</option>
+          <option value="OWNER">Dono(a) / Admin</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Senha</label>
+        <input type="password" name="password" value={formData.password} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" placeholder={initialData ? 'Deixe em branco para não alterar' : ''} required={!initialData} />
+      </div>
+      <div className="flex items-center">
+        <input
+            id="showInBooking"
+            name="showInBooking"
+            type="checkbox"
+            checked={formData.showInBooking}
+            onChange={handleChange}
+            className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+        />
+        <label htmlFor="showInBooking" className="ml-2 block text-sm text-gray-900">
+            Visível na página de agendamento público
+        </label>
+      </div>
       
-      {/* --- NOVA SECÇÃO DE HORÁRIOS --- */}
+      {/* --- SECÇÃO DE HORÁRIOS --- */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Horário de Trabalho</label>
         <div className="space-y-3">
