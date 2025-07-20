@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import ReloadPrompt from './components/pwa/ReloadPrompt'; // 1. Importa o novo componente
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -20,7 +21,7 @@ import PackagesPage from './pages/PackagesPage';
 import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BrandsPage from './pages/BrandsPage';
-import SettingsPage from './pages/SettingsPage'; // Novo import
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   return (
@@ -32,12 +33,13 @@ function App() {
           style: { background: '#333', color: '#fff' },
         }}
       />
+      <ReloadPrompt /> {/* 2. Adiciona o componente aqui */}
       
       <Routes>
+        {/* ... (o resto do seu código de rotas continua exatamente o mesmo) ... */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        
         <Route 
           element={
             <ProtectedRoute>
@@ -60,7 +62,7 @@ function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/brands" element={<BrandsPage />} />
-          <Route path="/settings" element={<SettingsPage />} /> {/* Nova rota adicionada */}
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </>
