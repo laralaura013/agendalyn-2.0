@@ -12,9 +12,8 @@ const Register = () => {
     password: '',
   });
 
-  // --- PASSO MAIS IMPORTANTE ---
-  // Substitua o valor abaixo pelo seu ID do Preço de PRODUÇÃO do Stripe
-  const stripePriceId = "COLE_AQUI_O_SEU_ID_DO_PREÇO_REAL_price_...";
+  // --- ID DO PREÇO INSERIDO ---
+  const stripePriceId = "price_1RmO42Ru0UQiqSF4YzX9jB4O";
 
   const [searchParams] = useSearchParams();
   const registrationStatus = searchParams.get('registration');
@@ -35,6 +34,7 @@ const Register = () => {
 
     const registrationPromise = api.post('/auth/register-checkout', { ...formData, priceId: stripePriceId })
       .then(response => {
+        // Redireciona o utilizador para a página de pagamento do Stripe
         window.location.href = response.data.url;
       });
 
@@ -49,6 +49,7 @@ const Register = () => {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-lg">
         <div className="text-center">
+          {/* Logo e Nome da Marca */}
           <div className="flex justify-center items-center mb-4">
              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-purple-700">
                 <path d="M8 7V6C8 4.34315 9.34315 3 11 3H13C14.6569 3 16 4.34315 16 6V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
