@@ -107,7 +107,6 @@ const BookingPage = () => {
         </header>
 
         <main className="bg-white p-6 rounded-lg shadow-md">
-          {/* Passo 1: Seleção de Serviço */}
           {step === 1 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -134,7 +133,6 @@ const BookingPage = () => {
             </div>
           )}
 
-          {/* Passo 2: Seleção de Profissional */}
           {step === 2 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -155,7 +153,6 @@ const BookingPage = () => {
             </div>
           )}
 
-          {/* Passo 3: Data e Hora */}
           {step === 3 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -171,18 +168,17 @@ const BookingPage = () => {
                 {format(parseISO(`${selectedDate}T00:00:00`), "EEEE, dd 'de' MMMM", { locale: ptBR })}
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {loadingSlots ? <p className="col-span-full text-center">A procurar horários...</p> : 
+                {loadingSlots ? <p className="col-span-full text-center py-4">A procurar horários...</p> : 
                   availableSlots.length > 0 ? availableSlots.map(slot => (
-                    <button key={slot.time} onClick={() => handleSelectSlot(slot)} className="p-2 border rounded-md text-center bg-purple-700 text-white hover:bg-purple-800">
+                    <button key={slot.time} onClick={() => handleSelectSlot(slot)} className="p-2 border rounded-md text-center bg-purple-700 text-white hover:bg-purple-800 transition-colors">
                       {format(parseISO(slot.time), 'HH:mm')}
                     </button>
-                  )) : <p className="col-span-full text-center text-gray-500">Nenhum horário disponível para este dia.</p>
+                  )) : <p className="col-span-full text-center text-gray-500 py-4">Nenhum horário disponível para este dia.</p>
                 }
               </div>
             </div>
           )}
 
-          {/* Passo 4: Confirmação e Dados do Cliente */}
           {step === 4 && (
             <div>
               <button onClick={handleBack} className="text-sm text-gray-600 hover:text-black mb-4 flex items-center"><ArrowLeft size={16} className="mr-1" /> Voltar</button>
@@ -213,7 +209,6 @@ const BookingPage = () => {
             </div>
           )}
 
-          {/* Passo 5: Tela de Sucesso */}
           {step === 5 && (
             <div className="text-center py-10">
                 <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
