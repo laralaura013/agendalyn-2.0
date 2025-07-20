@@ -271,8 +271,8 @@ model Product {
   id          String     @id @default(cuid())
   name        String
   description String?
-  price       Decimal    @db.Decimal(10, 2)
-  cost        Decimal?   @db.Decimal(10, 2)
+  price       Decimal    @db.Decimal(10, 2) // Preço de Venda
+  cost        Decimal?   @db.Decimal(10, 2) // Preço de Custo
   stock       Int        @default(0)
   companyId   String
   company     Company    @relation(fields: [companyId], references: [id])
