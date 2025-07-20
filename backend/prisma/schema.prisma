@@ -10,24 +10,24 @@ datasource db {
 model Company {
   id                 String          @id @default(cuid())
   name               String
-  [cite_start]phone              String? [cite: 5389]
-  [cite_start]address            String? [cite: 5389, 5574]
-  stripeCustomerId   String?         [cite_start]@unique [cite: 5575, 5823]
-  [cite_start]users              User[] [cite: 5575, 5823]
-  [cite_start]services           Service[] [cite: 5389, 5575, 5823]
-  [cite_start]appointments       Appointment[] [cite: 5389, 5575, 5823]
-  [cite_start]clients            Client[] [cite: 5575, 5823]
-  [cite_start]orders             Order[] [cite: 5575, 5823]
-  [cite_start]cashierSessions    CashierSession[] [cite: 5575, 5823]
-  [cite_start]subscription       Subscription? [cite: 5575, 5823]
-  [cite_start]anamnesisForms     AnamnesisForm[] [cite: 5576, 5824]
-  [cite_start]packages           Package[] [cite: 5576, 5824]
-  [cite_start]goals              Goal[] [cite: 5576, 5824]
-  [cite_start]products           Product[] [cite: 824]
-  [cite_start]categories         Category[] [cite: 824]
-  [cite_start]brands             Brand[] [cite: 824]
+  phone              String?
+  address            String?
+  stripeCustomerId   String?         @unique
+  users              User[]
+  services           Service[]
+  appointments       Appointment[]
+  clients            Client[]
+  orders             Order[]
+  cashierSessions    CashierSession[]
+  subscription       Subscription?
+  anamnesisForms     AnamnesisForm[]
+  packages           Package[]
+  goals              Goal[]
+  products           Product[]
+  categories         Category[]
+  brands             Brand[]
   createdAt          DateTime        @default(now())
-  [cite_start]updatedAt          DateTime        @updatedAt [cite: 5576]
+  updatedAt          DateTime        @updatedAt
 }
 
 model User {
@@ -35,33 +35,33 @@ model User {
   email                String                @unique
   name                 String
   password             String
-  [cite_start]role                 Role                  @default(STAFF) [cite: 5578]
+  role                 Role                  @default(STAFF)
   showInBooking        Boolean               @default(true)
-  commission           Decimal?              [cite_start]@db.Decimal(5, 2) [cite: 5579, 5827, 5863]
-  [cite_start]workSchedule         Json? [cite: 5579, 5827, 5863, 5959]
-  [cite_start]companyId            String [cite: 5580, 5828, 5864, 5960]
-  [cite_start]company              Company               @relation(fields: [companyId], references: [id]) [cite: 5580, 5828, 5864, 5960]
-  [cite_start]appointments         Appointment[] [cite: 5580, 5828, 5864, 5960]
-  [cite_start]services             Service[]             @relation("ServiceToUser") [cite: 5580, 5828, 5864, 5960]
-  [cite_start]orders               Order[] [cite: 5581, 5829, 5865, 5961]
-  [cite_start]packageSessionUsages PackageSessionUsage[] [cite: 5581, 5829, 5865, 5961]
-  [cite_start]goals                Goal[] [cite: 5581, 5829, 5865, 5961]
+  commission           Decimal?              @db.Decimal(5, 2)
+  workSchedule         Json?
+  companyId            String
+  company              Company               @relation(fields: [companyId], references: [id])
+  appointments         Appointment[]
+  services             Service[]             @relation("ServiceToUser")
+  orders               Order[]
+  packageSessionUsages PackageSessionUsage[]
+  goals                Goal[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 }
 
 model Service {
-  [cite_start]id            String        @id @default(cuid()) [cite: 5581, 5830, 5866, 5962]
-  [cite_start]name          String [cite: 5582]
-  [cite_start]price         Decimal       @db.Decimal(10, 2) [cite: 5582]
-  [cite_start]duration      Int [cite: 5582]
-  [cite_start]companyId     String [cite: 5582]
-  [cite_start]company       Company       @relation(fields: [companyId], references: [id]) [cite: 5582]
-  [cite_start]appointments  Appointment[] [cite: 5582]
-  [cite_start]orderItems    OrderItem[] [cite: 5582]
-  [cite_start]availableTo   User[]        @relation("ServiceToUser") [cite: 5582]
-  [cite_start]packages      Package[]     @relation("PackageServices") [cite: 5583, 5831, 5867, 5963]
-  [cite_start]goals         Goal[] [cite: 5583, 5831, 5867, 5963]
+  id            String        @id @default(cuid())
+  name          String
+  price         Decimal       @db.Decimal(10, 2)
+  duration      Int
+  companyId     String
+  company       Company       @relation(fields: [companyId], references: [id])
+  appointments  Appointment[]
+  orderItems    OrderItem[]
+  availableTo   User[]        @relation("ServiceToUser")
+  packages      Package[]     @relation("PackageServices")
+  goals         Goal[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }
@@ -69,35 +69,35 @@ model Service {
 model Client {
   id               String          @id @default(cuid())
   name             String
-  [cite_start]phone            String [cite: 5584, 5832, 5868, 5964]
-  [cite_start]birthDate        DateTime? [cite: 5584, 5832, 5868, 5964, 5999]
-  [cite_start]notes            String? [cite: 5585, 5833, 5869, 6000]
-  [cite_start]companyId        String [cite: 5585, 5833, 5869, 6001]
-  [cite_start]company          Company         @relation(fields: [companyId], references: [id]) [cite: 5585]
-  [cite_start]orders           Order[] [cite: 5585]
-  [cite_start]anamnesisAnswers AnamnesisAnswer[] [cite: 5585]
-  [cite_start]packages         ClientPackage[] [cite: 5585]
+  phone            String
+  birthDate        DateTime?
+  notes            String?
+  companyId        String
+  company          Company         @relation(fields: [companyId], references: [id])
+  orders           Order[]
+  anamnesisAnswers AnamnesisAnswer[]
+  packages         ClientPackage[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 }
 
 model Appointment {
-  [cite_start]id                  String                @id @default(cuid()) [cite: 5586, 5835, 5871, 5967, 6002]
-  [cite_start]clientName          String [cite: 5586]
-  [cite_start]clientPhone         String [cite: 5586]
-  [cite_start]start               DateTime [cite: 5586]
-  [cite_start]end                 DateTime [cite: 5586]
-  [cite_start]notes               String? [cite: 5587, 5836, 5872, 5968, 6003]
-  [cite_start]status              AppointmentStatus     @default(SCHEDULED) [cite: 5588, 5837, 5873, 5969, 6004]
-  [cite_start]companyId           String [cite: 5588]
-  [cite_start]company             Company               @relation(fields: [companyId], references: [id]) [cite: 5588]
-  [cite_start]serviceId           String [cite: 5589, 5838, 5874, 5970]
-  [cite_start]service             Service               @relation(fields: [serviceId], references: [id]) [cite: 5589, 5838, 5874, 5970]
-  [cite_start]userId              String [cite: 5589]
-  [cite_start]user                User                  @relation(fields: [userId], references: [id]) [cite: 5589]
-  [cite_start]anamnesisAnswers    AnamnesisAnswer[] [cite: 5589]
-  [cite_start]packageSessionUsage PackageSessionUsage[] [cite: 5590, 5839, 5875, 5971]
-  [cite_start]createdAt           DateTime              @default(now()) [cite: 5590, 5839, 5875, 5971]
+  id                  String                @id @default(cuid())
+  clientName          String
+  clientPhone         String
+  start               DateTime
+  end                 DateTime
+  notes               String?
+  status              AppointmentStatus     @default(SCHEDULED)
+  companyId           String
+  company             Company               @relation(fields: [companyId], references: [id])
+  serviceId           String
+  service             Service               @relation(fields: [serviceId], references: [id])
+  userId              String
+  user                User                  @relation(fields: [userId], references: [id])
+  anamnesisAnswers    AnamnesisAnswer[]
+  packageSessionUsage PackageSessionUsage[]
+  createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 }
 
@@ -108,7 +108,7 @@ model Order {
   companyId String
   company   Company     @relation(fields: [companyId], references: [id])
   clientId  String
-  [cite_start]client    Client      @relation(fields: [clientId], references: [id]) [cite: 5591, 5840, 5876, 5972]
+  client    Client      @relation(fields: [clientId], references: [id])
   userId    String
   user      User        @relation(fields: [userId], references: [id])
   items     OrderItem[]
@@ -120,10 +120,10 @@ model OrderItem {
   id        String   @id @default(cuid())
   orderId   String
   order     Order    @relation(fields: [orderId], references: [id])
-  [cite_start]serviceId String? [cite: 840]
-  service   Service? [cite_start]@relation(fields: [serviceId], references: [id]) [cite: 841, 973]
-  [cite_start]productId String? [cite: 841, 973]
-  product   Product? [cite_start]@relation(fields: [productId], references: [id]) [cite: 841, 974]
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id])
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
   quantity  Int
   price     Decimal  @db.Decimal(10, 2)
 }
@@ -131,10 +131,10 @@ model OrderItem {
 model CashierSession {
   id             String        @id @default(cuid())
   openingBalance Decimal       @db.Decimal(10, 2)
-  closingBalance Decimal?      [cite_start]@db.Decimal(10, 2) [cite: 5593, 5843, 5878, 5975]
+  closingBalance Decimal?      @db.Decimal(10, 2)
   openedAt       DateTime      @default(now())
-  [cite_start]closedAt       DateTime? [cite: 5594, 5844, 5879, 5976]
-  [cite_start]status         CashierStatus @default(OPEN) [cite: 5594, 5844, 5879, 5976]
+  closedAt       DateTime?
+  status         CashierStatus @default(OPEN)
   companyId      String
   company        Company       @relation(fields: [companyId], references: [id])
   transactions   Transaction[]
@@ -143,7 +143,7 @@ model CashierSession {
 model Transaction {
   id               String          @id @default(cuid())
   type             TransactionType
-  [cite_start]amount           Decimal         @db.Decimal(10, 2) [cite: 5595, 5845, 5880, 5977]
+  amount           Decimal         @db.Decimal(10, 2)
   description      String
   cashierSessionId String
   cashierSession   CashierSession  @relation(fields: [cashierSessionId], references: [id])
@@ -153,7 +153,7 @@ model Transaction {
 model Plan {
   id            String         @id @default(cuid())
   name          String         @unique
-  [cite_start]price         Decimal        @db.Decimal(10, 2) [cite: 5596, 5846, 5881, 5978]
+  price         Decimal        @db.Decimal(10, 2)
   features      Json
   stripePriceId String         @unique
   subscriptions Subscription[]
@@ -162,12 +162,12 @@ model Plan {
 model Subscription {
   id                   String             @id @default(cuid())
   status               SubscriptionStatus @default(INCOMPLETE)
-  [cite_start]currentPeriodEnd     DateTime? [cite: 5597, 5847, 5882, 5979]
+  currentPeriodEnd     DateTime?
   companyId            String             @unique
   company              Company            @relation(fields: [companyId], references: [id])
   planId               String
-  [cite_start]plan                 Plan               @relation(fields: [planId], references: [id]) [cite: 5598, 5848, 5883, 5980]
-  stripeSubscriptionId String?            [cite_start]@unique [cite: 5599, 5849, 5884, 5981]
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  stripeSubscriptionId String?            @unique
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 }
@@ -177,13 +177,13 @@ model Goal {
   type        GoalType
   targetValue Decimal  @db.Decimal(10, 2)
   month       Int
-  [cite_start]year        Int [cite: 5600, 5850, 5885, 5982]
+  year        Int
   companyId   String
   company     Company  @relation(fields: [companyId], references: [id])
-  [cite_start]userId      String? [cite: 5601, 5851, 5886, 5983]
-  user        User?    [cite_start]@relation(fields: [userId], references: [id]) [cite: 5601, 5851, 5886, 5983]
-  [cite_start]serviceId   String? [cite: 5602, 5852, 5887, 5984]
-  service     Service? [cite_start]@relation(fields: [serviceId], references: [id]) [cite: 5602, 5852, 5887, 5984]
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  serviceId   String?
+  service     Service? @relation(fields: [serviceId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   @@unique([month, year, companyId, userId, serviceId])
@@ -195,7 +195,7 @@ model AnamnesisForm {
   questions   Json
   companyId   String
   company     Company           @relation(fields: [companyId], references: [id])
-  [cite_start]answers     AnamnesisAnswer[] [cite: 5603, 5853, 5888, 5985]
+  answers     AnamnesisAnswer[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 }
@@ -205,10 +205,10 @@ model AnamnesisAnswer {
   formId        String
   form          AnamnesisForm @relation(fields: [formId], references: [id])
   clientId      String
-  [cite_start]client        Client        @relation(fields: [clientId], references: [id]) [cite: 5604, 5854, 5889, 5986]
+  client        Client        @relation(fields: [clientId], references: [id])
   answers       Json
-  [cite_start]appointmentId String? [cite: 5605, 5855, 5890, 5987]
-  appointment   Appointment?  [cite_start]@relation(fields: [appointmentId], references: [id]) [cite: 5605, 5855, 5890, 5987]
+  appointmentId String?
+  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
   createdAt     DateTime      @default(now())
 }
 
@@ -218,7 +218,7 @@ model Package {
   price          Decimal         @db.Decimal(10, 2)
   sessions       Int
   validityDays   Int
-  [cite_start]companyId      String [cite: 5606, 5856, 5891, 5988]
+  companyId      String
   company        Company         @relation(fields: [companyId], references: [id])
   services       Service[]       @relation("PackageServices")
   clientPackages ClientPackage[]
@@ -227,11 +227,11 @@ model Package {
 }
 
 model ClientPackage {
-  [cite_start]id                String                @id @default(cuid()) [cite: 5607, 5857, 5892, 5989]
+  id                String                @id @default(cuid())
   clientId          String
   client            Client                @relation(fields: [clientId], references: [id])
   packageId         String
-  [cite_start]package           Package               @relation(fields: [packageId], references: [id]) [cite: 5608, 5858, 5893, 5990]
+  package           Package               @relation(fields: [packageId], references: [id])
   sessionsRemaining Int
   expiresAt         DateTime
   createdAt         DateTime              @default(now())
@@ -242,9 +242,9 @@ model PackageSessionUsage {
   id              String        @id @default(cuid())
   clientPackageId String
   clientPackage   ClientPackage @relation(fields: [clientPackageId], references: [id])
-  [cite_start]usedAt          DateTime      @default(now()) [cite: 5609, 5859, 5894, 5991]
+  usedAt          DateTime      @default(now())
   appointmentId   String?
-  appointment     Appointment?  [cite_start]@relation(fields: [appointmentId], references: [id]) [cite: 5610, 5860, 5895, 5992]
+  appointment     Appointment?  @relation(fields: [appointmentId], references: [id])
   userId          String
   user            User          @relation(fields: [userId], references: [id])
 }
@@ -259,7 +259,7 @@ model Category {
 }
 
 model Brand {
-  [cite_start]id        String    @id @default(cuid()) [cite: 861, 993]
+  id        String    @id @default(cuid())
   name      String
   companyId String
   company   Company   @relation(fields: [companyId], references: [id])
@@ -271,15 +271,15 @@ model Product {
   id          String     @id @default(cuid())
   name        String
   description String?
-  [cite_start]price       Decimal    @db.Decimal(10, 2) [cite: 862, 994]
-  cost        Decimal?   [cite_start]@db.Decimal(10, 2) [cite: 863, 995]
+  price       Decimal    @db.Decimal(10, 2)
+  cost        Decimal?   @db.Decimal(10, 2)
   stock       Int        @default(0)
   companyId   String
   company     Company    @relation(fields: [companyId], references: [id])
-  [cite_start]categoryId  String? [cite: 864, 996]
-  category    Category?  [cite_start]@relation(fields: [categoryId], references: [id]) [cite: 864, 996]
-  [cite_start]brandId     String? [cite: 865, 997]
-  brand       Brand?     [cite_start]@relation(fields: [brandId], references: [id]) [cite: 865, 997]
+  categoryId  String?
+  category    Category?  @relation(fields: [categoryId], references: [id])
+  brandId     String?
+  brand       Brand?     @relation(fields: [brandId], references: [id])
   orderItems  OrderItem[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
