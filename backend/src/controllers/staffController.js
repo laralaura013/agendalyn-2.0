@@ -8,7 +8,8 @@ export const listStaff = async (req, res) => {
   try {
     const staff = await prisma.user.findMany({
       where: { companyId: req.company.id },
-      select: { id: true, name: true, email: true, role: true, showInBooking: true, workSchedule: true } // Adicionado workSchedule
+      // Adicionado 'commission' para que a gente possa ver no futuro
+      select: { id: true, name: true, email: true, role: true, showInBooking: true, workSchedule: true, commission: true }
     });
     res.status(200).json(staff);
   } catch (error) {
@@ -20,7 +21,7 @@ export const listStaff = async (req, res) => {
 // CRIAR Colaborador
 export const createStaff = async (req, res) => {
   try {
-    const { name, email, password, role, showInBooking, workSchedule } = req.body;
+    const { name, email, password, role, showInBooking, workSchedule, commission } = req.body;
     const companyId = req.company.id;
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Nome, email e senha são obrigatórios.' });
@@ -34,7 +35,8 @@ export const createStaff = async (req, res) => {
         password: hashedPassword,
         role: role || 'STAFF',
         showInBooking: typeof showInBooking === 'boolean' ? showInBooking : true,
-        workSchedule: workSchedule || {}, // Adicionado
+        workSchedule: workSchedule || {},
+        commission: commission ? parseFloat(commission) : null, // Adicionado
         companyId: companyId,
       },
     });
@@ -53,7 +55,7 @@ export const createStaff = async (req, res) => {
 export const updateStaff = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, role, password, showInBooking, workSchedule } = req.body;
+    const { name, email, role, password, showInBooking, workSchedule, commission } = req.body;
     const companyId = req.company.id;
     const updateData = { name, email, role };
 
@@ -66,10 +68,12 @@ export const updateStaff = async (req, res) => {
         updateData.showInBooking = showInBooking;
     }
     
-    // Adiciona o horário de trabalho ao objeto de atualização
     if (workSchedule) {
         updateData.workSchedule = workSchedule;
     }
+
+    // Adiciona a comissão ao objeto de atualização
+    updateData.commission = commission ? parseFloat(commission) : null;
 
     const updatedStaff = await prisma.user.update({
       where: { id: id, companyId: companyId },
