@@ -11,11 +11,10 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Se houver um token, tentamos validar e buscar os dados do usuário
     if (token) {
       api.defaults.headers.Authorization = `Bearer ${token}`;
-      // Você pode criar uma rota no backend para buscar o perfil do usuário logado
-      // Ex: api.get('/company/profile').then(response => setUser(response.data.user));
+      // Futuramente, podemos adicionar uma chamada para buscar os dados do usuário
+      // e confirmar se o token ainda é válido no servidor.
     }
     setLoading(false);
   }, [token]);
@@ -34,29 +33,27 @@ export const AuthProvider = ({ children }) => {
       navigate('/dashboard');
     } catch (error) {
       console.error('Erro no login:', error);
-      // Aqui você pode exibir uma mensagem de erro para o usuário
       alert('Email ou senha inválidos.');
     }
   };
 
   const logout = () => {
     localStorage.removeItem('token');
-    api.defaults.headers.Authorization = null;
+    delete api.defaults.headers.Authorization; // Garante a remoção do cabeçalho
     setToken(null);
     setUser(null);
-    navigate('/login');
+    navigate('/login'); // Redireciona para a página de login
   };
 
   const isAuthenticated = !!token;
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, token, loading, login, logout }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
 
-// Hook customizado para facilitar o uso do contexto
 export const useAuth = () => {
   return useContext(AuthContext);
 };
