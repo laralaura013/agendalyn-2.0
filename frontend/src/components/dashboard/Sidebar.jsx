@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 
 const menuGroups = [
-  // ... (o conteúdo de menuGroups continua exatamente o mesmo de antes)
   {
     title: 'PRINCIPAL',
     items: [
@@ -66,7 +65,7 @@ const NavItem = ({ item }) => (
     className={({ isActive }) =>
       `flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors duration-200 ${
         isActive
-          ? 'bg-gray-900 text-white'
+          ? 'bg-gray-900 text-white' // Estilo do item ativo
           : 'text-gray-300 hover:bg-gray-700 hover:text-white'
       }`
     }
@@ -76,10 +75,9 @@ const NavItem = ({ item }) => (
   </NavLink>
 );
 
-const Sidebar = ({ isMobileMenuOpen }) => { // Recebe o estado do menu
+const Sidebar = ({ isMobileMenuOpen }) => {
   const { user } = useAuth();
   return (
-    // As classes foram atualizadas para lidar com a visualização em telemóvel
     <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 text-white transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
       <div className="h-16 flex items-center justify-center text-2xl font-bold border-b border-gray-700">
         Agendalyn

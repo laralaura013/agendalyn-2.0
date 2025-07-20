@@ -1,8 +1,16 @@
+# Configurações de build para o projeto na Netlify
 [build]
+  # Onde a Netlify deve procurar os arquivos do frontend
   base = "frontend/"
+  
+  # O comando para construir o site
   command = "npm run build"
-  publish = "frontend/dist/"
+  
+  # A pasta que contém o site final a ser publicado
+  # CORREÇÃO: Usamos "dist/" em vez de "frontend/dist/" porque o "base" já é "frontend/"
+  publish = "dist/"
 
+# Regra de redirecionamento para garantir que o React Router funcione
 [[redirects]]
   from = "/*"
   to = "/index.html"
