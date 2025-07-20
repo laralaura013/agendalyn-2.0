@@ -66,7 +66,7 @@ const NavItem = ({ item }) => (
       `flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors duration-200 ${
         isActive
           ? 'bg-gray-900 text-white' // Estilo do item ativo
-          : 'text-gray-300 hover:bg-gray-700 hover:text-white' // CORREÇÃO: Usamos text-gray-300 para melhor visibilidade
+          : 'text-gray-300 hover:bg-gray-700 hover:text-white' // CORRIGIDO: Estilo do item inativo
       }`
     }
   >
