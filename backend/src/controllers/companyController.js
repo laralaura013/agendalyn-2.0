@@ -8,12 +8,12 @@ export const getCompanyProfile = async (req, res) => {
     const companyProfile = await prisma.company.findUnique({
       where: { id: companyId },
       select: {
+        id: true, // <-- LINHA ADICIONADA
         name: true,
         phone: true,
         address: true,
       }
     });
-
     if (!companyProfile) {
       return res.status(404).json({ message: 'Empresa não encontrada.' });
     }
