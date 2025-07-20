@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 
 // Importa todas as nossas rotas
 import authRoutes from './routes/authRoutes.js';
-import publicRoutes from './routes/publicRoutes.js'; // NOVO IMPORT
+import publicRoutes from './routes/publicRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
@@ -33,10 +33,17 @@ app.use(cors());
 app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
+// --- ROTA DE TESTE NA RAIZ ---
+app.get('/', (req, res) => {
+  console.log("--- DEBUG: A ROTA RAIZ (/) FOI ACEDIDA COM SUCESSO! ---");
+  res.status(200).json({ message: 'Servidor Agendalyn 2.0 está online e a responder!' });
+});
+
 // --- Uso das Rotas na API ---
-app.use('/api/public', publicRoutes); // NOVA ROTA ADICIONADA
+app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+// ... (resto das suas rotas app.use)
 app.use('/api/company', companyRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/staff', staffRoutes);
@@ -53,10 +60,6 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
 
-// Rota de teste
-app.get('/api', (req, res) => {
-  res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' });
-});
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
