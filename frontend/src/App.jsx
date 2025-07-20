@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import ReloadPrompt from './components/pwa/ReloadPrompt'; // 1. Importa o novo componente
+// import ReloadPrompt from './components/pwa/ReloadPrompt'; // 1. Removemos a importação
+
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -33,7 +34,7 @@ function App() {
           style: { background: '#333', color: '#fff' },
         }}
       />
-      <ReloadPrompt /> {/* 2. Adiciona o componente aqui */}
+      {/* <ReloadPrompt /> */} {/* 2. Removemos o componente daqui */}
       
       <Routes>
         {/* ... (o resto do seu código de rotas continua exatamente o mesmo) ... */}
