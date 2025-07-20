@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../services/api';
-import { ArrowLeft, Sparkles, Clock, Tag, User, Calendar } from 'lucide-react';
+import { ArrowLeft, Sparkles, Clock, Tag, User, Calendar, CheckCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import toast from 'react-hot-toast';
 
 const BookingPage = () => {
   const { companyId } = useParams();
@@ -15,6 +16,7 @@ const BookingPage = () => {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [customerDetails, setCustomerDetails] = useState({ name: '', phone: '', email: '' });
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -65,6 +67,33 @@ const BookingPage = () => {
   const handleSelectStaff = (staffMember) => { setSelectedStaff(staffMember); setStep(3); };
   const handleSelectSlot = (slot) => { setSelectedSlot(slot); setStep(4); };
   const handleBack = () => { setStep(prev => prev - 1); };
+
+  const handleCustomerDetailsChange = (e) => {
+    const { name, value } = e.target;
+    setCustomerDetails(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleConfirmBooking = async (e) => {
+    e.preventDefault();
+    const bookingPromise = api.post('/public/create-appointment', {
+      companyId,
+      serviceId: selectedService.id,
+      staffId: selectedStaff.id,
+      slotTime: selectedSlot.time,
+      clientName: customerDetails.name,
+      clientPhone: customerDetails.phone,
+      clientEmail: customerDetails.email,
+    });
+
+    toast.promise(bookingPromise, {
+      loading: 'A confirmar o seu agendamento...',
+      success: () => {
+        setStep(5);
+        return 'Agendamento confirmado com sucesso!';
+      },
+      error: 'Não foi possível confirmar o seu agendamento. Tente novamente.',
+    });
+  };
 
   if (loading) return <div className="flex justify-center items-center h-screen"><p>A carregar...</p></div>;
   if (error) return <div className="flex justify-center items-center h-screen"><p className="text-red-500">{error}</p></div>;
@@ -153,17 +182,44 @@ const BookingPage = () => {
             </div>
           )}
 
-          {/* Placeholder para o Passo 4 */}
+          {/* Passo 4: Confirmação e Dados do Cliente */}
           {step === 4 && (
             <div>
-              <button onClick={handleBack} className="text-sm text-gray-600 hover:text-black mb-4 flex items-center">
-                <ArrowLeft size={16} className="mr-1" /> Voltar
-              </button>
-              <h2 className="text-2xl font-semibold mb-4">Passo 4: Confirmação</h2>
-              <p>Serviço: <strong>{selectedService?.name}</strong></p>
-              <p>Profissional: <strong>{selectedStaff?.name}</strong></p>
-              <p>Horário: <strong>{selectedSlot ? format(parseISO(selectedSlot.time), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : ''}</strong></p>
-              <p className="mt-4">Vamos construir esta etapa a seguir.</p>
+              <button onClick={handleBack} className="text-sm text-gray-600 hover:text-black mb-4 flex items-center"><ArrowLeft size={16} className="mr-1" /> Voltar</button>
+              <h2 className="text-2xl font-semibold mb-4">Confirme seu Agendamento</h2>
+              <div className="p-4 bg-gray-50 rounded-md space-y-2 text-gray-700">
+                <p><strong>Serviço:</strong> {selectedService?.name}</p>
+                <p><strong>Profissional:</strong> {selectedStaff?.name}</p>
+                <p><strong>Horário:</strong> {selectedSlot ? format(parseISO(selectedSlot.time), "EEEE, dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : ''}</p>
+              </div>
+              <form onSubmit={handleConfirmBooking} className="space-y-4 mt-6">
+                <h3 className="font-semibold">Seus Dados</h3>
+                <div>
+                  <label className="block text-sm">Nome Completo</label>
+                  <input type="text" name="name" value={customerDetails.name} onChange={handleCustomerDetailsChange} className="w-full p-2 border rounded-md" required />
+                </div>
+                <div>
+                  <label className="block text-sm">Telemóvel (WhatsApp)</label>
+                  <input type="tel" name="phone" value={customerDetails.phone} onChange={handleCustomerDetailsChange} className="w-full p-2 border rounded-md" />
+                </div>
+                <div>
+                  <label className="block text-sm">Email (para receber a confirmação)</label>
+                  <input type="email" name="email" value={customerDetails.email} onChange={handleCustomerDetailsChange} className="w-full p-2 border rounded-md" />
+                </div>
+                <button type="submit" className="w-full py-3 bg-purple-700 text-white font-semibold rounded-lg hover:bg-purple-800 mt-4">
+                  Confirmar Agendamento
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Passo 5: Tela de Sucesso */}
+          {step === 5 && (
+            <div className="text-center py-10">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold">Tudo Certo!</h2>
+                <p className="text-gray-600 mt-2">O seu agendamento foi confirmado com sucesso. Você receberá um email com os detalhes em breve.</p>
+                <p className="text-sm text-gray-500 mt-6">Pode fechar esta janela.</p>
             </div>
           )}
         </main>
