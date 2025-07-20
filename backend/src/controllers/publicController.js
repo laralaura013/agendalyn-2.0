@@ -1,9 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import { startOfDay, endOfDay, parseISO, addMinutes } from 'date-fns';
+import { startOfDay, endOfDay, parseISO, addMinutes, getDay } from 'date-fns';
 import { sendAppointmentConfirmationEmail } from '../services/emailService.js';
 
 const prisma = new PrismaClient();
 
+// Função para buscar os dados iniciais da página de agendamento
 export const getBookingPageData = async (req, res) => {
     try {
         const { companyId } = req.params;
@@ -29,6 +30,7 @@ export const getBookingPageData = async (req, res) => {
     }
 };
 
+// Função para calcular os horários disponíveis com base no horário de trabalho
 export const getAvailableSlots = async (req, res) => {
     try {
         const { date, serviceId, staffId, companyId } = req.query;
@@ -38,47 +40,53 @@ export const getAvailableSlots = async (req, res) => {
         }
 
         const selectedDate = parseISO(date);
-        const dayStart = startOfDay(selectedDate);
-        const dayEnd = endOfDay(selectedDate);
+        const dayOfWeek = getDay(selectedDate); // 0 = Domingo, 1 = Segunda, ...
+        const weekDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dayName = weekDays[dayOfWeek];
 
+        const staffMember = await prisma.user.findUnique({ where: { id: staffId } });
+        if (!staffMember || !staffMember.workSchedule || !staffMember.workSchedule[dayName]?.active) {
+            return res.status(200).json([]); // Retorna lista vazia se o profissional não trabalha no dia
+        }
+
+        const workDay = staffMember.workSchedule[dayName];
+        const [startHour, startMinute] = workDay.start.split(':').map(Number);
+        const [endHour, endMinute] = workDay.end.split(':').map(Number);
+        
         const service = await prisma.service.findUnique({ where: { id: serviceId } });
         if (!service) return res.status(404).json({ message: "Serviço não encontrado." });
         const serviceDuration = service.duration;
 
+        const dayStart = startOfDay(selectedDate);
+        const dayEnd = endOfDay(selectedDate);
         const existingAppointments = await prisma.appointment.findMany({
             where: {
                 userId: staffId,
-                start: {
-                    gte: dayStart,
-                    lt: dayEnd,
-                },
+                start: { gte: dayStart, lt: dayEnd },
             },
         });
 
-        const workDayStartHour = 9;
-        const workDayEndHour = 18;
-        const interval = 30;
-
+        const interval = 15;
         const availableSlots = [];
-        let currentTime = new Date(selectedDate.setUTCHours(workDayStartHour, 0, 0, 0));
+        let currentTime = new Date(selectedDate.setUTCHours(startHour, startMinute, 0, 0));
+        const workEndTime = new Date(selectedDate.setUTCHours(endHour, endMinute, 0, 0));
 
-        while (currentTime.getUTCHours() < workDayEndHour) {
+        while (currentTime < workEndTime) {
             const slotStart = new Date(currentTime);
             const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
+
+            if (slotEnd > workEndTime) break;
 
             const isBooked = existingAppointments.some(apt => 
                 (slotStart < new Date(apt.end) && slotEnd > new Date(apt.start))
             );
 
-            if (slotEnd.getUTCHours() < workDayEndHour || (slotEnd.getUTCHours() === workDayEndHour && slotEnd.getUTCMinutes() === 0)) {
-                if (!isBooked) {
-                    availableSlots.push({ time: slotStart.toISOString() });
-                }
+            if (!isBooked) {
+                availableSlots.push({ time: slotStart.toISOString() });
             }
 
             currentTime.setUTCMinutes(currentTime.getUTCMinutes() + interval);
         }
-
         res.status(200).json(availableSlots);
 
     } catch (error) {
@@ -87,6 +95,7 @@ export const getAvailableSlots = async (req, res) => {
     }
 };
 
+// Função para que o cliente final crie um agendamento
 export const createPublicAppointment = async (req, res) => {
     try {
         const {

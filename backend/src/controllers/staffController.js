@@ -3,12 +3,12 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// LISTAR Colaboradores (agora inclui o campo showInBooking)
+// LISTAR Colaboradores
 export const listStaff = async (req, res) => {
   try {
     const staff = await prisma.user.findMany({
       where: { companyId: req.company.id },
-      select: { id: true, name: true, email: true, role: true, showInBooking: true } // Adicionado showInBooking
+      select: { id: true, name: true, email: true, role: true, showInBooking: true, workSchedule: true } // Adicionado workSchedule
     });
     res.status(200).json(staff);
   } catch (error) {
@@ -17,10 +17,10 @@ export const listStaff = async (req, res) => {
   }
 };
 
-// CRIAR Colaborador (agora inclui o campo showInBooking)
+// CRIAR Colaborador
 export const createStaff = async (req, res) => {
   try {
-    const { name, email, password, role, showInBooking } = req.body;
+    const { name, email, password, role, showInBooking, workSchedule } = req.body;
     const companyId = req.company.id;
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Nome, email e senha são obrigatórios.' });
@@ -33,7 +33,8 @@ export const createStaff = async (req, res) => {
         email,
         password: hashedPassword,
         role: role || 'STAFF',
-        showInBooking: typeof showInBooking === 'boolean' ? showInBooking : true, // Adicionado
+        showInBooking: typeof showInBooking === 'boolean' ? showInBooking : true,
+        workSchedule: workSchedule || {}, // Adicionado
         companyId: companyId,
       },
     });
@@ -48,11 +49,11 @@ export const createStaff = async (req, res) => {
   }
 };
 
-// ATUALIZAR Colaborador (agora inclui o campo showInBooking)
+// ATUALIZAR Colaborador
 export const updateStaff = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, role, password, showInBooking } = req.body;
+    const { name, email, role, password, showInBooking, workSchedule } = req.body;
     const companyId = req.company.id;
     const updateData = { name, email, role };
 
@@ -61,9 +62,13 @@ export const updateStaff = async (req, res) => {
       updateData.password = await bcrypt.hash(password, salt);
     }
     
-    // Adiciona o campo showInBooking ao objeto de atualização se ele for enviado
     if (typeof showInBooking === 'boolean') {
         updateData.showInBooking = showInBooking;
+    }
+    
+    // Adiciona o horário de trabalho ao objeto de atualização
+    if (workSchedule) {
+        updateData.workSchedule = workSchedule;
     }
 
     const updatedStaff = await prisma.user.update({
