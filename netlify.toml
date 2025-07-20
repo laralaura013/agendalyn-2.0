@@ -7,7 +7,8 @@
   command = "npm run build"
   
   # A pasta que contém o site final a ser publicado
-  publish = "frontend/dist/"
+  # CORREÇÃO: Usamos "dist/" em vez de "frontend/dist/" porque o "base" já é "frontend/"
+  publish = "dist/"
 
 # Regra de redirecionamento para garantir que o React Router funcione
 [[redirects]]
