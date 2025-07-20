@@ -1,4 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import ReloadPrompt from './components/pwa/ReloadPrompt';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -20,37 +22,18 @@ import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BrandsPage from './pages/BrandsPage';
 import SettingsPage from './pages/SettingsPage';
-import { Toaster } from 'react-hot-toast';
-import ReloadPrompt from './components/pwa/ReloadPrompt';
-import BookingPage from './pages/BookingPage'; // 1. Novo import
+import CommissionsPage from './pages/CommissionsPage'; // Novo import
 
 function App() {
   return (
     <>
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 5000,
-          style: { background: '#333', color: '#fff' },
-        }}
-      />
+      <Toaster position="top-right" toastOptions={{ duration: 5000, style: { background: '#333', color: '#fff' } }} />
       <ReloadPrompt />
-      
       <Routes>
-        {/* --- ROTAS PÚBLICAS --- */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/agendar/:companyId" element={<BookingPage />} /> {/* 2. Nova rota pública */}
-        
-        {/* --- ROTAS PROTEGIDAS --- */}
-        <Route 
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
+        <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/clients" element={<Clients />} />
@@ -67,6 +50,7 @@ function App() {
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/commissions" element={<CommissionsPage />} /> {/* Nova rota */}
         </Route>
       </Routes>
     </>
