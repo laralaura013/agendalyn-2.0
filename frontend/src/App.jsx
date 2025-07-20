@@ -1,7 +1,4 @@
 import { Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-// import ReloadPrompt from './components/pwa/ReloadPrompt'; // 1. Removemos a importação
-
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -23,6 +20,9 @@ import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BrandsPage from './pages/BrandsPage';
 import SettingsPage from './pages/SettingsPage';
+import { Toaster } from 'react-hot-toast';
+import ReloadPrompt from './components/pwa/ReloadPrompt';
+import BookingPage from './pages/BookingPage'; // 1. Novo import
 
 function App() {
   return (
@@ -34,13 +34,16 @@ function App() {
           style: { background: '#333', color: '#fff' },
         }}
       />
-      {/* <ReloadPrompt /> */} {/* 2. Removemos o componente daqui */}
+      <ReloadPrompt />
       
       <Routes>
-        {/* ... (o resto do seu código de rotas continua exatamente o mesmo) ... */}
+        {/* --- ROTAS PÚBLICAS --- */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/agendar/:companyId" element={<BookingPage />} /> {/* 2. Nova rota pública */}
+        
+        {/* --- ROTAS PROTEGIDAS --- */}
         <Route 
           element={
             <ProtectedRoute>

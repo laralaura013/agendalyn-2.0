@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 
 // Importa todas as nossas rotas
 import authRoutes from './routes/authRoutes.js';
+import publicRoutes from './routes/publicRoutes.js'; // NOVO IMPORT
 import companyRoutes from './routes/companyRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
 import staffRoutes from './routes/staffRoutes.js';
@@ -33,6 +34,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
 // --- Uso das Rotas na API ---
+app.use('/api/public', publicRoutes); // NOVA ROTA ADICIONADA
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/company', companyRoutes);
