@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { Building, User, Mail, Lock } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -10,9 +11,13 @@ const Register = () => {
     userEmail: '',
     password: '',
   });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const navigate = useNavigate();
+  
+  // O ID do seu plano de produção do Stripe
+  const stripePriceId = "price_..."; // <-- COLOQUE AQUI O SEU ID DO PREÇO REAL
+
+  const [searchParams] = useSearchParams();
+  const registrationStatus = searchParams.get('registration');
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -21,22 +26,23 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
 
-    try {
-      await api.post('/auth/register', formData);
-      setSuccess('Cadastro realizado com sucesso! Você será redirecionado para o login.');
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
-    } catch (err) {
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Ocorreu um erro ao realizar o cadastro. Tente novamente.');
-      }
+    if (!stripePriceId || stripePriceId.includes('...')) {
+        toast.error("Erro de configuração do sistema. Por favor, contacte o suporte.");
+        return;
     }
+
+    const registrationPromise = api.post('/auth/register-checkout', { ...formData, priceId: stripePriceId })
+      .then(response => {
+        // Redireciona o utilizador para a página de pagamento do Stripe
+        window.location.href = response.data.url;
+      });
+
+    toast.promise(registrationPromise, {
+      loading: 'A preparar o seu ambiente seguro...',
+      success: 'A redirecionar para o portal de pagamento!',
+      error: (err) => err.response?.data?.message || 'Não foi possível iniciar o cadastro. Tente novamente.',
+    });
   };
 
   return (
@@ -55,11 +61,14 @@ const Register = () => {
           <h2 className="text-xl text-gray-700">Crie sua conta</h2>
           <p className="mt-2 text-sm text-gray-500">Comece a organizar seu negócio hoje mesmo</p>
         </div>
+        
+        {registrationStatus === 'canceled' && (
+          <div className="p-3 bg-yellow-100 text-yellow-800 rounded-md text-sm text-center">
+            O processo de pagamento foi cancelado. Pode tentar novamente quando quiser.
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="p-3 bg-red-100 text-red-700 rounded-md text-sm">{error}</div>}
-          {success && <div className="p-3 bg-green-100 text-green-700 rounded-md text-sm">{success}</div>}
-          
+        <form onSubmit={handleSubmit} className="space-y-4">          
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Building className="h-5 w-5 text-gray-400" />
@@ -89,7 +98,7 @@ const Register = () => {
           </div>
 
           <button type="submit" className="w-full py-3 px-4 bg-purple-700 text-white font-semibold rounded-lg shadow-md hover:bg-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors">
-            Cadastrar
+            Continuar para Pagamento
           </button>
         </form>
 

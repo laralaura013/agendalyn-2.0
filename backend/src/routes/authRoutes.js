@@ -1,17 +1,12 @@
 import express from 'express';
-import { register, login } from '../controllers/authController.js';
+import { createRegistrationCheckout, login } from '../controllers/authController.js';
 
 const router = express.Router();
 
-// Rota para registrar uma nova empresa/usuário
-// POST /api/auth/register
-router.post('/register', register);
+// Nova rota para iniciar o processo de cadastro e pagamento
+router.post('/register-checkout', createRegistrationCheckout);
 
-// Rota para fazer login
-// POST /api/auth/login
+// Rota para fazer login (continua a mesma)
 router.post('/login', login);
-
-// TODO: Adicionar rota para refresh token
-// POST /api/auth/refresh
 
 export default router;
