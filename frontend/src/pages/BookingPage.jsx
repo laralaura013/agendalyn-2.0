@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import api from '../services/api';
-import { ArrowLeft, Clock, User, Sparkles, Tag, Calendar, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Sparkles, Clock, Tag, User } from 'lucide-react';
 
-// Este será o componente principal da nossa página de agendamento
 const BookingPage = () => {
-  const { companyId } = useParams(); // Pega o ID da empresa a partir do URL
-  const navigate = useNavigate();
+  const { companyId } = useParams();
 
   // Estados para controlar o fluxo
   const [step, setStep] = useState(1); // 1: Serviço, 2: Profissional, 3: Horário, 4: Confirmação
   const [selectedService, setSelectedService] = useState(null);
-  const [selectedStaff, setSelectedStaff] = useState(null);
-  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedStaff, setSelectedStaff] = useState(null); // Novo estado
 
   // Estados para guardar os dados da API
   const [loading, setLoading] = useState(true);
@@ -42,11 +39,21 @@ const BookingPage = () => {
     fetchBookingData();
   }, [companyId]);
 
-  // Função para lidar com a seleção de um serviço
+  // --- LÓGICA DE NAVEGAÇÃO E SELEÇÃO ---
   const handleSelectService = (service) => {
     setSelectedService(service);
-    setStep(2); // Avança para o próximo passo
+    setStep(2); // Avança para o passo 2
   };
+
+  const handleSelectStaff = (staffMember) => {
+    setSelectedStaff(staffMember);
+    setStep(3); // Avança para o passo 3 (que construiremos a seguir)
+  };
+
+  const handleBack = () => {
+    setStep((prevStep) => prevStep - 1); // Volta para o passo anterior
+  };
+
 
   if (loading) {
     return <div className="flex justify-center items-center h-screen"><p>A carregar informações do estabelecimento...</p></div>;
@@ -83,7 +90,7 @@ const BookingPage = () => {
                     >
                       <div>
                         <p className="font-semibold">{service.name}</p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 flex items-center">
                           <Clock size={14} className="inline mr-1" />{service.duration} min
                           <span className="mx-2">|</span>
                           <Tag size={14} className="inline mr-1" />R$ {Number(service.price).toFixed(2)}
@@ -99,8 +106,48 @@ const BookingPage = () => {
             </div>
           )}
 
-          {/* Os próximos passos (2, 3 e 4) virão aqui */}
-          
+          {/* Passo 2: Seleção de Profissional */}
+          {step === 2 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <button onClick={handleBack} className="p-2 rounded-full hover:bg-gray-100">
+                  <ArrowLeft className="h-5 w-5 text-gray-600" />
+                </button>
+                <div className="bg-purple-100 p-2 rounded-full">
+                  <User className="h-5 w-5 text-purple-700" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-semibold">Escolha um Profissional</h2>
+              </div>
+              <ul className="space-y-3">
+                {companyData.staff.map(staffMember => (
+                  <li key={staffMember.id}>
+                    <button
+                      onClick={() => handleSelectStaff(staffMember)}
+                      className="w-full text-left p-4 border rounded-md flex justify-between items-center hover:bg-gray-50 transition-colors"
+                    >
+                      <p className="font-semibold">{staffMember.name}</p>
+                      <span className="px-3 py-1 bg-purple-700 text-white text-xs font-semibold rounded-lg">
+                        Selecionar
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+           {/* Os próximos passos (3 e 4) virão aqui */}
+           {step === 3 && (
+            <div>
+              <button onClick={handleBack} className="text-sm text-gray-600 hover:text-black mb-4 flex items-center">
+                <ArrowLeft size={16} className="mr-1" /> Voltar
+              </button>
+              <h2 className="text-2xl font-semibold mb-4">Passo 3: Escolher Data e Hora</h2>
+              <p>Serviço: <strong>{selectedService?.name}</strong></p>
+              <p>Profissional: <strong>{selectedStaff?.name}</strong></p>
+              <p className="mt-4">Vamos construir esta etapa a seguir.</p>
+            </div>
+          )}
         </main>
       </div>
     </div>
