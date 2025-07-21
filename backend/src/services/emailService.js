@@ -1,24 +1,12 @@
 import { Resend } from 'resend';
 
-// Inicializa o cliente do Resend com a chave de API do ambiente
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-/**
- * Envia um email de confirmação de agendamento.
- * @param {object} appointmentDetails - Detalhes do agendamento.
- * @param {string} appointmentDetails.toEmail - Email do destinatário.
- * @param {string} appointmentDetails.clientName - Nome do cliente.
- * @param {string} appointmentDetails.serviceName - Nome do serviço agendado.
- * @param {string} appointmentDetails.staffName - Nome do profissional.
- * @param {Date} appointmentDetails.appointmentDate - Data e hora do agendamento.
- */
+// Função para enviar confirmação de agendamento (já existe)
 export const sendAppointmentConfirmationEmail = async (appointmentDetails) => {
   const { toEmail, clientName, serviceName, staffName, appointmentDate } = appointmentDetails;
-
   try {
     await resend.emails.send({
-      // Como você ainda não tem um domínio, usamos o endereço padrão do Resend.
-      // Isto funciona perfeitamente, mas o email aparecerá como "enviado via resend.dev".
       from: 'Agendalyn <onboarding@resend.dev>',
       to: toEmail,
       subject: 'Seu agendamento foi confirmado!',
@@ -41,7 +29,30 @@ export const sendAppointmentConfirmationEmail = async (appointmentDetails) => {
     console.log(`✅ Email de confirmação enviado para ${toEmail}`);
   } catch (error) {
     console.error(`❌ Erro ao enviar email de confirmação para ${toEmail}:`, error);
-    // Não retornamos um erro para a aplicação principal,
-    // pois o agendamento não deve falhar se o email falhar.
+  }
+};
+
+// --- FUNÇÃO EM FALTA ---
+// Função para enviar o link mágico de login
+export const sendMagicLinkEmail = async (details) => {
+  const { toEmail, clientName, magicLink } = details;
+  try {
+    await resend.emails.send({
+      from: 'Agendalyn <onboarding@resend.dev>',
+      to: toEmail,
+      subject: 'Seu Link de Acesso ao Portal do Cliente',
+      html: `
+        <div style="font-family: sans-serif; line-height: 1.6;">
+          <h2>Olá, ${clientName}!</h2>
+          <p>Recebemos uma solicitação de acesso ao seu portal do cliente. Clique no botão abaixo para entrar de forma segura. Este link é válido por 15 minutos.</p>
+          <a href="${magicLink}" style="display: inline-block; padding: 12px 24px; background-color: #6B21A8; color: white; text-decoration: none; border-radius: 8px;">Aceder ao Portal</a>
+          <p><small>Se você não solicitou este acesso, pode ignorar este email.</small></p>
+        </div>
+      `,
+    });
+    console.log(`✅ Email de Link Mágico enviado para ${toEmail}`);
+  } catch (error) {
+    console.error(`❌ Erro ao enviar email de link mágico para ${toEmail}:`, error);
+    throw new Error("Não foi possível enviar o email de acesso.");
   }
 };
