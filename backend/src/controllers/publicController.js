@@ -4,9 +4,29 @@ import { sendAppointmentConfirmationEmail } from '../services/emailService.js';
 
 const prisma = new PrismaClient();
 
-// ... (getBookingPageData e createPublicAppointment continuam os mesmos) ...
 export const getBookingPageData = async (req, res) => {
-    // ...código existente...
+    try {
+        const { companyId } = req.params;
+        const company = await prisma.company.findUnique({
+            where: { id: companyId },
+            select: { name: true, phone: true, address: true }
+        });
+        if (!company) {
+            return res.status(404).json({ message: "Estabelecimento não encontrado." });
+        }
+        const services = await prisma.service.findMany({
+            where: { companyId: companyId },
+            select: { id: true, name: true, price: true, duration: true }
+        });
+        const staff = await prisma.user.findMany({
+            where: { companyId: companyId, showInBooking: true },
+            select: { id: true, name: true }
+        });
+        res.status(200).json({ company, services, staff });
+    } catch (error) {
+        console.error("--- ERRO AO BUSCAR DADOS PÚBLICOS ---", error);
+        res.status(500).json({ message: "Erro ao carregar dados da página de agendamento." });
+    }
 };
 
 export const getAvailableSlots = async (req, res) => {
@@ -21,8 +41,7 @@ export const getAvailableSlots = async (req, res) => {
 
         const selectedDate = parseISO(date);
         console.log(`[2] Data parseada (UTC): ${selectedDate.toISOString()}`);
-        
-        // Usar getUTCDay() para garantir que o dia da semana é calculado em UTC, como o servidor
+
         const dayOfWeek = selectedDate.getUTCDay(); 
         const weekDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const dayName = weekDays[dayOfWeek];
@@ -96,5 +115,57 @@ export const getAvailableSlots = async (req, res) => {
 };
 
 export const createPublicAppointment = async (req, res) => {
-    // ...código existente...
+    try {
+        const {
+            companyId,
+            serviceId,
+            staffId,
+            slotTime,
+            clientName,
+            clientPhone,
+            clientEmail
+        } = req.body;
+
+        if (!companyId || !serviceId || !staffId || !slotTime || !clientName) {
+            return res.status(400).json({ message: "Todos os campos são obrigatórios." });
+        }
+
+        const service = await prisma.service.findUnique({ where: { id: serviceId } });
+        if (!service) return res.status(404).json({ message: "Serviço não encontrado." });
+
+        const staff = await prisma.user.findUnique({ where: { id: staffId } });
+        if (!staff) return res.status(404).json({ message: "Profissional não encontrado." });
+
+        const startDate = parseISO(slotTime);
+        const endDate = addMinutes(startDate, service.duration);
+
+        const newAppointment = await prisma.appointment.create({
+            data: {
+                clientName,
+                clientPhone,
+                start: startDate,
+                end: endDate,
+                companyId,
+                serviceId,
+                userId: staffId,
+                status: 'SCHEDULED',
+            },
+        });
+
+        if (clientEmail) {
+            sendAppointmentConfirmationEmail({
+                toEmail: clientEmail,
+                clientName: clientName,
+                serviceName: service.name,
+                staffName: staff.name,
+                appointmentDate: startDate,
+            });
+        }
+
+        res.status(201).json(newAppointment);
+
+    } catch (error) {
+        console.error("--- ERRO AO CRIAR AGENDAMENTO PÚBLICO ---", error);
+        res.status(500).json({ message: "Não foi possível confirmar o seu agendamento." });
+    }
 };
