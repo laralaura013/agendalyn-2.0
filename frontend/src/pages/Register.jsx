@@ -1,118 +1,95 @@
 import React, { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Building, User, Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 const Register = () => {
-  const [formData, setFormData] = useState({
-    companyName: '',
-    userName: '',
-    userEmail: '',
-    password: '',
-  });
-
-  // --- ID DO PREÇO INSERIDO ---
-  const stripePriceId = "price_1RmO42Ru0UQiqSF4YzX9jB4O";
-
-  const [searchParams] = useSearchParams();
-  const registrationStatus = searchParams.get('registration');
-
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!stripePriceId || stripePriceId.includes('...')) {
-        toast.error("Erro de configuração do sistema. Por favor, contacte o suporte.");
-        return;
-    }
-
-    const registrationPromise = api.post('/auth/register-checkout', { ...formData, priceId: stripePriceId })
-      .then(response => {
-        // Redireciona o utilizador para a página de pagamento do Stripe
-        window.location.href = response.data.url;
-      });
-
-    toast.promise(registrationPromise, {
-      loading: 'A preparar o seu ambiente seguro...',
-      success: 'A redirecionar para o portal de pagamento!',
-      error: (err) => err.response?.data?.message || 'Não foi possível iniciar o cadastro. Tente novamente.',
+    const [formData, setFormData] = useState({
+        companyName: '',
+        name: '',
+        email: '',
+        password: '',
     });
-  };
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
+    const { login } = useAuth();
 
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-lg">
-        <div className="text-center">
-          {/* Logo e Nome da Marca */}
-          <div className="flex justify-center items-center mb-4">
-             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-purple-700">
-                <path d="M8 7V6C8 4.34315 9.34315 3 11 3H13C14.6569 3 16 4.34315 16 6V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M4 10C4 8.34315 5.34315 7 7 7H17C18.6569 7 20 8.34315 20 10V18C20 19.6569 18.6569 21 17 21H7C5.34315 21 4 19.6569 4 18V10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M9 14L11 16L15 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <h1 className="ml-3 text-3xl font-bold text-gray-800">Agendalyn</h1>
-          </div>
-          <h2 className="text-xl text-gray-700">Crie sua conta</h2>
-          <p className="mt-2 text-sm text-gray-500">Comece a organizar seu negócio hoje mesmo</p>
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prevState => ({
+            ...prevState,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            // A chamada agora é para '/auth/register' e envia todos os dados de uma vez
+            const response = await api.post('/auth/register', formData);
+            
+            // Se o registo for bem-sucedido, o backend já retorna o token
+            const { token, user } = response.data;
+            login(token, user); // Usa a função de login do nosso contexto
+            
+            toast.success('Registo bem-sucedido! Bem-vindo(a)!');
+            navigate('/dashboard'); // Redireciona diretamente para o painel
+
+        } catch (error) {
+            const errorMessage = error.response?.data?.message || 'Não foi possível completar o registo. Tente novamente.';
+            toast.error(errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
+            <div className="w-full max-w-md">
+                <div className="text-center mb-8">
+                    <h1 className="text-4xl font-bold text-gray-800">Crie a sua Conta</h1>
+                    <p className="text-gray-500 mt-2">Comece a gerir o seu negócio de forma eficiente.</p>
+                </div>
+                
+                <div className="bg-white p-8 rounded-lg shadow-md">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Nome do Estabelecimento</label>
+                            <input type="text" name="companyName" value={formData.companyName} onChange={handleChange} className="mt-1 block w-full p-3 border rounded-md" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Seu Nome</label>
+                            <input type="text" name="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full p-3 border rounded-md" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Seu Melhor Email</label>
+                            <input type="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 block w-full p-3 border rounded-md" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Crie uma Senha</label>
+                            <input type="password" name="password" value={formData.password} onChange={handleChange} className="mt-1 block w-full p-3 border rounded-md" required />
+                        </div>
+                        <div>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-3 bg-purple-700 text-white font-semibold rounded-lg hover:bg-purple-800 disabled:bg-gray-400"
+                            >
+                                {loading ? 'A criar conta...' : 'Criar Conta Gratuita (14 dias)'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div className="text-center mt-6">
+                    <p className="text-sm">
+                        Já tem uma conta? <Link to="/login" className="font-medium text-purple-600 hover:underline">Faça login</Link>
+                    </p>
+                </div>
+            </div>
         </div>
-        
-        {registrationStatus === 'canceled' && (
-          <div className="p-3 bg-yellow-100 text-yellow-800 rounded-md text-sm text-center">
-            O processo de pagamento foi cancelado. Pode tentar novamente quando quiser.
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">          
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Building className="h-5 w-5 text-gray-400" />
-            </div>
-            <input type="text" name="companyName" value={formData.companyName} onChange={handleChange} className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Nome do seu Negócio" required />
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <User className="h-5 w-5 text-gray-400" />
-            </div>
-            <input type="text" name="userName" value={formData.userName} onChange={handleChange} className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Seu nome completo" required />
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-gray-400" />
-            </div>
-            <input type="email" name="userEmail" value={formData.userEmail} onChange={handleChange} className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Seu melhor email" required />
-          </div>
-
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-gray-400" />
-            </div>
-            <input type="password" name="password" value={formData.password} onChange={handleChange} className="w-full pl-10 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Crie uma senha forte" required />
-          </div>
-
-          <button type="submit" className="w-full py-3 px-4 bg-purple-700 text-white font-semibold rounded-lg shadow-md hover:bg-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors">
-            Continuar para Pagamento
-          </button>
-        </form>
-
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
-            Já tem uma conta?{' '}
-            <Link to="/login" className="font-medium text-purple-700 hover:text-purple-600">
-              Faça o login
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default Register;
