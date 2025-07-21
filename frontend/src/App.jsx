@@ -1,9 +1,14 @@
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import ReloadPrompt from './components/pwa/ReloadPrompt';
+
+// Páginas Públicas
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import BookingPage from './pages/BookingPage';
+
+// Páginas do Painel do Administrador
 import DashboardLayout from './components/dashboard/DashboardLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
@@ -22,7 +27,11 @@ import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BrandsPage from './pages/BrandsPage';
 import SettingsPage from './pages/SettingsPage';
-import CommissionsPage from './pages/CommissionsPage'; // Novo import
+import CommissionsPage from './pages/CommissionsPage';
+
+// Páginas do Portal do Cliente
+import ClientLoginPage from './pages/ClientLoginPage';
+import ClientVerifyPage from './pages/ClientVerifyPage';
 
 function App() {
   return (
@@ -30,9 +39,17 @@ function App() {
       <Toaster position="top-right" toastOptions={{ duration: 5000, style: { background: '#333', color: '#fff' } }} />
       <ReloadPrompt />
       <Routes>
+        {/* Rotas Públicas */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/agendar/:companyId" element={<BookingPage />} />
+        
+        {/* Rotas do Portal do Cliente */}
+        <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
+        <Route path="/portal/verify/:token" element={<ClientVerifyPage />} />
+
+        {/* Rotas Protegidas do Painel do Administrador */}
         <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/schedule" element={<Schedule />} />
@@ -50,7 +67,7 @@ function App() {
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/commissions" element={<CommissionsPage />} /> {/* Nova rota */}
+          <Route path="/commissions" element={<CommissionsPage />} />
         </Route>
       </Routes>
     </>
