@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -16,58 +17,62 @@ export const handleStripeWebhook = async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  console.log(`✅ Evento recebido: ${event.type}`);
-  switch (event.type) {
-    
-    case 'checkout.session.completed': {
-      const session = event.data.object;
+  // --- LÓGICA PARA CRIAR A CONTA APÓS PAGAMENTO ---
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
 
-      // --- LÓGICA ATUALIZADA PARA LIDAR COM CADASTRO ---
-      if (session.metadata && session.metadata.isRegistration === "true") {
-        const { companyName, userName, userEmail, hashedPassword } = session.metadata;
-        const stripeCustomerId = session.customer;
+    // Apenas executa se for uma sessão de registo
+    if (session.metadata.isRegistration === "true") {
+      const { companyName, userName, userEmail, password } = session.metadata;
+      const stripeCustomerId = session.customer;
 
-        try {
-          // Cria a Empresa e o primeiro Utilizador (OWNER)
-          const newCompany = await prisma.company.create({
-            data: {
-              name: companyName,
-              stripeCustomerId: stripeCustomerId,
-              users: {
-                create: {
-                  name: userName,
-                  email: userEmail,
-                  password: hashedPassword,
-                  role: 'OWNER',
-                },
+      try {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        
+        const plan = await prisma.plan.findFirst();
+        if (!plan) throw new Error("Nenhum plano encontrado para a assinatura.");
+
+        const newCompany = await prisma.company.create({
+          data: {
+            name: companyName,
+            stripeCustomerId: stripeCustomerId,
+            users: {
+              create: {
+                name: userName,
+                email: userEmail,
+                password: hashedPassword,
+                role: 'OWNER',
               },
-              // Cria a assinatura inicial
-              subscription: {
-                create: {
-                  stripeSubscriptionId: session.subscription,
-                  status: 'ACTIVE',
-                  planId: (await prisma.plan.findFirst()).id, // Assumindo um plano padrão
-                }
-              }
             },
-          });
-          console.log(`✅ Empresa e utilizador criados com sucesso para ${companyName}`);
-        } catch (dbError) {
-          console.error("--- ERRO AO CRIAR EMPRESA/UTILIZADOR NO BANCO DE DADOS VIA WEBHOOK ---", dbError);
-        }
+            subscription: {
+              create: {
+                planId: plan.id,
+                stripeSubscriptionId: session.subscription,
+                status: 'ACTIVE',
+                currentPeriodEnd: new Date(session.expires_at * 1000),
+              },
+            },
+          },
+        });
+        console.log(`✅ Empresa e utilizador criados com sucesso para ${companyName}`);
+      } catch (error) {
+        console.error("--- ERRO AO CRIAR CONTA VIA WEBHOOK ---", error);
+        return res.status(500).json({ message: "Erro ao processar o registo." });
       }
-      break;
     }
+  }
 
-    case 'customer.subscription.updated': {
-      // ... (código existente)
-      break;
-    }
-
-    case 'customer.subscription.deleted': {
-      // ... (código existente)
-      break;
-    }
+  // Lógica para atualizar ou cancelar assinaturas existentes
+  if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+    const subscription = event.data.object;
+    await prisma.subscription.update({
+      where: { stripeSubscriptionId: subscription.id },
+      data: {
+        status: subscription.status.toUpperCase(),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      },
+    });
   }
 
   res.status(200).json({ received: true });
