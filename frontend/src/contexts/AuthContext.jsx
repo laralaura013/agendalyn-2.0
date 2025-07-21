@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
                 setUser(JSON.parse(storedUser));
             } catch (error) {
                 console.error("Erro ao parsear dados do utilizador:", error);
-                localStorage.clear(); // Limpa o localStorage se os dados estiverem corrompidos
+                localStorage.clear();
             }
         }
         setLoading(false);

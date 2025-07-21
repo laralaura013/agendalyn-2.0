@@ -18,9 +18,12 @@ const Login = () => {
             const response = await api.post('/auth/login', { email, password });
             const { token, user } = response.data;
             
+            // Guarda os dados da sessão
             login(token, user); 
             
             toast.success('Login bem-sucedido!');
+            
+            // Redireciona para o painel
             navigate('/dashboard');
             
         } catch (error) {
