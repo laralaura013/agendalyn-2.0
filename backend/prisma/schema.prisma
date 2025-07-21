@@ -7,287 +7,290 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Company {
-  id                 String          @id @default(cuid())
-  name               String
-  phone              String?
-  address            String?
-  stripeCustomerId   String?         @unique
-  users              User[]
-  services           Service[]
-  appointments       Appointment[]
-  clients            Client[]
-  orders             Order[]
-  cashierSessions    CashierSession[]
-  subscription       Subscription?
-  anamnesisForms     AnamnesisForm[]
-  packages           Package[]
-  goals              Goal[]
-  products           Product[]
-  categories         Category[]
-  brands             Brand[]
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-}
-
-model User {
-  id                   String                @id @default(cuid())
-  email                String                @unique
-  name                 String
-  password             String
-  role                 Role                  @default(STAFF)
-  showInBooking        Boolean               @default(true)
-  commission           Decimal?              @db.Decimal(5, 2)
-  workSchedule         Json?
-  companyId            String
-  company              Company               @relation(fields: [companyId], references: [id])
-  appointments         Appointment[]
-  services             Service[]             @relation("ServiceToUser")
-  orders               Order[]
-  packageSessionUsages PackageSessionUsage[]
-  goals                Goal[]
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-}
-
-model Service {
-  id            String        @id @default(cuid())
-  name          String
-  price         Decimal       @db.Decimal(10, 2)
-  duration      Int
-  companyId     String
-  company       Company       @relation(fields: [companyId], references: [id])
-  appointments  Appointment[]
-  orderItems    OrderItem[]
-  availableTo   User[]        @relation("ServiceToUser")
-  packages      Package[]     @relation("PackageServices")
-  goals         Goal[]
+model AnamnesisAnswer {
+  id            String        @id
+  formId        String
+  clientId      String
+  answers       Json
+  appointmentId String?
   createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  Appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
+  Client        Client        @relation(fields: [clientId], references: [id])
+  AnamnesisForm AnamnesisForm @relation(fields: [formId], references: [id])
 }
 
-model Client {
-  id               String          @id @default(cuid())
-  name             String
-  phone            String
-  birthDate        DateTime?
-  notes            String?
-  companyId        String
-  company          Company         @relation(fields: [companyId], references: [id])
-  orders           Order[]
-  anamnesisAnswers AnamnesisAnswer[]
-  packages         ClientPackage[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+model AnamnesisForm {
+  id              String            @id
+  title           String
+  questions       Json
+  companyId       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  AnamnesisAnswer AnamnesisAnswer[]
+  Company         Company           @relation(fields: [companyId], references: [id])
 }
 
 model Appointment {
-  id                  String                @id @default(cuid())
-  clientName          String
-  clientPhone         String
+  id                  String                @id
   start               DateTime
   end                 DateTime
   notes               String?
   status              AppointmentStatus     @default(SCHEDULED)
   companyId           String
-  company             Company               @relation(fields: [companyId], references: [id])
   serviceId           String
-  service             Service               @relation(fields: [serviceId], references: [id])
   userId              String
-  user                User                  @relation(fields: [userId], references: [id])
-  anamnesisAnswers    AnamnesisAnswer[]
-  packageSessionUsage PackageSessionUsage[]
   createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  updatedAt           DateTime
+  clientId            String
+  AnamnesisAnswer     AnamnesisAnswer[]
+  Client              Client                @relation(fields: [clientId], references: [id])
+  Company             Company               @relation(fields: [companyId], references: [id])
+  Service             Service               @relation(fields: [serviceId], references: [id])
+  User                User                  @relation(fields: [userId], references: [id])
+  PackageSessionUsage PackageSessionUsage[]
 }
 
-model Order {
-  id        String      @id @default(cuid())
-  total     Decimal     @db.Decimal(10, 2)
-  status    OrderStatus @default(OPEN)
+model Brand {
+  id        String    @id
+  name      String
   companyId String
-  company   Company     @relation(fields: [companyId], references: [id])
-  clientId  String
-  client    Client      @relation(fields: [clientId], references: [id])
-  userId    String
-  user      User        @relation(fields: [userId], references: [id])
-  items     OrderItem[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-}
+  Company   Company   @relation(fields: [companyId], references: [id])
+  Product   Product[]
 
-model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id])
-  serviceId String?
-  service   Service? @relation(fields: [serviceId], references: [id])
-  productId String?
-  product   Product? @relation(fields: [productId], references: [id])
-  quantity  Int
-  price     Decimal  @db.Decimal(10, 2)
+  @@unique([name, companyId])
 }
 
 model CashierSession {
-  id             String        @id @default(cuid())
+  id             String        @id
   openingBalance Decimal       @db.Decimal(10, 2)
   closingBalance Decimal?      @db.Decimal(10, 2)
   openedAt       DateTime      @default(now())
   closedAt       DateTime?
   status         CashierStatus @default(OPEN)
   companyId      String
-  company        Company       @relation(fields: [companyId], references: [id])
-  transactions   Transaction[]
+  Company        Company       @relation(fields: [companyId], references: [id])
+  Transaction    Transaction[]
 }
 
-model Transaction {
-  id               String          @id @default(cuid())
-  type             TransactionType
-  amount           Decimal         @db.Decimal(10, 2)
-  description      String
-  cashierSessionId String
-  cashierSession   CashierSession  @relation(fields: [cashierSessionId], references: [id])
-  createdAt        DateTime        @default(now())
+model Category {
+  id        String    @id
+  name      String
+  companyId String
+  Company   Company   @relation(fields: [companyId], references: [id])
+  Product   Product[]
+
+  @@unique([name, companyId])
 }
 
-model Plan {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  price         Decimal        @db.Decimal(10, 2)
-  features      Json
-  stripePriceId String         @unique
-  subscriptions Subscription[]
+model Client {
+  id              String            @id
+  name            String
+  phone           String
+  birthDate       DateTime?
+  notes           String?
+  companyId       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  email           String?
+  password        String?
+  AnamnesisAnswer AnamnesisAnswer[]
+  Appointment     Appointment[]
+  Company         Company           @relation(fields: [companyId], references: [id])
+  ClientPackage   ClientPackage[]
+  Order           Order[]
+
+  @@unique([companyId, email])
 }
 
-model Subscription {
-  id                   String             @id @default(cuid())
-  status               SubscriptionStatus @default(INCOMPLETE)
-  currentPeriodEnd     DateTime?
-  companyId            String             @unique
-  company              Company            @relation(fields: [companyId], references: [id])
-  planId               String
-  plan                 Plan               @relation(fields: [planId], references: [id])
-  stripeSubscriptionId String?            @unique
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+model ClientPackage {
+  id                  String                @id
+  clientId            String
+  packageId           String
+  sessionsRemaining   Int
+  expiresAt           DateTime
+  createdAt           DateTime              @default(now())
+  Client              Client                @relation(fields: [clientId], references: [id])
+  Package             Package               @relation(fields: [packageId], references: [id])
+  PackageSessionUsage PackageSessionUsage[]
+}
+
+model Company {
+  id               String           @id
+  name             String
+  phone            String?
+  address          String?
+  stripeCustomerId String?          @unique
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  AnamnesisForm    AnamnesisForm[]
+  Appointment      Appointment[]
+  Brand            Brand[]
+  CashierSession   CashierSession[]
+  Category         Category[]
+  Client           Client[]
+  Goal             Goal[]
+  Order            Order[]
+  Package          Package[]
+  Product          Product[]
+  Service          Service[]
+  Subscription     Subscription?
+  User             User[]
 }
 
 model Goal {
-  id          String   @id @default(cuid())
+  id          String   @id
   type        GoalType
   targetValue Decimal  @db.Decimal(10, 2)
   month       Int
   year        Int
   companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
   userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
   serviceId   String?
-  service     Service? @relation(fields: [serviceId], references: [id])
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime
+  Company     Company  @relation(fields: [companyId], references: [id])
+  Service     Service? @relation(fields: [serviceId], references: [id])
+  User        User?    @relation(fields: [userId], references: [id])
+
   @@unique([month, year, companyId, userId, serviceId])
 }
 
-model AnamnesisForm {
-  id          String            @id @default(cuid())
-  title       String
-  questions   Json
-  companyId   String
-  company     Company           @relation(fields: [companyId], references: [id])
-  answers     AnamnesisAnswer[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+model Order {
+  id        String      @id
+  total     Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(OPEN)
+  companyId String
+  clientId  String
+  userId    String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime
+  Client    Client      @relation(fields: [clientId], references: [id])
+  Company   Company     @relation(fields: [companyId], references: [id])
+  User      User        @relation(fields: [userId], references: [id])
+  OrderItem OrderItem[]
 }
 
-model AnamnesisAnswer {
-  id            String        @id @default(cuid())
-  formId        String
-  form          AnamnesisForm @relation(fields: [formId], references: [id])
-  clientId      String
-  client        Client        @relation(fields: [clientId], references: [id])
-  answers       Json
-  appointmentId String?
-  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
-  createdAt     DateTime      @default(now())
+model OrderItem {
+  id        String   @id
+  orderId   String
+  serviceId String?
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2)
+  productId String?
+  Order     Order    @relation(fields: [orderId], references: [id])
+  Product   Product? @relation(fields: [productId], references: [id])
+  Service   Service? @relation(fields: [serviceId], references: [id])
 }
 
 model Package {
-  id             String          @id @default(cuid())
-  name           String
-  price          Decimal         @db.Decimal(10, 2)
-  sessions       Int
-  validityDays   Int
-  companyId      String
-  company        Company         @relation(fields: [companyId], references: [id])
-  services       Service[]       @relation("PackageServices")
-  clientPackages ClientPackage[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-}
-
-model ClientPackage {
-  id                String                @id @default(cuid())
-  clientId          String
-  client            Client                @relation(fields: [clientId], references: [id])
-  packageId         String
-  package           Package               @relation(fields: [packageId], references: [id])
-  sessionsRemaining Int
-  expiresAt         DateTime
-  createdAt         DateTime              @default(now())
-  sessionUsages     PackageSessionUsage[]
+  id            String          @id
+  name          String
+  price         Decimal         @db.Decimal(10, 2)
+  sessions      Int
+  validityDays  Int
+  companyId     String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  ClientPackage ClientPackage[]
+  Company       Company         @relation(fields: [companyId], references: [id])
+  Service       Service[]       @relation("PackageServices")
 }
 
 model PackageSessionUsage {
-  id              String        @id @default(cuid())
+  id              String        @id
   clientPackageId String
-  clientPackage   ClientPackage @relation(fields: [clientPackageId], references: [id])
   usedAt          DateTime      @default(now())
   appointmentId   String?
-  appointment     Appointment?  @relation(fields: [appointmentId], references: [id])
   userId          String
-  user            User          @relation(fields: [userId], references: [id])
+  Appointment     Appointment?  @relation(fields: [appointmentId], references: [id])
+  ClientPackage   ClientPackage @relation(fields: [clientPackageId], references: [id])
+  User            User          @relation(fields: [userId], references: [id])
 }
 
-model Category {
-  id        String    @id @default(cuid())
-  name      String
-  companyId String
-  company   Company   @relation(fields: [companyId], references: [id])
-  products  Product[]
-  @@unique([name, companyId])
-}
-
-model Brand {
-  id        String    @id @default(cuid())
-  name      String
-  companyId String
-  company   Company   @relation(fields: [companyId], references: [id])
-  products  Product[]
-  @@unique([name, companyId])
+model Plan {
+  id            String         @id
+  name          String         @unique
+  price         Decimal        @db.Decimal(10, 2)
+  features      Json
+  stripePriceId String         @unique
+  Subscription  Subscription[]
 }
 
 model Product {
-  id          String     @id @default(cuid())
+  id          String      @id
   name        String
   description String?
-  price       Decimal    @db.Decimal(10, 2) // Preço de Venda
-  cost        Decimal?   @db.Decimal(10, 2) // Preço de Custo
-  stock       Int        @default(0)
+  price       Decimal     @db.Decimal(10, 2)
+  cost        Decimal?    @db.Decimal(10, 2)
+  stock       Int         @default(0)
   companyId   String
-  company     Company    @relation(fields: [companyId], references: [id])
   categoryId  String?
-  category    Category?  @relation(fields: [categoryId], references: [id])
   brandId     String?
-  brand       Brand?     @relation(fields: [brandId], references: [id])
-  orderItems  OrderItem[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  OrderItem   OrderItem[]
+  Brand       Brand?      @relation(fields: [brandId], references: [id])
+  Category    Category?   @relation(fields: [categoryId], references: [id])
+  Company     Company     @relation(fields: [companyId], references: [id])
 }
 
-enum Role {
-  OWNER
-  STAFF
+model Service {
+  id          String        @id
+  name        String
+  price       Decimal       @db.Decimal(10, 2)
+  duration    Int
+  companyId   String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime
+  Appointment Appointment[]
+  Goal        Goal[]
+  OrderItem   OrderItem[]
+  Company     Company       @relation(fields: [companyId], references: [id])
+  Package     Package[]     @relation("PackageServices")
+  User        User[]
+}
+
+model Subscription {
+  id                   String             @id
+  status               SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodEnd     DateTime?
+  companyId            String             @unique
+  planId               String
+  stripeSubscriptionId String?            @unique
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime
+  Company              Company            @relation(fields: [companyId], references: [id])
+  Plan                 Plan               @relation(fields: [planId], references: [id])
+}
+
+model Transaction {
+  id               String          @id
+  type             TransactionType
+  amount           Decimal         @db.Decimal(10, 2)
+  description      String
+  cashierSessionId String
+  createdAt        DateTime        @default(now())
+  CashierSession   CashierSession  @relation(fields: [cashierSessionId], references: [id])
+}
+
+model User {
+  id                  String                @id
+  email               String                @unique
+  name                String
+  password            String
+  role                Role                  @default(STAFF)
+  commission          Decimal?              @db.Decimal(5, 2)
+  workSchedule        Json?
+  companyId           String
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  showInBooking       Boolean               @default(true)
+  Appointment         Appointment[]
+  Goal                Goal[]
+  Order               Order[]
+  PackageSessionUsage PackageSessionUsage[]
+  Company             Company               @relation(fields: [companyId], references: [id])
+  Service             Service[]
 }
 
 enum AppointmentStatus {
@@ -297,20 +300,26 @@ enum AppointmentStatus {
   COMPLETED
 }
 
+enum CashierStatus {
+  OPEN
+  CLOSED
+}
+
+enum GoalType {
+  TOTAL
+  BY_USER
+  BY_SERVICE
+}
+
 enum OrderStatus {
   OPEN
   FINISHED
   CANCELED
 }
 
-enum CashierStatus {
-  OPEN
-  CLOSED
-}
-
-enum TransactionType {
-  INCOME
-  EXPENSE
+enum Role {
+  OWNER
+  STAFF
 }
 
 enum SubscriptionStatus {
@@ -320,8 +329,7 @@ enum SubscriptionStatus {
   PAST_DUE
 }
 
-enum GoalType {
-  TOTAL
-  BY_USER
-  BY_SERVICE
+enum TransactionType {
+  INCOME
+  EXPENSE
 }
