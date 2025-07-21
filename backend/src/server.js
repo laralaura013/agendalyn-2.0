@@ -63,7 +63,6 @@ app.get('/api', (req, res) => {
 });
 
 // --- ROTA DE HEALTH CHECK PARA A RAILWAY ---
-// Esta rota responde à Railway que o servidor está online e saudável.
 app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' });
 });
