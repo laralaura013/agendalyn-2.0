@@ -3,12 +3,11 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// LISTAR Colaboradores
+// Listar Colaboradores
 export const listStaff = async (req, res) => {
   try {
     const staff = await prisma.user.findMany({
       where: { companyId: req.company.id },
-      // Adicionado 'commission' para que a gente possa ver no futuro
       select: { id: true, name: true, email: true, role: true, showInBooking: true, workSchedule: true, commission: true }
     });
     res.status(200).json(staff);
@@ -18,7 +17,7 @@ export const listStaff = async (req, res) => {
   }
 };
 
-// CRIAR Colaborador
+// Criar Colaborador
 export const createStaff = async (req, res) => {
   try {
     const { name, email, password, role, showInBooking, workSchedule, commission } = req.body;
@@ -36,7 +35,7 @@ export const createStaff = async (req, res) => {
         role: role || 'STAFF',
         showInBooking: typeof showInBooking === 'boolean' ? showInBooking : true,
         workSchedule: workSchedule || {},
-        commission: commission ? parseFloat(commission) : null, // Adicionado
+        commission: commission ? parseFloat(commission) : null,
         companyId: companyId,
       },
     });
@@ -51,29 +50,26 @@ export const createStaff = async (req, res) => {
   }
 };
 
-// ATUALIZAR Colaborador
+// ATUALIZAR Colaborador (LÓGICA CORRIGIDA)
 export const updateStaff = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, role, password, showInBooking, workSchedule, commission } = req.body;
     const companyId = req.company.id;
-    const updateData = { name, email, role };
-
+    
+    // CORREÇÃO: Construímos o objeto de atualização de forma segura,
+    // apenas com os campos que realmente recebemos.
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (role) updateData.role = role;
+    if (typeof showInBooking === 'boolean') updateData.showInBooking = showInBooking;
+    if (workSchedule) updateData.workSchedule = workSchedule;
+    if (commission !== undefined) updateData.commission = commission ? parseFloat(commission) : null;
     if (password) {
       const salt = await bcrypt.genSalt(10);
       updateData.password = await bcrypt.hash(password, salt);
     }
-    
-    if (typeof showInBooking === 'boolean') {
-        updateData.showInBooking = showInBooking;
-    }
-    
-    if (workSchedule) {
-        updateData.workSchedule = workSchedule;
-    }
-
-    // Adiciona a comissão ao objeto de atualização
-    updateData.commission = commission ? parseFloat(commission) : null;
 
     const updatedStaff = await prisma.user.update({
       where: { id: id, companyId: companyId },
@@ -87,7 +83,7 @@ export const updateStaff = async (req, res) => {
   }
 };
 
-// DELETAR Colaborador
+// Deletar Colaborador
 export const deleteStaff = async (req, res) => {
   try {
     const { id } = req.params;
