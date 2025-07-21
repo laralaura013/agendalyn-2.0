@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { addDays } from 'date-fns'; // Importa a função para adicionar dias
+import { addDays } from 'date-fns';
 
 const prisma = new PrismaClient();
 
@@ -21,29 +21,21 @@ export const register = async (req, res) => {
     }
 
     const newCompany = await prisma.company.create({
-      data: {
-        name: companyName,
-      }
+      data: { name: companyName }
     });
 
-    // Encontra o plano "PRO" que já deve existir no seu banco de dados
-    const proPlan = await prisma.plan.findUnique({
-      where: { name: 'PRO' },
-    });
+    const proPlan = await prisma.plan.findUnique({ where: { name: 'PRO' } });
     if (!proPlan) {
-      // Se o plano não existir no banco de dados, esta é uma falha crítica
       console.error("ERRO CRÍTICO: O plano 'PRO' não foi encontrado no banco de dados.");
       return res.status(500).json({ message: 'Erro de configuração do sistema: Plano PRO não encontrado.' });
     }
 
-    // --- LÓGICA DO PERÍODO DE TESTE ---
-    // Cria uma assinatura JÁ ATIVA com um período de teste de 14 dias.
     await prisma.subscription.create({
       data: {
         companyId: newCompany.id,
         planId: proPlan.id,
-        status: 'ACTIVE', // A assinatura começa ATIVA
-        currentPeriodEnd: addDays(new Date(), 14), // Define o fim do teste para 14 dias a partir de agora
+        status: 'ACTIVE',
+        currentPeriodEnd: addDays(new Date(), 14),
       },
     });
 
@@ -75,7 +67,6 @@ export const register = async (req, res) => {
     res.status(500).json({ message: 'Erro ao registar novo utilizador.' });
   }
 };
-
 
 export const login = async (req, res) => {
   try {

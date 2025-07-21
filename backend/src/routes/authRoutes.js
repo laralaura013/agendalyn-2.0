@@ -1,12 +1,9 @@
 import express from 'express';
-import { createRegistrationCheckout, login } from '../controllers/authController.js';
+import { register, login } from '../controllers/authController.js'; // Corrigido
 
 const router = express.Router();
 
-// Nova rota para iniciar o processo de cadastro e pagamento
-router.post('/register-checkout', createRegistrationCheckout);
-
-// Rota para fazer login (continua a mesma)
+router.post('/register', register); // Corrigido
 router.post('/login', login);
 
 export default router;
