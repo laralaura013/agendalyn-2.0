@@ -3,7 +3,7 @@ import { getBookingPageData, getAvailableSlots, createPublicAppointment } from '
 
 const router = express.Router();
 
-router.get('/booking-page/:companyId', getBookingPageData);
+router.get('/booking-page/:companyId', getBookingPageData); // A rota está aqui
 router.get('/available-slots', getAvailableSlots);
 router.post('/create-appointment', createPublicAppointment);
 

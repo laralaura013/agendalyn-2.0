@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
+  // URL forçada para depuração
   baseURL: 'https://agendalyn-20-production.up.railway.app/api', 
 });
 
