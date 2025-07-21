@@ -22,7 +22,7 @@ import productRoutes from './routes/productRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import brandRoutes from './routes/brandRoutes.js';
 import commissionRoutes from './routes/commissionRoutes.js';
-import publicRoutes from './routes/publicRoutes.js'; // Rota da pág. de agendamento
+import publicRoutes from './routes/publicRoutes.js';
 import clientPortalRoutes from './routes/clientPortalRoutes.js';
 
 dotenv.config();
@@ -37,7 +37,7 @@ app.use(express.json());
 
 // --- Uso das Rotas na API ---
 app.use('/api/portal', clientPortalRoutes);
-app.use('/api/public', publicRoutes); // A rota está aqui
+app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/company', companyRoutes);
@@ -62,7 +62,8 @@ app.get('/api', (req, res) => {
   res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' });
 });
 
-// Rota de Health Check para a Railway
+// --- ROTA DE HEALTH CHECK PARA A RAILWAY ---
+// Esta rota responde à Railway que o servidor está online e saudável.
 app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' });
 });
