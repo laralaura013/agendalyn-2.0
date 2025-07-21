@@ -1,59 +1,50 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+    const [user, setUser] = useState(null);
+    const [token, setToken] = useState(localStorage.getItem('token'));
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    if (token) {
-      api.defaults.headers.Authorization = `Bearer ${token}`;
-      // Futuramente, podemos adicionar uma chamada para buscar os dados do usuário
-      // e confirmar se o token ainda é válido no servidor.
-    }
-    setLoading(false);
-  }, [token]);
+    useEffect(() => {
+        const storedToken = localStorage.getItem('token');
+        const storedUser = localStorage.getItem('user');
+        
+        if (storedToken && storedUser) {
+            setToken(storedToken);
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch (error) {
+                console.error("Erro ao parsear dados do utilizador:", error);
+                localStorage.clear(); // Limpa o localStorage se os dados estiverem corrompidos
+            }
+        }
+        setLoading(false);
+    }, []);
 
-  const login = async (email, password) => {
-    try {
-      const response = await api.post('/auth/login', { email, password });
-      const { accessToken, user: userData } = response.data;
+    const login = (newToken, userData) => {
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user', JSON.stringify(userData));
+        setToken(newToken);
+        setUser(userData);
+    };
 
-      localStorage.setItem('token', accessToken);
-      api.defaults.headers.Authorization = `Bearer ${accessToken}`;
-      
-      setToken(accessToken);
-      setUser(userData);
-      
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Erro no login:', error);
-      alert('Email ou senha inválidos.');
-    }
-  };
+    const logout = () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setToken(null);
+        setUser(null);
+        navigate('/login');
+    };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    delete api.defaults.headers.Authorization; // Garante a remoção do cabeçalho
-    setToken(null);
-    setUser(null);
-    navigate('/login'); // Redireciona para a página de login
-  };
-
-  const isAuthenticated = !!token;
-
-  return (
-    <AuthContext.Provider value={{ isAuthenticated, user, token, loading, login, logout }}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+    return (
+        <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);
