@@ -1,18 +1,26 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Alteração: Agora ele recebe 'children' como propriedade
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+    const { token, loading } = useAuth();
+    const location = useLocation();
 
-  if (loading) {
-    return <div>Carregando...</div>;
-  }
+    // Enquanto a aplicação está a verificar se existe um token guardado,
+    // mostramos uma mensagem de "A carregar..." para evitar o "loop".
+    if (loading) {
+        return <div>A carregar sessão...</div>;
+    }
 
-  // Se estiver autenticado, renderiza os 'children' (que serão nossas rotas)
-  // Se não, redireciona para a página de login
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+    // Se o carregamento terminou e NÃO existe um token,
+    // redirecionamos para a página de login.
+    if (!token) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    // Se o carregamento terminou e EXISTE um token,
+    // mostramos a página que o utilizador queria aceder.
+    return children;
 };
 
 export default ProtectedRoute;
