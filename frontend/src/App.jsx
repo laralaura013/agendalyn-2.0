@@ -41,7 +41,6 @@ function App() {
       <Toaster position="top-right" toastOptions={{ duration: 5000, style: { background: '#333', color: '#fff' } }} />
       <ReloadPrompt />
       <Routes>
-        {/* Rotas Públicas */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -50,12 +49,10 @@ function App() {
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
 
-        {/* Rotas Protegidas do Portal do Cliente */}
         <Route element={<ClientProtectedRoute />}>
           <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
         </Route>
 
-        {/* Rotas Protegidas do Painel do Administrador */}
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />

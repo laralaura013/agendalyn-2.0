@@ -1,25 +1,16 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 
-const ProtectedRoute = () => {
-    const { token, loading } = useAuth();
+const ClientProtectedRoute = () => {
+    const clientToken = localStorage.getItem('clientToken');
 
-    // Enquanto a aplicação está a verificar se existe um token guardado,
-    // mostramos uma mensagem de "A carregar..." para evitar o "loop".
-    if (loading) {
-        return <div>A carregar sessão...</div>;
+    // Se não houver token, redireciona para a página inicial.
+    if (!clientToken) {
+        return <Navigate to="/" replace />;
     }
 
-    // Se o carregamento terminou e NÃO existe um token,
-    // redirecionamos para a página de login.
-    if (!token) {
-        return <Navigate to="/login" replace />;
-    }
-
-    // Se o carregamento terminou e EXISTE um token,
-    // renderiza a página filha (o DashboardLayout com o seu conteúdo).
+    // Se houver token, renderiza a página filha (o <Outlet /> representa a página do painel).
     return <Outlet />;
 };
 
-export default ProtectedRoute;
+export default ClientProtectedRoute;
