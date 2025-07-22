@@ -32,8 +32,6 @@ import CommissionsPage from './pages/CommissionsPage';
 // Páginas do Portal do Cliente
 import ClientLoginPage from './pages/ClientLoginPage';
 import ClientVerifyPage from './pages/ClientVerifyPage';
-import ClientProtectedRoute from './components/auth/ClientProtectedRoute';
-import ClientDashboardPage from './pages/ClientDashboardPage';
 
 function App() {
   return (
@@ -47,14 +45,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/agendar/:companyId" element={<BookingPage />} />
         
-        {/* Rotas de Login do Portal do Cliente */}
+        {/* Rotas do Portal do Cliente */}
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/verify/:token" element={<ClientVerifyPage />} />
-
-        {/* Rotas Protegidas do Portal do Cliente */}
-        <Route element={<ClientProtectedRoute />}>
-          <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
-        </Route>
 
         {/* Rotas Protegidas do Painel do Administrador */}
         <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
