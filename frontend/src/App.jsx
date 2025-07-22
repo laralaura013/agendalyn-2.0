@@ -41,6 +41,7 @@ function App() {
       <Toaster position="top-right" toastOptions={{ duration: 5000, style: { background: '#333', color: '#fff' } }} />
       <ReloadPrompt />
       <Routes>
+        {/* Rotas Públicas */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -49,28 +50,32 @@ function App() {
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
 
+        {/* Rotas Protegidas do Portal do Cliente */}
         <Route element={<ClientProtectedRoute />}>
           <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
         </Route>
 
-        <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/schedule" element={<Schedule />} />
-          <Route path="/clients" element={<Clients />} />
-          <Route path="/staff" element={<Staff />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/cashier" element={<Cashier />} />
-          <Route path="/subscription" element={<SubscriptionPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/goals" element={<GoalsPage />} />
-          <Route path="/anamnesis" element={<AnamnesisPage />} />
-          <Route path="/packages" element={<PackagesPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/categories" element={<CategoriesPage />} />
-          <Route path="/brands" element={<BrandsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/commissions" element={<CommissionsPage />} />
+        {/* Rotas Protegidas do Painel do Administrador */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<DashboardLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/schedule" element={<Schedule />} />
+            <Route path="/clients" element={<Clients />} />
+            <Route path="/staff" element={<Staff />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/cashier" element={<Cashier />} />
+            <Route path="/subscription" element={<SubscriptionPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/goals" element={<GoalsPage />} />
+            <Route path="/anamnesis" element={<AnamnesisPage />} />
+            <Route path="/packages" element={<PackagesPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/brands" element={<BrandsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/commissions" element={<CommissionsPage />} />
+          </Route>
         </Route>
       </Routes>
     </>
