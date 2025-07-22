@@ -3,7 +3,6 @@ import { parseISO, startOfDay, endOfDay } from 'date-fns';
 
 const prisma = new PrismaClient();
 
-// Relatório de Receitas
 export const getRevenueReport = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
@@ -28,45 +27,38 @@ export const getRevenueReport = async (req, res) => {
                         service: true,
                         product: true,
                     }
-                }
+                },
+                user: true, // Inclui os dados do colaborador
             }
         });
 
         const totalRevenue = finishedOrders.reduce((sum, order) => sum + Number(order.total), 0);
-        const totalOrders = finishedOrders.length;
-        const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-        const salesByType = { services: 0, products: 0 };
-        const salesByItem = {};
+        
+        const revenueByStaffMap = {};
+        const revenueByServiceMap = {};
 
         finishedOrders.forEach(order => {
+            // Calcula faturamento por colaborador
+            if (order.user) {
+                revenueByStaffMap[order.user.name] = (revenueByStaffMap[order.user.name] || 0) + Number(order.total);
+            }
+
+            // Calcula faturamento por serviço
             order.items.forEach(item => {
-                // --- AQUI ESTÁ A CORREÇÃO ---
-                // Verificamos se o serviço ou produto ainda existe antes de o processar.
                 if (item.service) {
-                    const itemName = item.service.name;
-                    salesByType.services += Number(item.price) * item.quantity;
-                    salesByItem[itemName] = (salesByItem[itemName] || 0) + (Number(item.price) * item.quantity);
-                } else if (item.product) {
-                    const itemName = item.product.name;
-                    salesByType.products += Number(item.price) * item.quantity;
-                    salesByItem[itemName] = (salesByItem[itemName] || 0) + (Number(item.price) * item.quantity);
+                    revenueByServiceMap[item.service.name] = (revenueByServiceMap[item.service.name] || 0) + (Number(item.price) * item.quantity);
                 }
-                // Se nem item.service nem item.product existirem, o item é ignorado.
             });
         });
 
-        const topItems = Object.entries(salesByItem)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 5)
-            .map(([name, revenue]) => ({ name, revenue }));
+        // Formata os dados para os gráficos
+        const revenueByStaff = Object.entries(revenueByStaffMap).map(([name, value]) => ({ name, value }));
+        const revenueByService = Object.entries(revenueByServiceMap).map(([name, value]) => ({ name, value }));
 
         res.status(200).json({
             totalRevenue,
-            totalOrders,
-            averageTicket,
-            salesByType,
-            topItems,
+            revenueByStaff,
+            revenueByService,
         });
 
     } catch (error) {
