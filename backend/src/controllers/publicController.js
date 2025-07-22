@@ -32,65 +32,47 @@ export const getBookingPageData = async (req, res) => {
 export const getAvailableSlots = async (req, res) => {
     try {
         const { date, serviceId, staffId } = req.query;
-
         if (!date || !serviceId || !staffId) {
             return res.status(400).json({ message: "Data, serviço e profissional são obrigatórios." });
         }
-
         const selectedDate = parseISO(date);
-        
-        // CORREÇÃO: Usar getUTCDay() para que o dia da semana seja consistente com o servidor
-        const dayOfWeek = selectedDate.getUTCDay(); 
+        const dayOfWeek = selectedDate.getUTCDay();
         const weekDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const dayName = weekDays[dayOfWeek];
-
         const staffMember = await prisma.user.findUnique({ where: { id: staffId } });
-
         if (!staffMember || !staffMember.workSchedule || !staffMember.workSchedule[dayName]?.active) {
             return res.status(200).json([]);
         }
-
         const workDay = staffMember.workSchedule[dayName];
         const [startHour, startMinute] = workDay.start.split(':').map(Number);
         const [endHour, endMinute] = workDay.end.split(':').map(Number);
-        
         const service = await prisma.service.findUnique({ where: { id: serviceId } });
         if (!service) return res.status(404).json({ message: "Serviço não encontrado." });
         const serviceDuration = service.duration;
-
         const dayStart = startOfDay(selectedDate);
         const dayEnd = endOfDay(selectedDate);
         const existingAppointments = await prisma.appointment.findMany({
             where: { userId: staffId, start: { gte: dayStart, lt: dayEnd } },
         });
-
         const interval = 15;
         const availableSlots = [];
         let currentTime = new Date(selectedDate);
         currentTime.setUTCHours(startHour, startMinute, 0, 0);
-
         const workEndTime = new Date(selectedDate);
         workEndTime.setUTCHours(endHour, endMinute, 0, 0);
-
         while (currentTime < workEndTime) {
             const slotStart = new Date(currentTime);
             const slotEnd = new Date(slotStart.getTime() + serviceDuration * 60000);
-
             if (slotEnd > workEndTime) break;
-
-            const isBooked = existingAppointments.some(apt => 
+            const isBooked = existingAppointments.some(apt =>
                 (slotStart < new Date(apt.end) && slotEnd > new Date(apt.start))
             );
-
             if (!isBooked) {
                 availableSlots.push({ time: slotStart.toISOString() });
             }
-
             currentTime.setUTCMinutes(currentTime.getUTCMinutes() + interval);
         }
-        
         res.status(200).json(availableSlots);
-
     } catch (error) {
         console.error("--- ERRO AO CALCULAR HORÁRIOS ---", error);
         res.status(500).json({ message: "Erro ao calcular horários disponíveis." });
@@ -100,22 +82,38 @@ export const getAvailableSlots = async (req, res) => {
 export const createPublicAppointment = async (req, res) => {
     try {
         const {
-            companyId,
-            serviceId,
-            staffId,
-            slotTime,
-            clientName,
-            clientPhone,
-            clientEmail
+            companyId, serviceId, staffId, slotTime,
+            clientName, clientPhone, clientEmail
         } = req.body;
 
         if (!companyId || !serviceId || !staffId || !slotTime || !clientName) {
             return res.status(400).json({ message: "Todos os campos são obrigatórios." });
         }
 
+        let client;
+        if (clientEmail) {
+            client = await prisma.client.findFirst({
+                where: {
+                    email: { equals: clientEmail, mode: 'insensitive' },
+                    companyId: companyId
+                }
+            });
+        }
+
+        if (!client) {
+            client = await prisma.client.create({
+                data: {
+                    name: clientName,
+                    phone: clientPhone || '',
+                    email: clientEmail,
+                    companyId: companyId,
+                }
+            });
+        }
+
         const service = await prisma.service.findUnique({ where: { id: serviceId } });
         if (!service) return res.status(404).json({ message: "Serviço não encontrado." });
-
+        
         const staff = await prisma.user.findUnique({ where: { id: staffId } });
         if (!staff) return res.status(404).json({ message: "Profissional não encontrado." });
 
@@ -124,10 +122,10 @@ export const createPublicAppointment = async (req, res) => {
 
         const newAppointment = await prisma.appointment.create({
             data: {
-                clientName,
-                clientPhone,
+                clientId: client.id,
                 start: startDate,
                 end: endDate,
+                notes: 'Agendado pelo cliente online',
                 companyId,
                 serviceId,
                 userId: staffId,
@@ -138,13 +136,12 @@ export const createPublicAppointment = async (req, res) => {
         if (clientEmail) {
             sendAppointmentConfirmationEmail({
                 toEmail: clientEmail,
-                clientName: clientName,
+                clientName: client.name,
                 serviceName: service.name,
                 staffName: staff.name,
                 appointmentDate: startDate,
             });
         }
-
         res.status(201).json(newAppointment);
 
     } catch (error) {

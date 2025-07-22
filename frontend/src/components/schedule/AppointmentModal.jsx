@@ -1,106 +1,122 @@
 import React, { useState, useEffect } from 'react';
+import Modal from '../dashboard/Modal';
 
-const AppointmentModal = ({ isOpen, onClose, onSave, onDelete, event, slot, services, staff }) => {
+const AppointmentModal = ({ isOpen, onClose, onSave, onDelete, event, slot, clients, services, staff }) => {
   const [formData, setFormData] = useState({
-    clientName: '',
-    clientPhone: '',
-    clientEmail: '', // Novo campo
+    clientId: '',
     serviceId: '',
     userId: '',
-    notes: ''
+    start: new Date(),
+    notes: '',
+    status: 'SCHEDULED',
   });
 
   useEffect(() => {
     if (event) {
-      // Se estamos a editar um evento existente
       setFormData({
-        clientName: event.clientName || '',
-        clientPhone: event.clientPhone || '',
-        clientEmail: event.clientEmail || '', // Adicionado para edição
+        clientId: event.clientId || '',
         serviceId: event.serviceId || '',
         userId: event.userId || '',
-        notes: event.notes || ''
+        start: new Date(event.start),
+        notes: event.notes || '',
+        status: event.status || 'SCHEDULED',
       });
     } else if (slot) {
-      // Se estamos a criar um novo evento
-      setFormData({ clientName: '', clientPhone: '', clientEmail: '', serviceId: '', userId: '', notes: '' });
+      setFormData(prev => ({ ...prev, start: new Date(slot.start) }));
     }
   }, [event, slot]);
-
-  if (!isOpen) return null;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const finalData = { ...formData, start: event?.start || slot?.start };
-    onSave(finalData);
+  const handleDateChange = (e) => {
+    const date = e.target.value;
+    const time = formData.start.toTimeString().split(' ')[0];
+    setFormData(prev => ({ ...prev, start: new Date(`${date}T${time}`) }));
+  };
+  
+  const handleTimeChange = (e) => {
+    const time = e.target.value;
+    const date = formData.start.toISOString().split('T')[0];
+    setFormData(prev => ({ ...prev, start: new Date(`${date}T${time}`) }));
   };
 
-  const title = event ? 'Editar Agendamento' : 'Novo Agendamento';
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ ...formData, start: formData.start.toISOString() });
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-      <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6">{title}</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <h2 className="text-2xl font-bold">{event ? 'Editar Agendamento' : 'Novo Agendamento'}</h2>
+        
+        <div>
+          <label className="block text-sm">Cliente</label>
+          <select name="clientId" value={formData.clientId} onChange={handleChange} className="w-full p-2 border rounded" required>
+            <option value="">Selecione um cliente</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Nome do Cliente</label>
-            <input type="text" name="clientName" value={formData.clientName} onChange={handleChange} className="w-full p-2 border rounded" required />
+            <label className="block text-sm">Data</label>
+            <input type="date" value={formData.start.toISOString().split('T')[0]} onChange={handleDateChange} className="w-full p-2 border rounded" />
           </div>
+          <div>
+            <label className="block text-sm">Hora</label>
+            <input type="time" value={formData.start.toTimeString().split(' ')[0].substring(0,5)} onChange={handleTimeChange} className="w-full p-2 border rounded" />
+          </div>
+        </div>
 
-          {/* Novo campo de Email do Cliente */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Email do Cliente (para notificação)</label>
-            <input type="email" name="clientEmail" value={formData.clientEmail} onChange={handleChange} className="w-full p-2 border rounded" />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Telefone do Cliente</label>
-            <input type="tel" name="clientPhone" value={formData.clientPhone} onChange={handleChange} className="w-full p-2 border rounded" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Serviço</label>
-            <select name="serviceId" value={formData.serviceId} onChange={handleChange} className="w-full p-2 border rounded" required>
-              <option value="">Selecione um serviço</option>
-              {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Colaborador</label>
-             <select name="userId" value={formData.userId} onChange={handleChange} className="w-full p-2 border rounded" required>
-              <option value="">Selecione um colaborador</option>
-              {staff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Notas</label>
-            <textarea name="notes" value={formData.notes} onChange={handleChange} className="w-full p-2 border rounded" rows="2"></textarea>
-          </div>
+        <div>
+          <label className="block text-sm">Serviço</label>
+          <select name="serviceId" value={formData.serviceId} onChange={handleChange} className="w-full p-2 border rounded" required>
+            <option value="">Selecione um serviço</option>
+            {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
 
-          <div className="flex justify-between items-center gap-4 mt-8">
-            <div>
-              {event && (
-                <button 
-                  type="button" 
-                  onClick={() => onDelete(event.id)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                >
-                  Excluir
+        <div>
+          <label className="block text-sm">Colaborador</label>
+          <select name="userId" value={formData.userId} onChange={handleChange} className="w-full p-2 border rounded" required>
+            <option value="">Selecione um colaborador</option>
+            {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm">Status</label>
+          <select name="status" value={formData.status} onChange={handleChange} className="w-full p-2 border rounded">
+            <option value="SCHEDULED">Agendado</option>
+            <option value="CONFIRMED">Confirmado</option>
+            <option value="COMPLETED">Finalizado</option>
+            <option value="CANCELED">Cancelado</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm">Observações</label>
+          <textarea name="notes" value={formData.notes} onChange={handleChange} className="w-full p-2 border rounded" rows="2"></textarea>
+        </div>
+
+        <div className="flex justify-between items-center pt-4">
+            {event && (
+                <button type="button" onClick={() => onDelete(event.id)} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                    Excluir
                 </button>
-              )}
+            )}
+            <div className="flex-grow"></div>
+            <div className="flex justify-end gap-4">
+                <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 rounded-md">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-purple-700 text-white rounded-md">Salvar</button>
             </div>
-            <div className="flex gap-4">
-              <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400">Cancelar</button>
-              <button type="submit" className="px-4 py-2 bg-purple-700 text-white rounded-md hover:bg-purple-800">Salvar</button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Modal>
   );
 };
 
