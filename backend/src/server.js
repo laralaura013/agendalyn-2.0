@@ -30,16 +30,13 @@ const app = express();
 
 const PORT = process.env.PORT || 3001;
 
-// --- CONFIGURAÇÃO DO CORS ---
-// Lista de endereços que têm permissão para aceder à nossa API
 const allowedOrigins = [
   'https://frontlyn.netlify.app',
-  'http://localhost:5173', // Para os seus testes locais
+  'http://localhost:5173',
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Permite pedidos sem 'origin' (como apps mobile ou Postman) ou da nossa lista
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -49,12 +46,12 @@ const corsOptions = {
 };
 
 // Middlewares
-app.use(cors(corsOptions)); // Usa as nossas novas opções de CORS
+app.use(cors(corsOptions));
 app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
 // --- Uso das Rotas na API ---
-app.use('/api/portal', clientPortalRoutes);
+app.use('/api/portal', clientPortalRoutes); // Garante que a rota do portal está a ser usada
 app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);

@@ -12,12 +12,7 @@ export const registerClient = async (req, res) => {
             return res.status(400).json({ message: "Todos os campos são obrigatórios." });
         }
 
-        const clientExists = await prisma.client.findFirst({ 
-            where: { 
-                email: { equals: email, mode: 'insensitive' }, 
-                companyId 
-            } 
-        });
+        const clientExists = await prisma.client.findFirst({ where: { email, companyId } });
         if (clientExists) {
             return res.status(409).json({ message: "Este email já está registado." });
         }
@@ -31,7 +26,7 @@ export const registerClient = async (req, res) => {
                 email,
                 password: hashedPassword,
                 companyId,
-                phone: '', // Telefone pode ser adicionado depois pelo cliente
+                phone: '',
             }
         });
 
@@ -50,12 +45,7 @@ export const loginClient = async (req, res) => {
             return res.status(400).json({ message: "Email, senha e ID da empresa são obrigatórios." });
         }
 
-        const client = await prisma.client.findFirst({ 
-            where: { 
-                email: { equals: email, mode: 'insensitive' }, 
-                companyId 
-            } 
-        });
+        const client = await prisma.client.findFirst({ where: { email, companyId } });
 
         if (client && client.password && (await bcrypt.compare(password, client.password))) {
             const sessionToken = jwt.sign(
@@ -81,14 +71,12 @@ export const loginClient = async (req, res) => {
 // Busca os agendamentos do cliente autenticado
 export const getMyAppointments = async (req, res) => {
     try {
-        const clientId = req.client.id; // Vem do middleware de autenticação
+        const clientId = req.client.id;
 
         const appointments = await prisma.appointment.findMany({
             where: {
                 clientId: clientId,
-                start: {
-                    gte: new Date(), // Busca apenas agendamentos futuros
-                },
+                start: { gte: new Date() },
             },
             include: {
                 service: { select: { name: true } },

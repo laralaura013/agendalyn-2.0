@@ -4,11 +4,11 @@ import { protectClient } from '../middlewares/clientAuthMiddleware.js';
 
 const router = express.Router();
 
-// Novas rotas públicas
+// Rotas públicas para registo e login com senha
 router.post('/register', registerClient);
 router.post('/login', loginClient);
 
-// Rotas protegidas (apenas para clientes autenticados)
+// Rota protegida para o cliente ver os seus agendamentos
 router.get('/my-appointments', protectClient, getMyAppointments);
 
 export default router;
