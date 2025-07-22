@@ -26,7 +26,7 @@ import PackagesPage from './pages/PackagesPage';
 import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BrandsPage from './pages/BrandsPage';
-import SettingsPage from './pages/SettingsPage';
+import SettingsPage from './pages/SettingsPage'; // Importado
 import CommissionsPage from './pages/CommissionsPage';
 
 // Páginas do Portal do Cliente
@@ -66,7 +66,7 @@ function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/brands" element={<BrandsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings" element={<SettingsPage />} /> {/* Rota Restaurada */}
           <Route path="/commissions" element={<CommissionsPage />} />
         </Route>
       </Routes>
