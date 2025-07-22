@@ -29,7 +29,11 @@ const ClientDashboardPage = () => {
             }
         };
 
-        fetchAppointments();
+        if (storedClientData) {
+            fetchAppointments();
+        } else {
+            setLoading(false);
+        }
     }, []);
 
     const handleLogout = () => {
@@ -61,13 +65,13 @@ const ClientDashboardPage = () => {
                     ) : appointments.length > 0 ? (
                         <ul className="space-y-4">
                             {appointments.map(apt => (
-                                <li key={apt.id} className="p-4 border rounded-md flex justify-between items-center">
+                                <li key={apt.id} className="p-4 border rounded-md flex flex-col sm:flex-row justify-between sm:items-center">
                                     <div>
-                                        <p className="font-semibold">{apt.service.name}</p>
+                                        <p className="font-semibold text-purple-800">{apt.service.name}</p>
                                         <p className="text-sm text-gray-600">Com {apt.user.name}</p>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-medium">{format(new Date(apt.start), "dd 'de' MMMM, yyyy", { locale: ptBR })}</p>
+                                    <div className="text-left sm:text-right mt-2 sm:mt-0">
+                                        <p className="font-medium">{format(new Date(apt.start), "EEEE, dd 'de' MMMM, yyyy", { locale: ptBR })}</p>
                                         <p className="text-sm text-gray-600">às {format(new Date(apt.start), "HH:mm", { locale: ptBR })}</p>
                                     </div>
                                 </li>
