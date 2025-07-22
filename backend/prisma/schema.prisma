@@ -70,9 +70,8 @@ model Client {
   id                   String          @id @default(cuid())
   name                 String
   phone                String
-  email                String?
-  loginToken           String?
-  loginTokenExpiresAt  DateTime?
+  email                String?         @unique
+  password             String?
   birthDate            DateTime?
   notes                String?
   companyId            String

@@ -102,7 +102,8 @@ CREATE TABLE "Client" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "email" TEXT,
-    "password" TEXT,
+    "loginToken" TEXT,
+    "loginTokenExpiresAt" TIMESTAMP(3),
 
     CONSTRAINT "Client_pkey" PRIMARY KEY ("id")
 );
