@@ -30,8 +30,26 @@ const app = express();
 
 const PORT = process.env.PORT || 3001;
 
+// --- CONFIGURAÇÃO DO CORS ---
+// Lista de endereços que têm permissão para aceder à nossa API
+const allowedOrigins = [
+  'https://frontlyn.netlify.app',
+  'http://localhost:5173', // Para os seus testes locais
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permite pedidos sem 'origin' (como apps mobile ou Postman) ou da nossa lista
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+};
+
 // Middlewares
-app.use(cors());
+app.use(cors(corsOptions)); // Usa as nossas novas opções de CORS
 app.use('/api/webhooks', webhookRoutes);
 app.use(express.json());
 
@@ -62,7 +80,7 @@ app.get('/api', (req, res) => {
   res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' });
 });
 
-// --- ROTA DE HEALTH CHECK PARA A RAILWAY ---
+// Rota de Health Check para a Railway
 app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' });
 });
