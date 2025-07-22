@@ -1,26 +1,22 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import DashboardLayout from '../dashboard/DashboardLayout'; // Importa o Layout aqui
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = () => {
     const { token, loading } = useAuth();
-    const location = useLocation();
 
-    // Enquanto a aplicação está a verificar se existe um token guardado,
-    // mostramos uma mensagem de "A carregar..." para evitar o "loop".
     if (loading) {
         return <div>A carregar sessão...</div>;
     }
 
-    // Se o carregamento terminou e NÃO existe um token,
-    // redirecionamos para a página de login.
     if (!token) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
+        return <Navigate to="/login" replace />;
     }
 
-    // Se o carregamento terminou e EXISTE um token,
-    // mostramos a página que o utilizador queria aceder.
-    return children;
+    // Se o utilizador estiver autenticado, renderiza o Layout Principal.
+    // O Layout, por sua vez, irá renderizar a página correta (ex: /dashboard).
+    return <DashboardLayout />;
 };
 
 export default ProtectedRoute;
