@@ -27,11 +27,13 @@ import ProductsPage from './pages/ProductsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import BrandsPage from './pages/BrandsPage';
 import SettingsPage from './pages/SettingsPage';
-import CommissionsPage from './pages/CommissionsPage'; // CORRIGIDO AQUI
+import CommissionsPage from './pages/CommissionsPage';
 
 // Páginas do Portal do Cliente
 import ClientLoginPage from './pages/ClientLoginPage';
 import ClientVerifyPage from './pages/ClientVerifyPage';
+import ClientProtectedRoute from './components/auth/ClientProtectedRoute'; // Novo
+import ClientDashboardPage from './pages/ClientDashboardPage'; // Novo
 
 function App() {
   return (
@@ -45,9 +47,14 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/agendar/:companyId" element={<BookingPage />} />
         
-        {/* Rotas do Portal do Cliente */}
+        {/* Rotas de Login do Portal do Cliente */}
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/verify/:token" element={<ClientVerifyPage />} />
+
+        {/* Rotas Protegidas do Portal do Cliente */}
+        <Route element={<ClientProtectedRoute />}>
+          <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
+        </Route>
 
         {/* Rotas Protegidas do Painel do Administrador */}
         <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
@@ -67,7 +74,7 @@ function App() {
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/brands" element={<BrandsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/commissions" element={<CommissionsPage />} /> {/* CORRIGIDO AQUI */}
+          <Route path="/commissions" element={<CommissionsPage />} />
         </Route>
       </Routes>
     </>
