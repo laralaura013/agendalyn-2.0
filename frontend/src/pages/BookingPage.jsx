@@ -21,6 +21,19 @@ const BookingPage = () => {
   const [companyData, setCompanyData] = useState({ company: null, services: [], staff: [] });
 
   useEffect(() => {
+    // --- LÓGICA NOVA: VERIFICA SE O CLIENTE ESTÁ AUTENTICADO ---
+    const clientToken = localStorage.getItem('clientToken');
+    const storedClientData = JSON.parse(localStorage.getItem('clientData'));
+    
+    if (clientToken && storedClientData) {
+        // Se estiver, pré-preenche os dados
+        setCustomerDetails({
+            name: storedClientData.name || '',
+            phone: storedClientData.phone || '', // Assumindo que o phone virá dos dados do cliente no futuro
+            email: storedClientData.email || '',
+        });
+    }
+
     const fetchBookingData = async () => {
       if (!companyId) return;
       try {
@@ -95,6 +108,7 @@ const BookingPage = () => {
         </header>
 
         <main className="bg-white p-6 rounded-lg shadow-md">
+          {/* Passo 1: Seleção de Serviço */}
           {step === 1 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -120,6 +134,8 @@ const BookingPage = () => {
               </ul>
             </div>
           )}
+
+          {/* Passo 2: Seleção de Profissional */}
           {step === 2 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -139,6 +155,8 @@ const BookingPage = () => {
               </ul>
             </div>
           )}
+
+          {/* Passo 3: Data e Hora */}
           {step === 3 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -158,6 +176,8 @@ const BookingPage = () => {
               </div>
             </div>
           )}
+
+          {/* Passo 4: Confirmação */}
           {step === 4 && (
             <div>
               <button onClick={handleBack} className="text-sm text-gray-600 hover:text-black mb-4 flex items-center"><ArrowLeft size={16} className="mr-1" /> Voltar</button>
@@ -185,6 +205,8 @@ const BookingPage = () => {
               </form>
             </div>
           )}
+
+          {/* Passo 5: Sucesso */}
           {step === 5 && (
             <div className="text-center py-10">
               <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />

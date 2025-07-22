@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom'; // Importa o Link
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -8,10 +9,23 @@ const ClientDashboardPage = () => {
     const [clientData, setClientData] = useState(null);
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [companyId, setCompanyId] = useState('');
 
     useEffect(() => {
         const storedClientData = JSON.parse(localStorage.getItem('clientData'));
-        setClientData(storedClientData);
+        if (storedClientData) {
+            setClientData(storedClientData);
+            // Extrai o companyId do token ou dos dados guardados. Vamos assumir que está nos dados do cliente.
+            const token = localStorage.getItem('clientToken');
+            if(token) {
+                try {
+                    const decodedToken = JSON.parse(atob(token.split('.')[1]));
+                    setCompanyId(decodedToken.companyId);
+                } catch(e) {
+                    console.error("Erro ao descodificar o token:", e);
+                }
+            }
+        }
 
         const fetchAppointments = async () => {
             try {
@@ -30,7 +44,6 @@ const ClientDashboardPage = () => {
         if (storedClientData) {
             fetchAppointments();
         } else {
-            // Se não houver dados do cliente, não há como buscar os agendamentos.
             setLoading(false);
         }
     }, []);
@@ -44,17 +57,23 @@ const ClientDashboardPage = () => {
     return (
         <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
             <div className="max-w-4xl mx-auto">
-                <header className="flex justify-between items-center mb-8">
+                <header className="flex flex-wrap justify-between items-center mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-800">Olá, {clientData?.name}!</h1>
                         <p className="text-gray-500">Bem-vindo(a) ao seu portal.</p>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="px-4 py-2 text-sm font-medium text-red-600 border border-red-600 rounded-md hover:bg-red-50"
-                    >
-                        Sair
-                    </button>
+                    <div className="flex items-center gap-4">
+                        {/* --- BOTÃO NOVO --- */}
+                        <Link to={`/agendar/${companyId}`} className="px-4 py-2 text-sm font-medium text-white bg-purple-700 rounded-md hover:bg-purple-800">
+                            Novo Agendamento
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="px-4 py-2 text-sm font-medium text-red-600 border border-red-600 rounded-md hover:bg-red-50"
+                        >
+                            Sair
+                        </button>
+                    </div>
                 </header>
 
                 <main className="bg-white p-6 rounded-lg shadow-md">
