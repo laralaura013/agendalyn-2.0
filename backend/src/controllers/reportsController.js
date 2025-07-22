@@ -28,7 +28,7 @@ export const getRevenueReport = async (req, res) => {
                         product: true,
                     }
                 },
-                user: true, // Inclui os dados do colaborador
+                user: true,
             }
         });
 
@@ -38,12 +38,9 @@ export const getRevenueReport = async (req, res) => {
         const revenueByServiceMap = {};
 
         finishedOrders.forEach(order => {
-            // Calcula faturamento por colaborador
             if (order.user) {
                 revenueByStaffMap[order.user.name] = (revenueByStaffMap[order.user.name] || 0) + Number(order.total);
             }
-
-            // Calcula faturamento por serviço
             order.items.forEach(item => {
                 if (item.service) {
                     revenueByServiceMap[item.service.name] = (revenueByServiceMap[item.service.name] || 0) + (Number(item.price) * item.quantity);
@@ -51,8 +48,8 @@ export const getRevenueReport = async (req, res) => {
             });
         });
 
-        // Formata os dados para os gráficos
-        const revenueByStaff = Object.entries(revenueByStaffMap).map(([name, value]) => ({ name, value }));
+        // --- AQUI ESTÁ A CORREÇÃO ---
+        const revenueByStaff = Object.entries(revenueByStaffMap).map(([name, Faturamento]) => ({ name, Faturamento }));
         const revenueByService = Object.entries(revenueByServiceMap).map(([name, value]) => ({ name, value }));
 
         res.status(200).json({
