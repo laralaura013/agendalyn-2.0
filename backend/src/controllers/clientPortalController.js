@@ -6,15 +6,9 @@ const prisma = new PrismaClient();
 
 // REGISTAR um novo cliente no portal
 export const registerClient = async (req, res) => {
-    // --- LOG DE DEPURAÇÃO ---
-    console.log("--- INICIANDO REGISTO DE CLIENTE ---");
-    console.log("Dados recebidos no corpo do pedido (req.body):", req.body);
-    // --- FIM DO LOG ---
-
     try {
         const { name, email, password, companyId } = req.body;
         if (!name || !email || !password || !companyId) {
-            console.log("Erro: Campos em falta.");
             return res.status(400).json({ message: "Todos os campos são obrigatórios." });
         }
 
@@ -25,7 +19,6 @@ export const registerClient = async (req, res) => {
             } 
         });
         if (clientExists) {
-            console.log("Erro: Email já registado para esta empresa.");
             return res.status(409).json({ message: "Este email já está registado." });
         }
 
@@ -38,11 +31,10 @@ export const registerClient = async (req, res) => {
                 email,
                 password: hashedPassword,
                 companyId,
-                phone: '', // Telefone pode ser adicionado depois
+                phone: '', // Telefone pode ser adicionado depois pelo cliente
             }
         });
 
-        console.log("--- CLIENTE REGISTADO COM SUCESSO ---");
         res.status(201).json({ id: newClient.id, name: newClient.name, email: newClient.email });
     } catch (error) {
         console.error("--- ERRO AO REGISTAR CLIENTE ---", error);
@@ -111,5 +103,29 @@ export const getMyAppointments = async (req, res) => {
     } catch (error) {
         console.error("--- ERRO AO BUSCAR AGENDAMENTOS DO CLIENTE ---", error);
         res.status(500).json({ message: "Erro ao buscar agendamentos." });
+    }
+};
+
+// Busca os pacotes do cliente autenticado
+export const getMyPackages = async (req, res) => {
+    try {
+        const clientId = req.client.id;
+
+        const clientPackages = await prisma.clientPackage.findMany({
+            where: { clientId: clientId },
+            include: {
+                package: {
+                    select: { name: true }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        });
+
+        res.status(200).json(clientPackages);
+    } catch (error) {
+        console.error("--- ERRO AO BUSCAR PACOTES DO CLIENTE ---", error);
+        res.status(500).json({ message: "Erro ao buscar pacotes." });
     }
 };

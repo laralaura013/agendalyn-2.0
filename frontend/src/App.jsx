@@ -34,6 +34,8 @@ import ClientLoginPage from './pages/ClientLoginPage';
 import ClientRegisterPage from './pages/ClientRegisterPage';
 import ClientProtectedRoute from './components/auth/ClientProtectedRoute';
 import ClientDashboardPage from './pages/ClientDashboardPage';
+import ClientPackagesPage from './pages/ClientPackagesPage';
+import ClientPortalLayout from './components/portal/ClientPortalLayout';
 
 function App() {
   return (
@@ -41,18 +43,25 @@ function App() {
       <Toaster position="top-right" toastOptions={{ duration: 5000, style: { background: '#333', color: '#fff' } }} />
       <ReloadPrompt />
       <Routes>
+        {/* Rotas Públicas */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/agendar/:companyId" element={<BookingPage />} />
         
+        {/* Rotas de Login do Portal do Cliente */}
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
 
+        {/* Rotas Protegidas do Portal do Cliente */}
         <Route element={<ClientProtectedRoute />}>
-          <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
+          <Route element={<ClientPortalLayout />}>
+            <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
+            <Route path="/portal/packages" element={<ClientPackagesPage />} />
+          </Route>
         </Route>
 
+        {/* Rotas Protegidas do Painel do Administrador */}
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />

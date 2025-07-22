@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerClient, loginClient, getMyAppointments } from '../controllers/clientPortalController.js';
+import { registerClient, loginClient, getMyAppointments, getMyPackages } from '../controllers/clientPortalController.js';
 import { protectClient } from '../middlewares/clientAuthMiddleware.js';
 
 const router = express.Router();
@@ -8,7 +8,8 @@ const router = express.Router();
 router.post('/register', registerClient);
 router.post('/login', loginClient);
 
-// Rota protegida para o cliente ver os seus agendamentos
+// Rotas protegidas (apenas para clientes autenticados)
 router.get('/my-appointments', protectClient, getMyAppointments);
+router.get('/my-packages', protectClient, getMyPackages); // Rota adicionada
 
 export default router;
