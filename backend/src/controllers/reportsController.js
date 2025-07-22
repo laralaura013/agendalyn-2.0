@@ -1,8 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-import { startOfDay, endOfDay, parseISO } from 'date-fns';
+import { parseISO, startOfDay, endOfDay } from 'date-fns';
 
 const prisma = new PrismaClient();
 
+// Relatório de Receitas
 export const getRevenueReport = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
@@ -12,61 +13,64 @@ export const getRevenueReport = async (req, res) => {
             return res.status(400).json({ message: "As datas de início e fim são obrigatórias." });
         }
 
-        const parsedStartDate = startOfDay(parseISO(startDate));
-        const parsedEndDate = endOfDay(parseISO(endDate));
-
-        // Encontra todas as comandas finalizadas no período
         const finishedOrders = await prisma.order.findMany({
             where: {
-                companyId: companyId,
+                companyId,
                 status: 'FINISHED',
-                updatedAt: { // Filtra por quando a comanda foi finalizada
-                    gte: parsedStartDate,
-                    lte: parsedEndDate,
-                },
+                updatedAt: {
+                    gte: startOfDay(parseISO(startDate)),
+                    lte: endOfDay(parseISO(endDate)),
+                }
             },
             include: {
-                user: { select: { name: true } }, // Para o relatório por colaborador
-                items: { // Para o relatório por serviço
+                items: {
                     include: {
-                        service: { select: { name: true, price: true } },
+                        service: true,
+                        product: true,
                     }
                 }
             }
         });
 
-        // 1. Calcula o Faturamento Total
         const totalRevenue = finishedOrders.reduce((sum, order) => sum + Number(order.total), 0);
+        const totalOrders = finishedOrders.length;
+        const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-        // 2. Agrupa o Faturamento por Colaborador
-        const revenueByStaff = finishedOrders.reduce((acc, order) => {
-            const staffName = order.user.name;
-            acc[staffName] = (acc[staffName] || 0) + Number(order.total);
-            return acc;
-        }, {});
+        const salesByType = { services: 0, products: 0 };
+        const salesByItem = {};
 
-        // 3. Agrupa o Faturamento por Serviço
-        const revenueByService = finishedOrders.reduce((acc, order) => {
+        finishedOrders.forEach(order => {
             order.items.forEach(item => {
-                const serviceName = item.service.name;
-                const itemTotal = Number(item.price) * item.quantity;
-                acc[serviceName] = (acc[serviceName] || 0) + itemTotal;
+                // --- AQUI ESTÁ A CORREÇÃO ---
+                // Verificamos se o serviço ou produto ainda existe antes de o processar.
+                if (item.service) {
+                    const itemName = item.service.name;
+                    salesByType.services += Number(item.price) * item.quantity;
+                    salesByItem[itemName] = (salesByItem[itemName] || 0) + (Number(item.price) * item.quantity);
+                } else if (item.product) {
+                    const itemName = item.product.name;
+                    salesByType.products += Number(item.price) * item.quantity;
+                    salesByItem[itemName] = (salesByItem[itemName] || 0) + (Number(item.price) * item.quantity);
+                }
+                // Se nem item.service nem item.product existirem, o item é ignorado.
             });
-            return acc;
-        }, {});
+        });
 
-        // Formata os dados para os gráficos do Recharts
-        const formattedRevenueByStaff = Object.entries(revenueByStaff).map(([name, value]) => ({ name, Faturamento: value }));
-        const formattedRevenueByService = Object.entries(revenueByService).map(([name, value]) => ({ name, value }));
+        const topItems = Object.entries(salesByItem)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5)
+            .map(([name, revenue]) => ({ name, revenue }));
 
         res.status(200).json({
             totalRevenue,
-            revenueByStaff: formattedRevenueByStaff,
-            revenueByService: formattedRevenueByService,
+            totalOrders,
+            averageTicket,
+            salesByType,
+            topItems,
         });
 
     } catch (error) {
         console.error("--- ERRO AO GERAR RELATÓRIO ---", error);
-        res.status(500).json({ message: 'Erro ao gerar relatório.' });
+        res.status(500).json({ message: "Erro ao gerar relatório." });
     }
 };
