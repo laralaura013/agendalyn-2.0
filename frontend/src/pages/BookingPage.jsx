@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 
 const BookingPage = () => {
   const { companyId } = useParams();
-
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedStaff, setSelectedStaff] = useState(null);
@@ -17,7 +16,6 @@ const BookingPage = () => {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [customerDetails, setCustomerDetails] = useState({ name: '', phone: '', email: '' });
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [companyData, setCompanyData] = useState({ company: null, services: [], staff: [] });
@@ -30,7 +28,6 @@ const BookingPage = () => {
         const response = await api.get(`/public/booking-page/${companyId}`);
         setCompanyData(response.data);
       } catch (err) {
-        console.error("Erro ao buscar dados de agendamento:", err);
         setError("Não foi possível carregar a página de agendamento. Verifique o link e tente novamente.");
       } finally {
         setLoading(false);
@@ -45,23 +42,18 @@ const BookingPage = () => {
         setLoadingSlots(true);
         setAvailableSlots([]);
         try {
-          const params = {
-            date: selectedDate,
-            serviceId: selectedService.id,
-            staffId: selectedStaff.id,
-            companyId: companyId,
-          };
+          const params = { date: selectedDate, serviceId: selectedService.id, staffId: selectedStaff.id };
           const response = await api.get('/public/available-slots', { params });
           setAvailableSlots(response.data);
         } catch (err) {
-          console.error("Erro ao buscar horários:", err);
+          toast.error("Não foi possível buscar os horários.");
         } finally {
           setLoadingSlots(false);
         }
       };
       fetchSlots();
     }
-  }, [step, selectedDate, selectedService, selectedStaff, companyId]);
+  }, [step, selectedDate, selectedService, selectedStaff]);
 
   const handleSelectService = (service) => { setSelectedService(service); setStep(2); };
   const handleSelectStaff = (staffMember) => { setSelectedStaff(staffMember); setStep(3); };
@@ -84,14 +76,10 @@ const BookingPage = () => {
       clientPhone: customerDetails.phone,
       clientEmail: customerDetails.email,
     });
-
     toast.promise(bookingPromise, {
       loading: 'A confirmar o seu agendamento...',
-      success: () => {
-        setStep(5);
-        return 'Agendamento confirmado com sucesso!';
-      },
-      error: 'Não foi possível confirmar o seu agendamento. Tente novamente.',
+      success: () => { setStep(5); return 'Agendamento confirmado com sucesso!'; },
+      error: 'Não foi possível confirmar o seu agendamento.',
     });
   };
 
@@ -102,8 +90,8 @@ const BookingPage = () => {
     <div className="min-h-screen bg-gray-50 flex justify-center">
       <div className="w-full max-w-lg mx-auto p-4 sm:p-6">
         <header className="text-center my-6 sm:my-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">{companyData.company.name}</h1>
-          <p className="text-gray-500 mt-2">{companyData.company.address}</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">{companyData.company?.name}</h1>
+          <p className="text-gray-500 mt-2">{companyData.company?.address}</p>
         </header>
 
         <main className="bg-white p-6 rounded-lg shadow-md">
@@ -132,7 +120,6 @@ const BookingPage = () => {
               </ul>
             </div>
           )}
-
           {step === 2 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -152,7 +139,6 @@ const BookingPage = () => {
               </ul>
             </div>
           )}
-
           {step === 3 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -164,21 +150,14 @@ const BookingPage = () => {
                 <label htmlFor="date-picker" className="block text-sm font-medium text-gray-700 mb-1">Selecione o dia</label>
                 <input type="date" id="date-picker" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full p-2 border rounded-md" />
               </div>
-              <p className="text-center font-semibold my-2">
-                {format(parseISO(`${selectedDate}T00:00:00`), "EEEE, dd 'de' MMMM", { locale: ptBR })}
-              </p>
+              <p className="text-center font-semibold my-2">{format(parseISO(`${selectedDate}T00:00:00`), "EEEE, dd 'de' MMMM", { locale: ptBR })}</p>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {loadingSlots ? <p className="col-span-full text-center py-4">A procurar horários...</p> : 
-                  availableSlots.length > 0 ? availableSlots.map(slot => (
-                    <button key={slot.time} onClick={() => handleSelectSlot(slot)} className="p-2 border rounded-md text-center bg-purple-700 text-white hover:bg-purple-800 transition-colors">
-                      {format(parseISO(slot.time), 'HH:mm')}
-                    </button>
-                  )) : <p className="col-span-full text-center text-gray-500 py-4">Nenhum horário disponível para este dia.</p>
-                }
+                {loadingSlots ? <p className="col-span-full text-center py-4">A procurar horários...</p> : availableSlots.length > 0 ? availableSlots.map(slot => (
+                  <button key={slot.time} onClick={() => handleSelectSlot(slot)} className="p-2 border rounded-md text-center bg-purple-700 text-white hover:bg-purple-800 transition-colors">{format(parseISO(slot.time), 'HH:mm')}</button>
+                )) : <p className="col-span-full text-center text-gray-500 py-4">Nenhum horário disponível para este dia.</p>}
               </div>
             </div>
           )}
-
           {step === 4 && (
             <div>
               <button onClick={handleBack} className="text-sm text-gray-600 hover:text-black mb-4 flex items-center"><ArrowLeft size={16} className="mr-1" /> Voltar</button>
@@ -202,19 +181,16 @@ const BookingPage = () => {
                   <label className="block text-sm">Email (para receber a confirmação)</label>
                   <input type="email" name="email" value={customerDetails.email} onChange={handleCustomerDetailsChange} className="w-full p-2 border rounded-md" />
                 </div>
-                <button type="submit" className="w-full py-3 bg-purple-700 text-white font-semibold rounded-lg hover:bg-purple-800 mt-4">
-                  Confirmar Agendamento
-                </button>
+                <button type="submit" className="w-full py-3 bg-purple-700 text-white font-semibold rounded-lg hover:bg-purple-800 mt-4">Confirmar Agendamento</button>
               </form>
             </div>
           )}
-
           {step === 5 && (
             <div className="text-center py-10">
-                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold">Tudo Certo!</h2>
-                <p className="text-gray-600 mt-2">O seu agendamento foi confirmado com sucesso. Você receberá um email com os detalhes em breve.</p>
-                <p className="text-sm text-gray-500 mt-6">Pode fechar esta janela.</p>
+              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold">Tudo Certo!</h2>
+              <p className="text-gray-600 mt-2">O seu agendamento foi confirmado com sucesso. Você receberá um email com os detalhes em breve.</p>
+              <p className="text-sm text-gray-500 mt-6">Pode fechar esta janela.</p>
             </div>
           )}
         </main>

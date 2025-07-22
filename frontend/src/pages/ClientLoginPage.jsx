@@ -4,7 +4,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const ClientLoginPage = () => {
-    const { companyId } = useParams(); // Pega o ID da empresa do URL
+    const { companyId } = useParams();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
@@ -14,7 +14,6 @@ const ClientLoginPage = () => {
         setLoading(true);
         setMessage('');
         try {
-            // Chama a rota que criámos no backend para pedir o link
             await api.post('/portal/request-login', { email, companyId });
             setMessage("Quase lá! Se este email estiver registado, você receberá um link de acesso em breve. Verifique a sua caixa de entrada e de spam.");
             toast.success("Link de acesso enviado!");

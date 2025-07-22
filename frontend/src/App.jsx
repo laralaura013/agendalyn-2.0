@@ -32,8 +32,8 @@ import CommissionsPage from './pages/CommissionsPage';
 // Páginas do Portal do Cliente
 import ClientLoginPage from './pages/ClientLoginPage';
 import ClientVerifyPage from './pages/ClientVerifyPage';
-import ClientProtectedRoute from './components/auth/ClientProtectedRoute'; // Novo
-import ClientDashboardPage from './pages/ClientDashboardPage'; // Novo
+import ClientProtectedRoute from './components/auth/ClientProtectedRoute';
+import ClientDashboardPage from './pages/ClientDashboardPage';
 
 function App() {
   return (
