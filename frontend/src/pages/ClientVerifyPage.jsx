@@ -17,12 +17,14 @@ const ClientVerifyPage = () => {
             }
             try {
                 const response = await api.post('/portal/verify-login', { token });
+                // Guarda o token de sessão e os dados do cliente no browser
                 localStorage.setItem('clientToken', response.data.sessionToken);
                 localStorage.setItem('clientData', JSON.stringify(response.data.client));
                 
                 setMessage("Login bem-sucedido! A redirecionar para o seu portal...");
+                
                 setTimeout(() => {
-                    navigate('/portal/dashboard');
+                    navigate('/portal/dashboard'); // Redireciona para o painel do cliente
                 }, 2000);
 
             } catch (err) {
