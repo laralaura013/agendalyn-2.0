@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
-// LISTAR todas as definições de Pacotes
+// Suas funções existentes (listPackages, createPackage, etc.)
 export const listPackages = async (req, res) => {
     try {
         const packages = await prisma.package.findMany({
@@ -15,7 +15,6 @@ export const listPackages = async (req, res) => {
     }
 };
 
-// CRIAR uma nova definição de Pacote
 export const createPackage = async (req, res) => {
     try {
         const { name, price, sessions, validityDays, serviceIds } = req.body;
@@ -44,26 +43,46 @@ export const createPackage = async (req, res) => {
     }
 };
 
-// VENDER um Pacote para um Cliente
+// --- FUNÇÃO DE VENDA CORRIGIDA E MAIS SEGURA ---
 export const sellPackageToClient = async (req, res) => {
-    const { packageId, clientId } = req.body;
+    // Mantive a sua lógica original de receber os dados
+    const { packageId, clientId, paymentMethod } = req.body; // Adicionado paymentMethod aqui
     const companyId = req.company.id;
     const userId = req.user.id;
 
     try {
+        // 1. Busca do pacote a ser vendido
         const pkg = await prisma.package.findUnique({ where: { id: packageId } });
-        if (!pkg) return res.status(404).json({ message: "Pacote não encontrado." });
+        if (!pkg) {
+            return res.status(404).json({ message: "Pacote não encontrado." });
+        }
 
+        // 2. Validação robusta dos dados do pacote para evitar erros
+        if (typeof pkg.sessions !== 'number' || pkg.sessions <= 0) {
+            return res.status(400).json({ message: "Pacote inválido: O número de sessões não está definido ou é zero." });
+        }
+        if (typeof pkg.price !== 'number' || pkg.price < 0) {
+            return res.status(400).json({ message: "Pacote inválido: O preço não está definido." });
+        }
+
+        // 3. Busca de um caixa aberto
         const activeCashier = await prisma.cashierSession.findFirst({
             where: { companyId, status: 'OPEN' },
         });
-        if (!activeCashier) return res.status(400).json({ message: "Nenhum caixa aberto para registrar a venda." });
+        if (!activeCashier) {
+            return res.status(400).json({ message: "Nenhum caixa aberto para registar a venda." });
+        }
         
+        // 4. Lógica do serviço de placeholder corrigida para não quebrar o servidor
         const placeholderService = await prisma.service.findFirst({ where: { companyId } });
-        if (!placeholderService) throw new Error("A empresa precisa ter pelo menos um serviço cadastrado para vender pacotes.");
+        if (!placeholderService) {
+            // Em vez de 'throw new Error', retornamos um erro 400 claro.
+            return res.status(400).json({ message: "A sua empresa precisa de ter pelo menos um serviço cadastrado para poder vender pacotes." });
+        }
 
+        // 5. Transação segura para garantir a consistência dos dados
         const result = await prisma.$transaction(async (tx) => {
-            // 1. Cria a comanda para a venda do pacote
+            // Cria a comanda para a venda do pacote
             const order = await tx.order.create({
                 data: {
                     total: pkg.price,
@@ -75,25 +94,29 @@ export const sellPackageToClient = async (req, res) => {
                 }
             });
 
-            // 2. Cria a transação de entrada no caixa
+            // Cria a transação de entrada no caixa
             await tx.transaction.create({
                 data: {
                     type: 'INCOME',
                     amount: pkg.price,
                     description: `Venda do Pacote: ${pkg.name}`,
                     cashierSessionId: activeCashier.id,
+                    paymentMethod: paymentMethod || 'N/A', // Adicionado para consistência
                 }
             });
 
-            // 3. Associa o pacote ao cliente
+            // Associa o pacote ao cliente de forma segura
+            const validityDays = typeof pkg.validityDays === 'number' ? pkg.validityDays : 365;
             const expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + pkg.validityDays);
+            expiresAt.setDate(expiresAt.getDate() + validityDays);
+            
             const clientPackage = await tx.clientPackage.create({
                 data: {
                     sessionsRemaining: pkg.sessions,
                     expiresAt,
                     clientId,
                     packageId,
+                    companyId, // Boa prática para multi-tenancy
                 }
             });
             return clientPackage;
@@ -103,21 +126,21 @@ export const sellPackageToClient = async (req, res) => {
 
     } catch (error) {
         console.error("--- ERRO AO VENDER PACOTE ---", error);
-        res.status(500).json({ message: error.message || 'Erro ao vender pacote.' });
+        // Retorna a mensagem de erro específica, se houver, senão uma genérica
+        res.status(500).json({ message: error.message || 'Erro interno do servidor ao vender o pacote.' });
     }
 };
 
-// LISTAR os Pacotes de um Cliente específico
+
+// Suas outras funções (listClientPackages, usePackageSession, etc.)
 export const listClientPackages = async (req, res) => {
     try {
         const { clientId } = req.params;
         const clientPackages = await prisma.clientPackage.findMany({
             where: { 
                 clientId: clientId,
-                // Adicionando companyId para segurança, assumindo que ClientPackage terá a relação
-                // Para isso, precisamos adicionar `companyId` ao modelo ClientPackage no schema.prisma
-                // Por enquanto, vamos confiar na rota protegida.
-             },
+                companyId: req.company.id // Adicionando segurança
+            },
             include: {
                 package: true,
             },
@@ -130,7 +153,6 @@ export const listClientPackages = async (req, res) => {
     }
 };
 
-// USAR (dar baixa) em uma Sessão de um Pacote
 export const usePackageSession = async (req, res) => {
     try {
         const { clientPackageId } = req.params;
