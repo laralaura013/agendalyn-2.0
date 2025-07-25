@@ -4,23 +4,32 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export const protectClient = async (req, res, next) => {
-    let token;
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        try {
-            token = req.headers.authorization.split(' ')[1];
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            
-            req.client = await prisma.client.findUnique({ where: { id: decoded.clientId } });
-            
-            if (!req.client) {
-                return res.status(401).json({ message: 'Cliente não encontrado.' });
-            }
-            next();
-        } catch (error) {
-            res.status(401).json({ message: 'Não autorizado, token falhou.' });
-        }
+  let token;
+
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    try {
+      token = req.headers.authorization.split(' ')[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      if (!decoded.clientId) {
+        return res.status(401).json({ message: 'Token inválido. (sem clientId)' });
+      }
+
+      const client = await prisma.client.findUnique({
+        where: { id: decoded.clientId },
+      });
+
+      if (!client) {
+        return res.status(401).json({ message: 'Cliente não encontrado.' });
+      }
+
+      req.client = { id: client.id, companyId: client.companyId };
+      next();
+    } catch (error) {
+      console.error('Erro no middleware protectClient:', error);
+      return res.status(401).json({ message: 'Token inválido ou expirado.' });
     }
-    if (!token) {
-        res.status(401).json({ message: 'Não autorizado, sem token.' });
-    }
+  } else {
+    return res.status(401).json({ message: 'Não autorizado, sem token.' });
+  }
 };
