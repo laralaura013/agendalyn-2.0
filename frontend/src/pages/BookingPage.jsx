@@ -21,17 +21,14 @@ const BookingPage = () => {
   const [companyData, setCompanyData] = useState({ company: null, services: [], staff: [] });
 
   useEffect(() => {
-    // --- LÓGICA NOVA: VERIFICA SE O CLIENTE ESTÁ AUTENTICADO ---
     const clientToken = localStorage.getItem('clientToken');
     const storedClientData = JSON.parse(localStorage.getItem('clientData'));
-    
     if (clientToken && storedClientData) {
-        // Se estiver, pré-preenche os dados
-        setCustomerDetails({
-            name: storedClientData.name || '',
-            phone: storedClientData.phone || '', // Assumindo que o phone virá dos dados do cliente no futuro
-            email: storedClientData.email || '',
-        });
+      setCustomerDetails({
+        name: storedClientData.name || '',
+        phone: storedClientData.phone || '',
+        email: storedClientData.email || '',
+      });
     }
 
     const fetchBookingData = async () => {
@@ -100,25 +97,26 @@ const BookingPage = () => {
   if (error) return <div className="flex justify-center items-center h-screen"><p className="text-red-500">{error}</p></div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex justify-center">
-      <div className="w-full max-w-lg mx-auto p-4 sm:p-6">
-        <header className="text-center my-6 sm:my-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">{companyData.company?.name}</h1>
-          <p className="text-gray-500 mt-2">{companyData.company?.address}</p>
-        </header>
+    <div className="min-h-screen bg-gradient-to-br from-purple-100 to-white pb-10">
+      <div className="fixed top-0 w-full bg-white shadow z-50 p-4 text-center font-bold text-purple-700 text-lg">
+        {companyData.company?.name || 'Agendamento'}
+      </div>
 
-        <main className="bg-white p-6 rounded-lg shadow-md">
-          {/* Passo 1: Seleção de Serviço */}
+      <div className="w-full max-w-lg mx-auto px-4 pt-[80px]">
+        <main className="bg-white p-6 rounded-2xl shadow-lg">
+
           {step === 1 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="bg-purple-100 p-2 rounded-full"><Sparkles className="h-5 w-5 text-purple-700" /></div>
-                <h2 className="text-xl sm:text-2xl font-semibold">Escolha um Serviço</h2>
+                <div className="bg-purple-100 p-3 rounded-full text-purple-700 shadow-sm">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <h2 className="text-xl font-semibold">Escolha um Serviço</h2>
               </div>
               <ul className="space-y-3">
                 {companyData.services.map(service => (
                   <li key={service.id}>
-                    <button onClick={() => handleSelectService(service)} className="w-full text-left p-4 border rounded-md flex justify-between items-center hover:bg-gray-50 transition-colors">
+                    <button onClick={() => handleSelectService(service)} className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition">
                       <div>
                         <p className="font-semibold">{service.name}</p>
                         <p className="text-sm text-gray-500 flex items-center">
@@ -135,18 +133,17 @@ const BookingPage = () => {
             </div>
           )}
 
-          {/* Passo 2: Seleção de Profissional */}
           {step === 2 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <button onClick={handleBack} className="p-2 rounded-full hover:bg-gray-100"><ArrowLeft className="h-5 w-5 text-gray-600" /></button>
-                <div className="bg-purple-100 p-2 rounded-full"><User className="h-5 w-5 text-purple-700" /></div>
-                <h2 className="text-xl sm:text-2xl font-semibold">Escolha um Profissional</h2>
+                <div className="bg-purple-100 p-3 rounded-full text-purple-700 shadow-sm"><User className="h-6 w-6" /></div>
+                <h2 className="text-xl font-semibold">Escolha um Profissional</h2>
               </div>
               <ul className="space-y-3">
                 {companyData.staff.map(staffMember => (
                   <li key={staffMember.id}>
-                    <button onClick={() => handleSelectStaff(staffMember)} className="w-full text-left p-4 border rounded-md flex justify-between items-center hover:bg-gray-50 transition-colors">
+                    <button onClick={() => handleSelectStaff(staffMember)} className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition">
                       <p className="font-semibold">{staffMember.name}</p>
                       <span className="px-3 py-1 bg-purple-700 text-white text-xs font-semibold rounded-lg">Selecionar</span>
                     </button>
@@ -156,13 +153,12 @@ const BookingPage = () => {
             </div>
           )}
 
-          {/* Passo 3: Data e Hora */}
           {step === 3 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <button onClick={handleBack} className="p-2 rounded-full hover:bg-gray-100"><ArrowLeft className="h-5 w-5 text-gray-600" /></button>
-                <div className="bg-purple-100 p-2 rounded-full"><Calendar className="h-5 w-5 text-purple-700" /></div>
-                <h2 className="text-xl sm:text-2xl font-semibold">Escolha Data e Hora</h2>
+                <div className="bg-purple-100 p--3 rounded-full text-purple-700 shadow-sm"><Calendar className="h-6 w-6" /></div>
+                <h2 className="text-xl font-semibold">Escolha Data e Hora</h2>
               </div>
               <div className="mb-4">
                 <label htmlFor="date-picker" className="block text-sm font-medium text-gray-700 mb-1">Selecione o dia</label>
@@ -171,13 +167,12 @@ const BookingPage = () => {
               <p className="text-center font-semibold my-2">{format(parseISO(`${selectedDate}T00:00:00`), "EEEE, dd 'de' MMMM", { locale: ptBR })}</p>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {loadingSlots ? <p className="col-span-full text-center py-4">A procurar horários...</p> : availableSlots.length > 0 ? availableSlots.map(slot => (
-                  <button key={slot.time} onClick={() => handleSelectSlot(slot)} className="p-2 border rounded-md text-center bg-purple-700 text-white hover:bg-purple-800 transition-colors">{format(parseISO(slot.time), 'HH:mm')}</button>
+                  <button key={slot.time} onClick={() => handleSelectSlot(slot)} className="p-2 border rounded-xl text-center bg-purple-700 text-white hover:bg-purple-800 transition-colors">{format(parseISO(slot.time), 'HH:mm')}</button>
                 )) : <p className="col-span-full text-center text-gray-500 py-4">Nenhum horário disponível para este dia.</p>}
               </div>
             </div>
           )}
 
-          {/* Passo 4: Confirmação */}
           {step === 4 && (
             <div>
               <button onClick={handleBack} className="text-sm text-gray-600 hover:text-black mb-4 flex items-center"><ArrowLeft size={16} className="mr-1" /> Voltar</button>
@@ -201,12 +196,11 @@ const BookingPage = () => {
                   <label className="block text-sm">Email (para receber a confirmação)</label>
                   <input type="email" name="email" value={customerDetails.email} onChange={handleCustomerDetailsChange} className="w-full p-2 border rounded-md" />
                 </div>
-                <button type="submit" className="w-full py-3 bg-purple-700 text-white font-semibold rounded-lg hover:bg-purple-800 mt-4">Confirmar Agendamento</button>
+                <button type="submit" className="w-full py-3 bg-purple-700 text-white font-semibold rounded-xl text-lg hover:bg-purple-800 mt-4">Confirmar Agendamento</button>
               </form>
             </div>
           )}
 
-          {/* Passo 5: Sucesso */}
           {step === 5 && (
             <div className="text-center py-10">
               <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
@@ -215,6 +209,7 @@ const BookingPage = () => {
               <p className="text-sm text-gray-500 mt-6">Pode fechar esta janela.</p>
             </div>
           )}
+
         </main>
       </div>
     </div>
