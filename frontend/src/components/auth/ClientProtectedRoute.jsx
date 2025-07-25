@@ -3,13 +3,13 @@ import { Navigate, Outlet } from 'react-router-dom';
 
 const ClientProtectedRoute = () => {
     const clientToken = localStorage.getItem('clientToken');
+    const clientData = JSON.parse(localStorage.getItem('clientData'));
+    const companyId = clientData?.companyId || 'empresa'; // fallback
 
-    // Se não houver token, redireciona para a página inicial.
     if (!clientToken) {
-        return <Navigate to="/" replace />;
+        return <Navigate to={`/portal/login/${companyId}`} replace />;
     }
 
-    // Se houver token, renderiza a página filha (o <Outlet /> representa a página do painel).
     return <Outlet />;
 };
 
