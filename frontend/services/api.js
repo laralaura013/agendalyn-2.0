@@ -6,17 +6,14 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
+// Interceptor de token: separa bem rotas do cliente e do admin
 api.interceptors.request.use((config) => {
   const clientToken = localStorage.getItem('clientToken');
   const adminToken = localStorage.getItem('token');
 
-  // Se for rota do portal e houver clientToken, usa o token do cliente
-  if (config.url?.includes('/portal') && clientToken) {
+  if (config.url?.startsWith('/portal') && clientToken) {
     config.headers.Authorization = `Bearer ${clientToken}`;
-  }
-
-  // Caso contrário, se houver token de admin, usa ele
-  else if (adminToken) {
+  } else if (!config.url?.startsWith('/portal') && adminToken) {
     config.headers.Authorization = `Bearer ${adminToken}`;
   }
 
