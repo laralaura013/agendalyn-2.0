@@ -98,13 +98,32 @@ const BookingPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 to-white pb-10">
-      <div className="fixed top-0 w-full bg-white shadow z-50 p-4 text-center font-bold text-purple-700 text-lg">
+      {/* Topo fixo com nome da empresa */}
+      <div className="fixed top-0 w-full bg-white shadow z-40 p-4 text-center font-bold text-purple-700 text-lg">
         {companyData.company?.name || 'Agendamento'}
+      </div>
+
+      {/* Botões de login e registro */}
+      <div className="fixed top-0 right-4 z-50 pt-4">
+        <div className="flex gap-2">
+          <a
+            href={`/portal/login/${companyId}`}
+            className="bg-purple-600 text-white px-4 py-1 rounded-md text-sm hover:bg-purple-700 transition"
+          >
+            Entrar
+          </a>
+          <a
+            href={`/portal/register/${companyId}`}
+            className="bg-gray-200 text-gray-800 px-4 py-1 rounded-md text-sm hover:bg-gray-300 transition"
+          >
+            Criar Conta
+          </a>
+        </div>
       </div>
 
       <div className="w-full max-w-lg mx-auto px-4 pt-[80px]">
         <main className="bg-white p-6 rounded-2xl shadow-lg">
-
+          {/* Etapas do processo */}
           {step === 1 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -157,7 +176,7 @@ const BookingPage = () => {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <button onClick={handleBack} className="p-2 rounded-full hover:bg-gray-100"><ArrowLeft className="h-5 w-5 text-gray-600" /></button>
-                <div className="bg-purple-100 p--3 rounded-full text-purple-700 shadow-sm"><Calendar className="h-6 w-6" /></div>
+                <div className="bg-purple-100 p-3 rounded-full text-purple-700 shadow-sm"><Calendar className="h-6 w-6" /></div>
                 <h2 className="text-xl font-semibold">Escolha Data e Hora</h2>
               </div>
               <div className="mb-4">
@@ -209,7 +228,6 @@ const BookingPage = () => {
               <p className="text-sm text-gray-500 mt-6">Pode fechar esta janela.</p>
             </div>
           )}
-
         </main>
       </div>
     </div>

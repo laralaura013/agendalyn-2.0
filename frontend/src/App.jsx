@@ -38,22 +38,26 @@ import ClientDashboardPage from './pages/ClientDashboardPage';
 function App() {
   return (
     <>
-      <Toaster position="top-right" toastOptions={{ duration: 5000, style: { background: '#333', color: '#fff' } }} />
+      <Toaster
+        position="top-right"
+        toastOptions={{ duration: 5000, style: { background: '#333', color: '#fff' } }}
+      />
       <ReloadPrompt />
+
       <Routes>
         {/* Rotas Públicas */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/agendar/:companyId" element={<BookingPage />} />
-        
-        {/* Rotas do Portal do Cliente */}
+
+        {/* Portal do Cliente */}
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
         <Route element={<ClientProtectedRoute />}>
           <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
         </Route>
 
-        {/* --- ESTRUTURA DE ROTAS DO ADMIN CORRIGIDA --- */}
+        {/* Painel do Administrador */}
         <Route path="/" element={<ProtectedRoute />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="schedule" element={<Schedule />} />
@@ -72,8 +76,7 @@ function App() {
           <Route path="brands" element={<BrandsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="commissions" element={<CommissionsPage />} />
-          {/* A rota para a página inicial (/) agora também é protegida */}
-          <Route index element={<Home />} /> 
+          <Route index element={<Home />} />
         </Route>
       </Routes>
     </>

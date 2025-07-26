@@ -18,7 +18,7 @@ const ClientDashboardPage = () => {
     const token = localStorage.getItem('clientToken');
     const clientInfo = JSON.parse(localStorage.getItem('clientData'));
     if (!token || !clientInfo) {
-      navigate('/portal/login/');
+      navigate('/portal/login/cmdep95530000pspaolfy7dod');
       return;
     }
     setClientData(clientInfo);
@@ -66,7 +66,7 @@ const ClientDashboardPage = () => {
   const handleLogout = () => {
     localStorage.removeItem('clientToken');
     localStorage.removeItem('clientData');
-    navigate('/portal/login');
+    navigate('/portal/login/cmdep95530000pspaolfy7dod');
   };
 
   const upcoming = appointments.filter((appt) => !isBefore(new Date(appt.start), new Date()));
@@ -75,28 +75,38 @@ const ClientDashboardPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-md mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-purple-700">Olá, {clientData?.name}</h1>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-500 hover:underline">
-            <LogOut size={16} /> Sair
-          </button>
+
+        {/* TOPO COM AÇÕES */}
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-purple-700">Olá, {clientData?.name}</h1>
+            <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-500 hover:underline">
+              <LogOut size={16} /> Sair
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              to={`/agendar/${clientData?.companyId}`}
+              className="flex-1 flex items-center justify-center gap-2 bg-purple-700 text-white py-2 px-4 rounded-lg hover:bg-purple-800 transition text-center"
+            >
+              <PlusCircle size={16} /> Agendar Novo Horário
+            </Link>
+
+            <Link
+              to={`/portal/register/${clientData?.companyId}`}
+              className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition text-center"
+            >
+              Criar Conta
+            </Link>
+          </div>
         </div>
 
-        <div className="flex justify-end mb-4">
-          <Link
-            to={`/agendar/${clientData?.companyId}`}
-            className="flex items-center gap-2 bg-purple-700 text-white py-2 px-4 rounded-lg hover:bg-purple-800 transition"
-          >
-            <PlusCircle size={16} /> Agendar Novo Horário
-          </Link>
-        </div>
-
-        {/* Agendamentos Futuros */}
+        {/* AGENDAMENTOS FUTUROS */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <CalendarDays size={18} className="text-purple-600" /> Próximos Agendamentos
           </h2>
-
           {upcoming.length === 0 ? (
             <p className="text-gray-500 text-sm">Você não tem agendamentos futuros.</p>
           ) : (
@@ -121,12 +131,11 @@ const ClientDashboardPage = () => {
           )}
         </div>
 
-        {/* Histórico */}
+        {/* HISTÓRICO */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <History size={18} className="text-gray-600" /> Histórico de Agendamentos
           </h2>
-
           {history.length === 0 ? (
             <p className="text-gray-500 text-sm">Nenhum agendamento anterior encontrado.</p>
           ) : (
@@ -145,12 +154,11 @@ const ClientDashboardPage = () => {
           )}
         </div>
 
-        {/* Pacotes Ativos */}
+        {/* PACOTES */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <PackageCheck size={18} className="text-green-600" /> Meus Pacotes
           </h2>
-
           {packages.length === 0 ? (
             <p className="text-gray-500 text-sm">Você não possui pacotes ativos.</p>
           ) : (
