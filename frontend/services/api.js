@@ -10,17 +10,18 @@ api.interceptors.request.use((config) => {
   const adminToken = localStorage.getItem('token');
   const clientToken = localStorage.getItem('clientToken');
 
-  // Adiciona o token de cliente se for uma rota do portal
-  if (config.url?.startsWith('/portal') && clientToken) {
-    config.headers.Authorization = `Bearer ${clientToken}`;
-  }
+  const isClientRoute = config.url?.startsWith('/portal');
+  const isAdminRoute = !isClientRoute && config.url?.startsWith('/');
 
-  // Caso contrário, usa o token de admin
-  else if (adminToken) {
+  if (isClientRoute && clientToken) {
+    config.headers.Authorization = `Bearer ${clientToken}`;
+  } else if (isAdminRoute && adminToken) {
     config.headers.Authorization = `Bearer ${adminToken}`;
   }
 
   return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 export default api;
