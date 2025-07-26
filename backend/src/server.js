@@ -27,7 +27,6 @@ import clientPortalRoutes from './routes/clientPortalRoutes.js';
 
 dotenv.config();
 const app = express();
-
 const PORT = process.env.PORT || 3001;
 
 const allowedOrigins = [
@@ -37,7 +36,7 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -45,13 +44,13 @@ const corsOptions = {
   },
 };
 
-// Middlewares
-app.use(cors(corsOptions));
-app.use('/api/webhooks', webhookRoutes);
-app.use(express.json());
+// ✅ Ordem correta dos middlewares
+app.use(express.json());           // Primeiro: body parser
+app.use(cors(corsOptions));       // Depois: CORS
+app.use('/api/webhooks', webhookRoutes); // Webhooks (antes de auth se necessário)
 
 // --- Uso das Rotas na API ---
-app.use('/api/portal', clientPortalRoutes); // Garante que a rota do portal está a ser usada
+app.use('/api/portal', clientPortalRoutes); // Portal do Cliente
 app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
