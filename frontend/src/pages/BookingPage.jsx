@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import {
   ArrowLeft, Sparkles, Clock, Tag, User, Calendar, CheckCircle
@@ -10,26 +10,35 @@ import toast from 'react-hot-toast';
 
 const BookingPage = () => {
   const { companyId } = useParams();
+  const navigate = useNavigate(); // Adicionado
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedStaff, setSelectedStaff] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [customerDetails, setCustomerDetails] = useState({ name: '', phone: '', email: '' });
+  const [customerDetails, setCustomerDetails] = useState({ name: "", phone: "", email: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [companyData, setCompanyData] = useState({ company: null, services: [], staff: [] });
+  const [client, setClient] = useState(null); // Estado do cliente logado
 
   useEffect(() => {
-    const clientToken = localStorage.getItem('clientToken');
-    const storedClientData = JSON.parse(localStorage.getItem('clientData'));
+    const storedClient = localStorage.getItem("clientData");
+    if (storedClient) {
+      setClient(JSON.parse(storedClient));
+    }
+  }, []);
+
+  useEffect(() => {
+    const clientToken = localStorage.getItem("clientToken");
+    const storedClientData = JSON.parse(localStorage.getItem("clientData"));
     if (clientToken && storedClientData) {
       setCustomerDetails({
-        name: storedClientData.name || '',
-        phone: storedClientData.phone || '',
-        email: storedClientData.email || '',
+        name: storedClientData.name || "",
+        phone: storedClientData.phone || "",
+        email: storedClientData.email || "",
       });
     }
 
@@ -59,7 +68,7 @@ const BookingPage = () => {
             serviceId: selectedService.id,
             staffId: selectedStaff.id
           };
-          const response = await api.get('/public/available-slots', { params });
+          const response = await api.get("/public/available-slots", { params });
           setAvailableSlots(response.data);
         } catch (err) {
           toast.error("Não foi possível buscar os horários.");
@@ -97,7 +106,7 @@ const BookingPage = () => {
 
   const handleConfirmBooking = async (e) => {
     e.preventDefault();
-    const bookingPromise = api.post('/public/create-appointment', {
+    const bookingPromise = api.post("/public/create-appointment", {
       companyId,
       serviceId: selectedService.id,
       staffId: selectedStaff.id,
@@ -105,15 +114,16 @@ const BookingPage = () => {
       clientName: customerDetails.name,
       clientPhone: customerDetails.phone,
       clientEmail: customerDetails.email,
+      clientId: client?.id, // ✅ Inclui o ID do cliente
     });
 
     toast.promise(bookingPromise, {
-      loading: 'A confirmar o seu agendamento...',
+      loading: "A confirmar o seu agendamento...",
       success: () => {
         setStep(5);
-        return 'Agendamento confirmado com sucesso!';
+        return "Agendamento confirmado com sucesso!";
       },
-      error: 'Não foi possível confirmar o seu agendamento.',
+      error: "Não foi possível confirmar o seu agendamento.",
     });
   };
 
@@ -136,30 +146,37 @@ const BookingPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 to-white pb-10">
       <div className="fixed top-0 w-full bg-white shadow z-40 p-4 text-center font-bold text-purple-700 text-lg">
-        {companyData.company?.name || 'Agendamento'}
-      </div>
-
-      <div className="fixed top-0 right-4 z-50 pt-4">
-        <div className="flex gap-2">
-          {localStorage.getItem("clientToken") ? (
-            <Link to="/portal/dashboard" className="text-sm text-purple-600 hover:underline">
-              Voltar ao Painel
-            </Link>
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl font-bold text-gray-800">Agendar Novo Horário</h1>
+          {client ? (
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-700">Olá, {client.name}</span>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("clientToken");
+                  localStorage.removeItem("clientData");
+                  setClient(null);
+                }}
+                className="text-sm text-purple-600 hover:underline"
+              >
+                Sair
+              </button>
+            </div>
           ) : (
-            <>
-              <a
-                href={`/portal/login/${companyId}`}
-                className="bg-purple-600 text-white px-4 py-1 rounded-md text-sm hover:bg-purple-700 transition"
+            <div className="flex gap-4">
+              <Link
+                to={`/portal/login/${companyId}`}
+                className="text-sm text-purple-600 hover:underline"
               >
                 Entrar
-              </a>
-              <a
-                href={`/portal/register/${companyId}`}
-                className="bg-gray-200 text-gray-800 px-4 py-1 rounded-md text-sm hover:bg-gray-300 transition"
+              </Link>
+              <Link
+                to={`/portal/register/${companyId}`}
+                className="text-sm text-purple-600 hover:underline"
               >
                 Criar Conta
-              </a>
-            </>
+              </Link>
+            </div>
           )}
         </div>
       </div>
