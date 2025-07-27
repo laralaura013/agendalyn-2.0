@@ -13,7 +13,11 @@ const generateToken = (clientId) => {
 
 // ✅ Registro do cliente
 export const registerClient = async (req, res) => {
-  const { name, email, phone, password, companyId } = req.body;
+  const { name, email, password, companyId, phone } = req.body;
+
+  if (!name || !email || !password || !companyId || !phone) {
+    return res.status(400).json({ message: 'Preencha todos os campos obrigatórios.' });
+  }
 
   try {
     const existing = await prisma.client.findFirst({
@@ -24,7 +28,7 @@ export const registerClient = async (req, res) => {
     });
 
     if (existing) {
-      return res.status(400).json({ message: 'Cliente já existe com este e-mail' });
+      return res.status(400).json({ message: 'Cliente já existe com este e-mail.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -33,8 +37,8 @@ export const registerClient = async (req, res) => {
       data: {
         name,
         email,
-        phone: phone || '', // ← Garante que nunca seja undefined
         password: hashedPassword,
+        phone,
         companyId,
       },
     });
@@ -72,12 +76,12 @@ export const loginClient = async (req, res) => {
     });
 
     if (!client) {
-      return res.status(401).json({ message: 'Cliente não encontrado' });
+      return res.status(401).json({ message: 'Cliente não encontrado.' });
     }
 
     const isMatch = await bcrypt.compare(password, client.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Senha incorreta' });
+      return res.status(401).json({ message: 'Senha incorreta.' });
     }
 
     const token = generateToken(client.id);
@@ -105,7 +109,7 @@ export const getMyAppointments = async (req, res) => {
       where: { clientId: req.client.id },
       include: {
         service: true,
-        staff: true,
+        user: true, // <- user é o nome correto, não "staff"
       },
       orderBy: { start: 'desc' },
     });
@@ -120,11 +124,8 @@ export const getMyAppointments = async (req, res) => {
 // ✅ Listar pacotes do cliente autenticado
 export const getMyPackages = async (req, res) => {
   try {
-    const packages = await prisma.packagePurchase.findMany({
+    const packages = await prisma.clientPackage.findMany({
       where: { clientId: req.client.id },
-      include: {
-        package: true,
-      },
       orderBy: { createdAt: 'desc' },
     });
 
