@@ -1,3 +1,4 @@
+
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
@@ -17,7 +18,10 @@ export const registerClient = async (req, res) => {
 
   try {
     const existing = await prisma.client.findFirst({
-      where: { email, companyId },
+      where: {
+        email: { equals: email, mode: 'insensitive' },
+        companyId,
+      },
     });
 
     if (existing) {
@@ -54,10 +58,17 @@ export const registerClient = async (req, res) => {
 
 // ✅ Login do cliente
 export const loginClient = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, companyId } = req.body;
 
   try {
-    const client = await prisma.client.findUnique({ where: { email } });
+    const client = await prisma.client.findUnique({
+      where: {
+        companyId_email: {
+          email,
+          companyId,
+        },
+      },
+    });
 
     if (!client) {
       return res.status(401).json({ message: 'Cliente não encontrado' });
@@ -94,7 +105,7 @@ export const getMyAppointments = async (req, res) => {
         service: true,
         staff: true,
       },
-      orderBy: { date: 'desc' },
+      orderBy: { start: 'desc' },
     });
 
     res.json(appointments);
