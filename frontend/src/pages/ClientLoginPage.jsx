@@ -10,7 +10,6 @@ const ClientLoginPage = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    companyId,
   });
 
   const [loading, setLoading] = useState(false);
@@ -24,7 +23,11 @@ const ClientLoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await api.post('/portal/login', formData);
+      const response = await api.post('/portal/login', {
+        ...formData,
+        companyId, // garante que companyId da URL está sendo enviado
+      });
+
       const { token, client } = response.data;
 
       localStorage.setItem('clientToken', token);
@@ -86,7 +89,10 @@ const ClientLoginPage = () => {
         <div className="text-center mt-4">
           <p className="text-sm">
             Não tem uma conta?{' '}
-            <Link to={`/portal/register/${companyId}`} className="font-medium text-purple-600 hover:underline">
+            <Link
+              to={`/portal/register/${companyId}`}
+              className="font-medium text-purple-600 hover:underline"
+            >
               Crie uma agora
             </Link>
           </p>

@@ -12,6 +12,7 @@ model Company {
   name               String
   phone              String?
   address            String?
+  isActive           Boolean         @default(true)
   stripeCustomerId   String?         @unique
   users              User[]
   services           Service[]
