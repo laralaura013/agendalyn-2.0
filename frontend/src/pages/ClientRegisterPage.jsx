@@ -10,6 +10,7 @@ const ClientRegisterPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     companyId: companyId,
   });
@@ -56,6 +57,7 @@ const ClientRegisterPage = () => {
               <input
                 type="text"
                 name="name"
+                value={formData.name}
                 onChange={handleChange}
                 className="mt-1 block w-full p-3 border rounded-md"
                 required
@@ -66,6 +68,18 @@ const ClientRegisterPage = () => {
               <input
                 type="email"
                 name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="mt-1 block w-full p-3 border rounded-md"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm">Telefone</label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
                 onChange={handleChange}
                 className="mt-1 block w-full p-3 border rounded-md"
                 required
@@ -76,6 +90,7 @@ const ClientRegisterPage = () => {
               <input
                 type="password"
                 name="password"
+                value={formData.password}
                 onChange={handleChange}
                 className="mt-1 block w-full p-3 border rounded-md"
                 required

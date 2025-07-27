@@ -1,4 +1,3 @@
-
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
@@ -14,7 +13,7 @@ const generateToken = (clientId) => {
 
 // ✅ Registro do cliente
 export const registerClient = async (req, res) => {
-  const { name, email, password, companyId } = req.body;
+  const { name, email, phone, password, companyId } = req.body;
 
   try {
     const existing = await prisma.client.findFirst({
@@ -34,6 +33,7 @@ export const registerClient = async (req, res) => {
       data: {
         name,
         email,
+        phone: phone || '', // ← Garante que nunca seja undefined
         password: hashedPassword,
         companyId,
       },
@@ -47,6 +47,7 @@ export const registerClient = async (req, res) => {
         id: client.id,
         name: client.name,
         email: client.email,
+        phone: client.phone,
         companyId: client.companyId,
       },
     });
@@ -87,6 +88,7 @@ export const loginClient = async (req, res) => {
         id: client.id,
         name: client.name,
         email: client.email,
+        phone: client.phone,
         companyId: client.companyId,
       },
     });
