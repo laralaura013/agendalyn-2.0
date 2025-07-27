@@ -13,7 +13,7 @@ const BookingPage = () => {
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedStaff, setSelectedStaff] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T'));
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -37,7 +37,6 @@ const BookingPage = () => {
       if (!companyId) return;
       try {
         setLoading(true);
-        // Este trecho já estava correto, usando crases ``
         const response = await api.get(`/public/booking-page/${companyId}`);
         setCompanyData(response.data);
       } catch (err) {
@@ -142,20 +141,26 @@ const BookingPage = () => {
 
       <div className="fixed top-0 right-4 z-50 pt-4">
         <div className="flex gap-2">
-          {/* CORREÇÃO APLICADA AQUI */}
-          <a
-            href={`/portal/login/${companyId}`}
-            className="bg-purple-600 text-white px-4 py-1 rounded-md text-sm hover:bg-purple-700 transition"
-          >
-            Entrar
-          </a>
-          {/* CORREÇÃO APLICADA AQUI */}
-          <a
-            href={`/portal/register/${companyId}`}
-            className="bg-gray-200 text-gray-800 px-4 py-1 rounded-md text-sm hover:bg-gray-300 transition"
-          >
-            Criar Conta
-          </a>
+          {localStorage.getItem("clientToken") ? (
+            <Link to="/portal/dashboard" className="text-sm text-purple-600 hover:underline">
+              Voltar ao Painel
+            </Link>
+          ) : (
+            <>
+              <a
+                href={`/portal/login/${companyId}`}
+                className="bg-purple-600 text-white px-4 py-1 rounded-md text-sm hover:bg-purple-700 transition"
+              >
+                Entrar
+              </a>
+              <a
+                href={`/portal/register/${companyId}`}
+                className="bg-gray-200 text-gray-800 px-4 py-1 rounded-md text-sm hover:bg-gray-300 transition"
+              >
+                Criar Conta
+              </a>
+            </>
+          )}
         </div>
       </div>
 
