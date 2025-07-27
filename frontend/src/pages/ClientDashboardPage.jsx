@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/api';
+import {
+  getMyAppointments,
+  getMyPackages,
+  cancelAppointment
+} from '../services/clientService';
 import toast from 'react-hot-toast';
 import {
   CalendarDays, LogOut, Clock, PlusCircle, PackageCheck, History, XCircle
@@ -28,11 +32,8 @@ const ClientDashboardPage = () => {
 
   const fetchAppointments = async () => {
     try {
-      const token = localStorage.getItem('clientToken');
-      const response = await api.get('/portal/my-appointments', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAppointments(response.data);
+      const data = await getMyAppointments();
+      setAppointments(data);
     } catch (err) {
       toast.error('Erro ao carregar agendamentos.');
     }
@@ -40,11 +41,8 @@ const ClientDashboardPage = () => {
 
   const fetchPackages = async () => {
     try {
-      const token = localStorage.getItem('clientToken');
-      const response = await api.get('/portal/my-packages', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setPackages(response.data);
+      const data = await getMyPackages();
+      setPackages(data);
     } catch (err) {
       toast.error('Erro ao carregar pacotes.');
     }
@@ -52,10 +50,7 @@ const ClientDashboardPage = () => {
 
   const handleCancel = async (id) => {
     try {
-      const token = localStorage.getItem('clientToken');
-      await api.delete(`/portal/appointments/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await cancelAppointment(id);
       toast.success('Agendamento cancelado!');
       fetchAppointments();
     } catch (err) {

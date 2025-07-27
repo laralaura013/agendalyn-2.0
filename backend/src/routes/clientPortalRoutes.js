@@ -5,19 +5,19 @@ import {
   getMyAppointments,
   getMyPackages,
   cancelAppointment
-} from '../controllers/clientPortalController.js';
+} from '../controllers/portal/clientAuthController.js'; // ✅ corrigido o caminho
 
 import { protectClient } from '../middlewares/clientAuthMiddleware.js';
 
 const router = express.Router();
 
-// Rotas públicas para registo e login com senha
+// 🔓 Rotas públicas para login e cadastro
 router.post('/register', registerClient);
 router.post('/login', loginClient);
 
-// Rotas protegidas (apenas para clientes autenticados)
+// 🔐 Rotas protegidas (cliente autenticado via token)
 router.get('/my-appointments', protectClient, getMyAppointments);
 router.get('/my-packages', protectClient, getMyPackages);
-router.delete('/appointments/:id', protectClient, cancelAppointment); // ✅ NOVA ROTA
+router.delete('/appointments/:id', protectClient, cancelAppointment); // Cancelar agendamento
 
 export default router;
