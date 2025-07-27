@@ -12,7 +12,7 @@ const ClientRegisterPage = () => {
     email: '',
     phone: '',
     password: '',
-    companyId: companyId,
+    companyId,
   });
 
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,6 @@ const ClientRegisterPage = () => {
     try {
       const response = await api.post('/portal/register', formData);
 
-      // ✅ Autentica automaticamente após o registro
       const { token, client } = response.data;
       localStorage.setItem('clientToken', token);
       localStorage.setItem('clientData', JSON.stringify(client));
@@ -53,7 +52,7 @@ const ClientRegisterPage = () => {
         <div className="bg-white p-8 rounded-lg shadow-md">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm">Nome</label>
+              <label className="block text-sm font-medium text-gray-700">Nome</label>
               <input
                 type="text"
                 name="name"
@@ -63,8 +62,9 @@ const ClientRegisterPage = () => {
                 required
               />
             </div>
+
             <div>
-              <label className="block text-sm">Email</label>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 name="email"
@@ -74,8 +74,9 @@ const ClientRegisterPage = () => {
                 required
               />
             </div>
+
             <div>
-              <label className="block text-sm">Telefone</label>
+              <label className="block text-sm font-medium text-gray-700">Telefone</label>
               <input
                 type="tel"
                 name="phone"
@@ -85,8 +86,9 @@ const ClientRegisterPage = () => {
                 required
               />
             </div>
+
             <div>
-              <label className="block text-sm">Senha</label>
+              <label className="block text-sm font-medium text-gray-700">Senha</label>
               <input
                 type="password"
                 name="password"
@@ -96,6 +98,7 @@ const ClientRegisterPage = () => {
                 required
               />
             </div>
+
             <div>
               <button
                 type="submit"
