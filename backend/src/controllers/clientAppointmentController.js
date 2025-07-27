@@ -1,6 +1,6 @@
-const prisma = require('../../prisma/client');
+import prisma from '../../prisma/client.js';
 
-const cancelClientAppointment = async (req, res) => {
+export const cancelClientAppointment = async (req, res) => {
   try {
     const clientId = req.client.id;
     const { id } = req.params;
@@ -22,8 +22,4 @@ const cancelClientAppointment = async (req, res) => {
     console.error('Erro ao cancelar agendamento:', error);
     res.status(500).json({ message: 'Erro interno.' });
   }
-};
-
-module.exports = {
-  cancelClientAppointment,
 };
