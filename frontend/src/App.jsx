@@ -34,6 +34,7 @@ import ClientLoginPage from './pages/ClientLoginPage';
 import ClientRegisterPage from './pages/ClientRegisterPage';
 import ClientProtectedRoute from './components/auth/ClientProtectedRoute';
 import ClientDashboardPage from './pages/ClientDashboardPage';
+import ClientProfilePage from './pages/ClientProfilePage'; // ✅ NOVO
 
 function App() {
   return (
@@ -55,6 +56,7 @@ function App() {
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
         <Route element={<ClientProtectedRoute />}>
           <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
+          <Route path="/portal/perfil" element={<ClientProfilePage />} /> {/* ✅ NOVA ROTA */}
         </Route>
 
         {/* Painel do Administrador */}

@@ -20,6 +20,15 @@ export const registerClient = async (req, res) => {
   }
 
   try {
+    // Valida empresa ativa
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+    });
+
+    if (!company || !company.isActive) {
+      return res.status(400).json({ message: 'Empresa inativa ou não encontrada.' });
+    }
+
     const existing = await prisma.client.findFirst({
       where: {
         email: { equals: email, mode: 'insensitive' },
@@ -66,6 +75,15 @@ export const loginClient = async (req, res) => {
   const { email, password, companyId } = req.body;
 
   try {
+    // Valida empresa ativa
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+    });
+
+    if (!company || !company.isActive) {
+      return res.status(400).json({ message: 'Empresa inativa ou não encontrada.' });
+    }
+
     const client = await prisma.client.findUnique({
       where: {
         companyId_email: {
@@ -109,7 +127,7 @@ export const getMyAppointments = async (req, res) => {
       where: { clientId: req.client.id },
       include: {
         service: true,
-        user: true, // <- user é o nome correto, não "staff"
+        user: true,
       },
       orderBy: { start: 'desc' },
     });
@@ -155,5 +173,37 @@ export const cancelAppointment = async (req, res) => {
   } catch (error) {
     console.error('Erro ao cancelar agendamento:', error);
     res.status(500).json({ message: 'Erro ao cancelar agendamento.' });
+  }
+};
+
+
+// ✅ Atualizar perfil do cliente autenticado
+export const updateClientProfile = async (req, res) => {
+  const { name, phone, password } = req.body;
+
+  try {
+    const data = { name, phone };
+
+    if (password) {
+      const hashed = await bcrypt.hash(password, 10);
+      data.password = hashed;
+    }
+
+    const updated = await prisma.client.update({
+      where: { id: req.client.id },
+      data,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        companyId: true,
+      },
+    });
+
+    res.json({ message: 'Perfil atualizado com sucesso.', client: updated });
+  } catch (error) {
+    console.error('Erro ao atualizar perfil do cliente:', error);
+    res.status(500).json({ message: 'Erro ao atualizar perfil.' });
   }
 };

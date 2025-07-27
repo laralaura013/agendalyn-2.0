@@ -49,6 +49,9 @@ const ClientDashboardPage = () => {
   };
 
   const handleCancel = async (id) => {
+    const confirm = window.confirm('Deseja realmente cancelar este agendamento?');
+    if (!confirm) return;
+
     try {
       await cancelAppointment(id);
       toast.success('Agendamento cancelado!');
@@ -74,8 +77,16 @@ const ClientDashboardPage = () => {
         {/* TOPO COM AÇÕES */}
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-purple-700">Olá, {clientData?.name}</h1>
-            <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-500 hover:underline">
+            <div>
+              <h1 className="text-2xl font-bold text-purple-700">Olá, {clientData?.name}</h1>
+              <Link to="/portal/perfil" className="text-sm text-purple-600 hover:underline">
+                Editar Perfil
+              </Link>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-sm text-red-500 hover:underline"
+            >
               <LogOut size={16} /> Sair
             </button>
           </div>

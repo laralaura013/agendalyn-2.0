@@ -23,6 +23,14 @@ export const protectClient = async (req, res, next) => {
         return res.status(401).json({ message: 'Cliente não encontrado.' });
       }
 
+      const company = await prisma.company.findUnique({
+        where: { id: client.companyId },
+      });
+
+      if (!company || !company.isActive) {
+        return res.status(403).json({ message: 'Empresa inativa ou não encontrada.' });
+      }
+
       req.client = { id: client.id, companyId: client.companyId };
       next();
     } catch (error) {
