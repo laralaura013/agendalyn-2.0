@@ -1,4 +1,10 @@
-// ...imports
+import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
+import ResourceTable from '../components/dashboard/ResourceTable';
+import Modal from '../components/dashboard/Modal';
+import ClientForm from '../components/forms/ClientForm';
+import api from '../services/api';
+
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
