@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
-  { to: '/portal/dashboard', icon: 'home-outline', label: 'Home' },
-  { to: '/portal/sobre', icon: 'book-outline', label: 'Sobre' },
-  { to: '/portal/mensagens', icon: 'chatbox-ellipses-outline', label: 'Mensagens' },
-  { to: '/portal/configuracoes', icon: 'settings-outline', label: 'Config' },
+  { to: '/portal/dashboard', icon: 'home-outline', label: 'Início' },
+  { to: '/portal/pacotes', icon: 'cube-outline', label: 'Pacotes' },
+  { to: '/portal/historico', icon: 'time-outline', label: 'Histórico' },
+  { to: '/portal/notificacoes', icon: 'notifications-outline', label: 'Avisos' },
   { to: '/portal/perfil', icon: 'person-outline', label: 'Perfil' },
 ];
 
@@ -14,41 +14,28 @@ const ClientBottomNav = () => {
 
   return (
     <>
-      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[90%] max-w-[430px] h-[70px] bg-[#1e272e] rounded-xl shadow-lg z-50">
-        <ul className="flex justify-between items-center h-full px-2">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow z-50">
+        <ul className="flex justify-around items-center h-[60px]">
           {navItems.map((item) => {
             const isActive = location.pathname === item.to;
             return (
-              <li
-                key={item.to}
-                className={`relative w-[70px] h-[70px] list ${isActive ? 'active' : ''}`}
-              >
+              <li key={item.to} className="text-center text-xs">
                 <Link
                   to={item.to}
-                  className="flex flex-col justify-center items-center w-full h-full text-sm text-[#ccc] hover:text-white transition"
+                  className={`flex flex-col items-center transition ${
+                    isActive ? 'text-purple-700 font-medium' : 'text-gray-500 hover:text-purple-600'
+                  }`}
                 >
-                  <span
-                    className={`icon text-[1.5rem] ${
-                      isActive
-                        ? 'bg-cyan-500 text-white p-2 rounded-full'
-                        : ''
-                    }`}
-                  >
+                  <span className="text-xl">
                     <ion-icon name={item.icon}></ion-icon>
                   </span>
-                  <span
-                    className={`text text-xs mt-1 ${
-                      isActive ? 'text-white font-bold' : ''
-                    }`}
-                  >
-                    {item.label}
-                  </span>
+                  <span className="text-[11px]">{item.label}</span>
                 </Link>
               </li>
             );
           })}
         </ul>
-      </div>
+      </nav>
 
       {/* Ionicons CDN */}
       <script
