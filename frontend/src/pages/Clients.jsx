@@ -1,10 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast';
-import ResourceTable from '../components/dashboard/ResourceTable';
-import Modal from '../components/dashboard/Modal';
-import ClientForm from '../components/forms/ClientForm';
-import api from '../services/api';
-
+// ...imports
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -14,7 +8,7 @@ const Clients = () => {
   const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/clients');
+      const response = await api.get('/clients/admin'); // ✅ Corrigido
       setClients(response.data);
     } catch (error) {
       toast.error("Não foi possível carregar os clientes.");
@@ -30,40 +24,39 @@ const Clients = () => {
   const handleSave = async (data) => {
     const isEditing = selectedClient && selectedClient.id;
     const savePromise = isEditing
-        ? api.put(`/clients/${selectedClient.id}`, data)
-        : api.post('/clients', data);
+      ? api.put(`/clients/admin/${selectedClient.id}`, data) // ✅ Corrigido
+      : api.post('/clients/admin', data); // ✅ Corrigido
 
     toast.promise(savePromise, {
-        loading: 'A salvar cliente...',
-        success: () => {
-            fetchClients();
-            setIsModalOpen(false);
-            setSelectedClient(null);
-            return `Cliente ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
-        },
-        error: "Não foi possível salvar o cliente."
+      loading: 'A salvar cliente...',
+      success: () => {
+        fetchClients();
+        setIsModalOpen(false);
+        setSelectedClient(null);
+        return `Cliente ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
+      },
+      error: "Não foi possível salvar o cliente."
     });
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Tem certeza que deseja excluir este cliente?")) {
-        const deletePromise = api.delete(`/clients/${id}`);
-        toast.promise(deletePromise, {
-            loading: 'A excluir cliente...',
-            success: () => {
-                fetchClients();
-                return 'Cliente excluído com sucesso!';
-            },
-            error: "Não foi possível excluir o cliente."
-        });
+      const deletePromise = api.delete(`/clients/admin/${id}`); // ✅ Corrigido
+      toast.promise(deletePromise, {
+        loading: 'A excluir cliente...',
+        success: () => {
+          fetchClients();
+          return 'Cliente excluído com sucesso!';
+        },
+        error: "Não foi possível excluir o cliente."
+      });
     }
   };
 
-  // --- COLUNAS ATUALIZADAS ---
   const columns = [
     { header: 'Nome', accessor: 'name' },
     { header: 'Telefone', accessor: 'phone' },
-    { header: 'Email', accessor: 'email' }, // COLUNA ADICIONADA
+    { header: 'Email', accessor: 'email' },
   ];
 
   return (

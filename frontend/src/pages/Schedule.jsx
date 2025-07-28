@@ -38,7 +38,7 @@ const Schedule = () => {
       try {
         await Promise.all([
           fetchAppointments(),
-          api.get('/clients').then(res => setClients(res.data)),
+          api.get('/clients/admin').then(res => setClients(res.data)), // ✅ Corrigido
           api.get('/services').then(res => setServices(res.data)),
           api.get('/staff').then(res => setStaff(res.data))
         ]);
@@ -66,32 +66,32 @@ const Schedule = () => {
   const handleSave = async (formData) => {
     const isEditing = selectedEvent && selectedEvent.id;
     const savePromise = isEditing
-        ? api.put(`/appointments/${selectedEvent.id}`, formData)
-        : api.post('/appointments', formData);
+      ? api.put(`/appointments/${selectedEvent.id}`, formData)
+      : api.post('/appointments', formData);
     
     toast.promise(savePromise, {
-        loading: 'A salvar agendamento...',
-        success: () => {
-            fetchAppointments();
-            setIsModalOpen(false);
-            return `Agendamento ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
-        },
-        error: "Não foi possível salvar o agendamento."
+      loading: 'A salvar agendamento...',
+      success: () => {
+        fetchAppointments();
+        setIsModalOpen(false);
+        return `Agendamento ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
+      },
+      error: "Não foi possível salvar o agendamento."
     });
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Tem certeza que deseja excluir este agendamento?")) {
-        const deletePromise = api.delete(`/appointments/${id}`);
-        toast.promise(deletePromise, {
-            loading: 'A excluir...',
-            success: () => {
-                fetchAppointments();
-                setIsModalOpen(false);
-                return 'Agendamento excluído com sucesso!';
-            },
-            error: "Não foi possível excluir o agendamento."
-        });
+      const deletePromise = api.delete(`/appointments/${id}`);
+      toast.promise(deletePromise, {
+        loading: 'A excluir...',
+        success: () => {
+          fetchAppointments();
+          setIsModalOpen(false);
+          return 'Agendamento excluído com sucesso!';
+        },
+        error: "Não foi possível excluir o agendamento."
+      });
     }
   };
 
