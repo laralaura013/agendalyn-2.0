@@ -1,55 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { updateClientProfile } from '../services/clientService';
+import ClientLayout from '../components/layouts/ClientLayout';
+import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const ClientProfilePage = () => {
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     password: '',
   });
 
-  useEffect(() => {
-    const clientInfo = JSON.parse(localStorage.getItem('clientData'));
-    if (!clientInfo) {
-      navigate('/portal/login');
-      return;
-    }
+  const [loading, setLoading] = useState(true);
 
-    setFormData({
-      name: clientInfo.name || '',
-      phone: clientInfo.phone || '',
-      password: '',
-    });
-  }, [navigate]);
+  useEffect(() => {
+    fetchClientProfile();
+  }, []);
+
+  const fetchClientProfile = async () => {
+    try {
+      const res = await api.get('/portal/me');
+      setFormData({ name: res.data.name, phone: res.data.phone, password: '' });
+    } catch (err) {
+      toast.error('Erro ao carregar perfil.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await updateClientProfile(formData);
-      localStorage.setItem('clientData', JSON.stringify(res.client));
+      await api.put('/portal/me', formData);
       toast.success('Perfil atualizado com sucesso!');
-      setFormData((prev) => ({ ...prev, password: '' }));
+      setFormData(prev => ({ ...prev, password: '' })); // limpa campo senha
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Erro ao atualizar perfil.');
+      toast.error('Erro ao atualizar perfil.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6">
-        <h1 className="text-2xl font-bold mb-4 text-center text-purple-700">Editar Perfil</h1>
+    <ClientLayout>
+      <h1 className="text-2xl font-bold mb-4 text-purple-700">Editar Perfil</h1>
+      {loading ? (
+        <p>Carregando...</p>
+      ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-
           <div>
             <label className="block text-sm font-medium text-gray-700">Nome</label>
             <input
@@ -57,7 +57,7 @@ const ClientProfilePage = () => {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full mt-1 p-2 border rounded-md"
+              className="w-full p-2 border rounded"
               required
             />
           </div>
@@ -65,11 +65,11 @@ const ClientProfilePage = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700">Telefone</label>
             <input
-              type="text"
+              type="tel"
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              className="w-full mt-1 p-2 border rounded-md"
+              className="w-full p-2 border rounded"
               required
             />
           </div>
@@ -81,20 +81,19 @@ const ClientProfilePage = () => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full mt-1 p-2 border rounded-md"
-              placeholder="Deixe em branco para manter a atual"
+              className="w-full p-2 border rounded"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full bg-purple-700 hover:bg-purple-800 text-white font-semibold py-2 px-4 rounded-md"
+            className="w-full bg-purple-700 text-white py-2 px-4 rounded hover:bg-purple-800 transition"
           >
             Salvar Alterações
           </button>
         </form>
-      </div>
-    </div>
+      )}
+    </ClientLayout>
   );
 };
 
