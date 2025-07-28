@@ -35,6 +35,9 @@ import ClientRegisterPage from './pages/ClientRegisterPage';
 import ClientProtectedRoute from './components/auth/ClientProtectedRoute';
 import ClientDashboardPage from './pages/ClientDashboardPage';
 import ClientProfilePage from './pages/ClientProfilePage';
+import ClientPackagesPage from './pages/ClientPackagesPage';
+import ClientHistoryPage from './pages/ClientHistoryPage';
+import ClientNoticesPage from './pages/ClientNoticesPage';
 
 function App() {
   return (
@@ -60,6 +63,9 @@ function App() {
         <Route element={<ClientProtectedRoute />}>
           <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
           <Route path="/portal/perfil" element={<ClientProfilePage />} />
+          <Route path="/portal/pacotes" element={<ClientPackagesPage />} />
+          <Route path="/portal/historico" element={<ClientHistoryPage />} />
+          <Route path="/portal/avisos" element={<ClientNoticesPage />} />
         </Route>
 
         {/* Painel do Administrador (protegido) */}
