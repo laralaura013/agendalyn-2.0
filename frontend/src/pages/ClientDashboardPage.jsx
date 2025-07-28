@@ -74,9 +74,6 @@ const ClientDashboardPage = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-purple-700">Olá, {clientData?.name}</h1>
-            <Link to="/portal/perfil" className="text-sm text-purple-600 hover:underline">
-              Editar Perfil
-            </Link>
           </div>
           <button
             onClick={handleLogout}
@@ -86,21 +83,12 @@ const ClientDashboardPage = () => {
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Link
-            to={`/agendar/${clientData?.companyId}`}
-            className="flex-1 flex items-center justify-center gap-2 bg-purple-700 text-white py-2 px-4 rounded-lg hover:bg-purple-800 transition text-center"
-          >
-            <PlusCircle size={16} /> Agendar Novo Horário
-          </Link>
-
-          <Link
-            to={`/portal/register/${clientData?.companyId}`}
-            className="flex-1 flex items-center justify-center gap-2 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition text-center"
-          >
-            Criar Conta
-          </Link>
-        </div>
+        <Link
+          to={`/agendar/${clientData?.companyId}`}
+          className="flex items-center justify-center gap-2 bg-purple-700 text-white py-2 px-4 rounded-lg hover:bg-purple-800 transition text-center"
+        >
+          <PlusCircle size={16} /> Agendar Novo Horário
+        </Link>
       </div>
 
       {/* AGENDAMENTOS FUTUROS */}
