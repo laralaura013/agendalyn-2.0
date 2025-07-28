@@ -14,38 +14,32 @@ const ClientBottomNav = () => {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t shadow z-50">
-        <ul className="flex justify-around items-center h-[65px]">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.to;
-            return (
-              <li key={item.to} className="text-center text-xs">
-                <Link
-                  to={item.to}
-                  className="flex flex-col items-center justify-center transition"
-                >
-                  <span
-                    className={`text-[24px] flex items-center justify-center rounded-full mb-1 transition ${
-                      isActive
-                        ? 'bg-purple-100 text-purple-700 w-10 h-10'
-                        : 'text-gray-500'
-                    }`}
-                  >
-                    <ion-icon name={item.icon}></ion-icon>
-                  </span>
-                  <span
-                    className={`text-[11px] ${
-                      isActive ? 'text-purple-700 font-medium' : 'text-gray-500'
-                    }`}
-                  >
-                    {item.label}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 w-[90%] max-w-md bg-gray-900 rounded-2xl px-4 py-2 shadow-lg z-50 flex justify-between items-center">
+        {navItems.map((item, index) => {
+          const isActive = location.pathname === item.to;
+
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="relative flex flex-col items-center justify-center w-[60px] h-[60px]"
+            >
+              {isActive && (
+                <div className="absolute -top-5 bg-purple-600 w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-gray-900 transition-all z-10">
+                  <ion-icon name={item.icon} class="text-white text-[24px]"></ion-icon>
+                </div>
+              )}
+
+              {!isActive && (
+                <>
+                  <ion-icon name={item.icon} class="text-gray-400 text-[24px]"></ion-icon>
+                  <span className="text-[11px] text-gray-400 mt-1">{item.label}</span>
+                </>
+              )}
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Ionicons CDN */}
       <script
