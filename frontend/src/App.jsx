@@ -34,7 +34,7 @@ import ClientLoginPage from './pages/ClientLoginPage';
 import ClientRegisterPage from './pages/ClientRegisterPage';
 import ClientProtectedRoute from './components/auth/ClientProtectedRoute';
 import ClientDashboardPage from './pages/ClientDashboardPage';
-import ClientProfilePage from './pages/ClientProfilePage'; // ✅ NOVO
+import ClientProfilePage from './pages/ClientProfilePage';
 
 function App() {
   return (
@@ -46,6 +46,9 @@ function App() {
       <ReloadPrompt />
 
       <Routes>
+        {/* ✅ Página inicial agora é pública */}
+        <Route path="/" element={<Home />} />
+
         {/* Rotas Públicas */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -56,10 +59,10 @@ function App() {
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
         <Route element={<ClientProtectedRoute />}>
           <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
-          <Route path="/portal/perfil" element={<ClientProfilePage />} /> {/* ✅ NOVA ROTA */}
+          <Route path="/portal/perfil" element={<ClientProfilePage />} />
         </Route>
 
-        {/* Painel do Administrador */}
+        {/* Painel do Administrador (protegido) */}
         <Route path="/" element={<ProtectedRoute />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="schedule" element={<Schedule />} />
@@ -78,7 +81,6 @@ function App() {
           <Route path="brands" element={<BrandsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="commissions" element={<CommissionsPage />} />
-          <Route index element={<Home />} />
         </Route>
       </Routes>
     </>
