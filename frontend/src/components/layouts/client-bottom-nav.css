@@ -1,0 +1,70 @@
+.client-nav-wrapper {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 430px;
+  height: 70px;
+  background-color: #1e272e;
+  border-radius: 16px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+  z-index: 50;
+}
+
+.client-nav-wrapper ul {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  padding: 0 10px;
+  margin: 0;
+}
+
+.client-nav-wrapper ul li {
+  list-style: none;
+  flex: 1;
+  text-align: center;
+  position: relative;
+  transition: 0.3s;
+}
+
+.client-nav-wrapper ul li .link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ccc;
+  text-decoration: none;
+  font-size: 0.75rem;
+  height: 100%;
+  transition: all 0.3s ease;
+}
+
+.client-nav-wrapper ul li.active .link {
+  color: white;
+  font-weight: bold;
+}
+
+.client-nav-wrapper ul li .icon {
+  font-size: 1.5rem;
+  transition: 0.3s;
+}
+
+.client-nav-wrapper ul li.active .icon {
+  background: #8b5cf6; /* Roxo tailwind */
+  padding: 10px;
+  border-radius: 50%;
+  color: white;
+  font-size: 1.5rem;
+  animation: bounce-in 0.3s ease;
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.client-nav-wrapper ul li .label {
+  margin-top: 4px;
+}
