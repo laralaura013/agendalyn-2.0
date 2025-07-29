@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ClientBottomNav from '../ClientBottomNav';
+import ClientBottomNav from './ClientBottomNav'; // ✅ corrigido
 
 const ClientLayout = ({ children }) => {
   const navigate = useNavigate();
