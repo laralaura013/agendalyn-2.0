@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import ClientLayout from '../components/layouts/ClientLayout';
 import { getMyPackages } from '../services/clientService';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -8,20 +7,19 @@ const ClientPackagesPage = () => {
   const [packages, setPackages] = useState([]);
 
   useEffect(() => {
+    const fetchPackages = async () => {
+      try {
+        const data = await getMyPackages();
+        setPackages(data);
+      } catch {
+        toast.error('Erro ao carregar pacotes.');
+      }
+    };
     fetchPackages();
   }, []);
 
-  const fetchPackages = async () => {
-    try {
-      const data = await getMyPackages();
-      setPackages(data);
-    } catch (err) {
-      toast.error('Erro ao carregar pacotes.');
-    }
-  };
-
   return (
-    <ClientLayout>
+    <div>
       <h1 className="text-2xl font-bold mb-4 text-purple-700">Meus Pacotes</h1>
       {packages.length === 0 ? (
         <p className="text-gray-500 text-sm">Você não possui pacotes ativos.</p>
@@ -37,7 +35,7 @@ const ClientPackagesPage = () => {
           ))}
         </ul>
       )}
-    </ClientLayout>
+    </div>
   );
 };
 

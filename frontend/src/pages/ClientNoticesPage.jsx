@@ -1,5 +1,4 @@
 import React from 'react';
-import ClientLayout from '../components/layouts/ClientLayout';
 
 const mockNotices = [
   { id: 1, title: 'Agendamento confirmado!', message: 'Seu horário foi confirmado para 28/07 às 14h.' },
@@ -8,7 +7,7 @@ const mockNotices = [
 
 const ClientNoticesPage = () => {
   return (
-    <ClientLayout>
+    <div>
       <h1 className="text-2xl font-bold mb-4 text-purple-700">Avisos</h1>
       {mockNotices.length === 0 ? (
         <p className="text-gray-500 text-sm">Nenhuma notificação encontrada.</p>
@@ -22,7 +21,7 @@ const ClientNoticesPage = () => {
           ))}
         </ul>
       )}
-    </ClientLayout>
+    </div>
   );
 };
 

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import ClientLayout from '../components/layouts/ClientLayout';
 import { getMyAppointments } from '../services/clientService';
 import { isBefore, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -9,21 +8,20 @@ const ClientHistoryPage = () => {
   const [appointments, setAppointments] = useState([]);
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getMyAppointments();
+        const past = data.filter(appt => isBefore(new Date(appt.start), new Date()));
+        setAppointments(past);
+      } catch {
+        toast.error('Erro ao carregar histórico.');
+      }
+    };
     fetchData();
   }, []);
 
-  const fetchData = async () => {
-    try {
-      const data = await getMyAppointments();
-      const past = data.filter(appt => isBefore(new Date(appt.start), new Date()));
-      setAppointments(past);
-    } catch (err) {
-      toast.error('Erro ao carregar histórico.');
-    }
-  };
-
   return (
-    <ClientLayout>
+    <div>
       <h1 className="text-2xl font-bold mb-4 text-purple-700">Histórico</h1>
       {appointments.length === 0 ? (
         <p className="text-gray-500 text-sm">Nenhum agendamento anterior encontrado.</p>
@@ -40,7 +38,7 @@ const ClientHistoryPage = () => {
           ))}
         </ul>
       )}
-    </ClientLayout>
+    </div>
   );
 };
 

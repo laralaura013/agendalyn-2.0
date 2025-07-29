@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { format, parseISO, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import ClientLayout from '../components/layouts/ClientLayout';
 
 const ClientDashboardPage = () => {
   const navigate = useNavigate();
@@ -32,7 +31,7 @@ const ClientDashboardPage = () => {
     try {
       const data = await getMyAppointments();
       setAppointments(data);
-    } catch (err) {
+    } catch {
       toast.error('Erro ao carregar agendamentos.');
     }
   };
@@ -41,20 +40,18 @@ const ClientDashboardPage = () => {
     try {
       const data = await getMyPackages();
       setPackages(data);
-    } catch (err) {
+    } catch {
       toast.error('Erro ao carregar pacotes.');
     }
   };
 
   const handleCancel = async (id) => {
-    const confirm = window.confirm('Deseja realmente cancelar este agendamento?');
-    if (!confirm) return;
-
+    if (!window.confirm('Deseja realmente cancelar este agendamento?')) return;
     try {
       await cancelAppointment(id);
       toast.success('Agendamento cancelado!');
       fetchAppointments();
-    } catch (err) {
+    } catch {
       toast.error('Erro ao cancelar agendamento.');
     }
   };
@@ -69,68 +66,58 @@ const ClientDashboardPage = () => {
   const history = appointments.filter((appt) => isBefore(new Date(appt.start), new Date()));
 
   return (
-    <ClientLayout>
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-purple-700">Olá, {clientData?.name}</h1>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-red-500 hover:underline"
-          >
-            <LogOut size={16} /> Sair
-          </button>
-        </div>
-
-        <Link
-          to={`/agendar/${clientData?.companyId}`}
-          className="flex items-center justify-center gap-2 bg-purple-700 text-white py-2 px-4 rounded-lg hover:bg-purple-800 transition text-center"
-        >
-          <PlusCircle size={16} /> Agendar Novo Horário
-        </Link>
+    <div className="flex flex-col gap-6 mb-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-purple-700">Olá, {clientData?.name}</h1>
+        <button onClick={handleLogout} className="text-red-500 text-sm hover:underline flex items-center gap-1">
+          <LogOut size={16} /> Sair
+        </button>
       </div>
 
-      {/* AGENDAMENTOS FUTUROS */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <CalendarDays size={18} className="text-purple-600" /> Próximos Agendamentos
+      <Link
+        to={`/agendar/${clientData?.companyId}`}
+        className="flex justify-center items-center gap-2 bg-purple-700 text-white py-2 px-4 rounded-lg hover:bg-purple-800 transition"
+      >
+        <PlusCircle size={16} /> Agendar Novo Horário
+      </Link>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <CalendarDays size={18} className="text-purple-600" />
+          Próximos Agendamentos
         </h2>
         {upcoming.length === 0 ? (
           <p className="text-gray-500 text-sm">Você não tem agendamentos futuros.</p>
         ) : (
           <ul className="space-y-4">
             {upcoming.map((appt) => (
-              <li key={appt.id} className="p-4 border rounded-lg">
+              <li key={appt.id} className="border p-4 rounded-lg">
                 <p className="font-medium">{appt.service?.name}</p>
                 <p className="text-sm text-gray-500">{appt.user?.name}</p>
                 <p className="text-sm text-gray-700 mt-1 flex items-center gap-1">
                   <Clock size={14} />
                   {format(parseISO(appt.start), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                 </p>
-                <button
-                  onClick={() => handleCancel(appt.id)}
-                  className="mt-3 flex items-center gap-2 text-red-500 text-sm hover:underline"
-                >
+                <button onClick={() => handleCancel(appt.id)} className="mt-2 text-red-500 text-sm hover:underline flex items-center gap-1">
                   <XCircle size={14} /> Cancelar
                 </button>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </section>
 
-      {/* HISTÓRICO */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <History size={18} className="text-gray-600" /> Histórico de Agendamentos
+      <section>
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <History size={18} className="text-gray-600" />
+          Histórico de Agendamentos
         </h2>
         {history.length === 0 ? (
           <p className="text-gray-500 text-sm">Nenhum agendamento anterior encontrado.</p>
         ) : (
           <ul className="space-y-4">
             {history.map((appt) => (
-              <li key={appt.id} className="p-4 border rounded-lg bg-gray-50">
+              <li key={appt.id} className="border p-4 rounded-lg bg-gray-50">
                 <p className="font-medium">{appt.service?.name}</p>
                 <p className="text-sm text-gray-500">{appt.user?.name}</p>
                 <p className="text-sm text-gray-700 mt-1 flex items-center gap-1">
@@ -141,12 +128,12 @@ const ClientDashboardPage = () => {
             ))}
           </ul>
         )}
-      </div>
+      </section>
 
-      {/* PACOTES */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <PackageCheck size={18} className="text-green-600" /> Meus Pacotes
+      <section>
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <PackageCheck size={18} className="text-green-600" />
+          Meus Pacotes
         </h2>
         {packages.length === 0 ? (
           <p className="text-gray-500 text-sm">Você não possui pacotes ativos.</p>
@@ -162,8 +149,8 @@ const ClientDashboardPage = () => {
             ))}
           </ul>
         )}
-      </div>
-    </ClientLayout>
+      </section>
+    </div>
   );
 };
 
