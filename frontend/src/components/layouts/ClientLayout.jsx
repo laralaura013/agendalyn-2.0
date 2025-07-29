@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import ClientBottomNav from '../ClientBottomNav'; // Ajustado para nova localização
+import ClientBottomNav from './ClientBottomNav'; // Caminho corrigido (está na mesma pasta)
 
 const ClientLayout = ({ children }) => {
   const navigate = useNavigate();
@@ -21,10 +21,10 @@ const ClientLayout = ({ children }) => {
 
   return (
     <div
-      className="min-h-screen bg-white pt-[env(safe-area-inset-top)] pb-[90px] px-4"
+      className="min-h-screen bg-white pt-[env(safe-area-inset-top)] px-4"
       style={{ paddingBottom: shouldHideNav ? '1rem' : '90px' }}
     >
-      <div className="w-full">{children}</div>
+      <div className="max-w-md mx-auto">{children}</div>
       {!shouldHideNav && <ClientBottomNav />}
     </div>
   );
