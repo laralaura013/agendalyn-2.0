@@ -8,7 +8,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import BookingPage from './pages/BookingPage';
 
-// Páginas do Painel do Administrador
+// Admin
 import DashboardLayout from './components/dashboard/DashboardLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
@@ -29,7 +29,7 @@ import BrandsPage from './pages/BrandsPage';
 import SettingsPage from './pages/SettingsPage';
 import CommissionsPage from './pages/CommissionsPage';
 
-// Páginas do Portal do Cliente
+// Cliente
 import ClientLoginPage from './pages/ClientLoginPage';
 import ClientRegisterPage from './pages/ClientRegisterPage';
 import ClientProtectedRoute from './components/auth/ClientProtectedRoute';
@@ -38,6 +38,7 @@ import ClientProfilePage from './pages/ClientProfilePage';
 import ClientPackagesPage from './pages/ClientPackagesPage';
 import ClientHistoryPage from './pages/ClientHistoryPage';
 import ClientNoticesPage from './pages/ClientNoticesPage';
+import ClientLayout from './components/layouts/ClientLayout'; // ✅ Aqui importado corretamente
 
 function App() {
   return (
@@ -49,10 +50,8 @@ function App() {
       <ReloadPrompt />
 
       <Routes>
-        {/* ✅ Página inicial agora é pública */}
-        <Route path="/" element={<Home />} />
-
         {/* Rotas Públicas */}
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/agendar/:companyId" element={<BookingPage />} />
@@ -61,14 +60,16 @@ function App() {
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
         <Route element={<ClientProtectedRoute />}>
-          <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
-          <Route path="/portal/perfil" element={<ClientProfilePage />} />
-          <Route path="/portal/pacotes" element={<ClientPackagesPage />} />
-          <Route path="/portal/historico" element={<ClientHistoryPage />} />
-          <Route path="/portal/avisos" element={<ClientNoticesPage />} />
+          <Route element={<ClientLayout />}>
+            <Route path="/portal/dashboard" element={<ClientDashboardPage />} />
+            <Route path="/portal/perfil" element={<ClientProfilePage />} />
+            <Route path="/portal/pacotes" element={<ClientPackagesPage />} />
+            <Route path="/portal/historico" element={<ClientHistoryPage />} />
+            <Route path="/portal/avisos" element={<ClientNoticesPage />} />
+          </Route>
         </Route>
 
-        {/* Painel do Administrador (protegido) */}
+        {/* Painel do Admin */}
         <Route path="/" element={<ProtectedRoute />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="schedule" element={<Schedule />} />

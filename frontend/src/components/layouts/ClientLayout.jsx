@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ClientBottomNav from './ClientBottomNav'; // ✅ corrigido
+import { useNavigate, useLocation } from 'react-router-dom';
+import ClientBottomNav from '../ClientBottomNav'; // Ajustado para nova localização
 
 const ClientLayout = ({ children }) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const token = localStorage.getItem('clientToken');
@@ -13,10 +14,18 @@ const ClientLayout = ({ children }) => {
     }
   }, [navigate]);
 
+  const hideNavRoutes = ['/portal/login', '/portal/register'];
+  const shouldHideNav = hideNavRoutes.some((path) =>
+    location.pathname.includes(path)
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-28 px-4 pt-6">
-      <div className="max-w-md mx-auto">{children}</div>
-      <ClientBottomNav />
+    <div
+      className="min-h-screen bg-white pt-[env(safe-area-inset-top)] pb-[90px] px-4"
+      style={{ paddingBottom: shouldHideNav ? '1rem' : '90px' }}
+    >
+      <div className="w-full">{children}</div>
+      {!shouldHideNav && <ClientBottomNav />}
     </div>
   );
 };
