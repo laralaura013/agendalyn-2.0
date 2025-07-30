@@ -9,9 +9,9 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// ✅ Correção compatível com ESM
-import tz from 'date-fns-tz';
-const { zonedTimeToUtc } = tz;
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { zonedTimeToUtc } = require('date-fns-tz'); // ✅ Compatível com ESM
 
 const prisma = new PrismaClient();
 const timeZone = 'America/Sao_Paulo';
@@ -22,7 +22,7 @@ export const getDashboardSummary = async (req, res) => {
     const companyId = req.company.id;
     const now = new Date();
 
-    // Períodos ajustados para UTC
+    // Ajustes de data para UTC conforme o fuso brasileiro
     const todayStart = zonedTimeToUtc(startOfDay(now), timeZone);
     const todayEnd = zonedTimeToUtc(endOfDay(now), timeZone);
     const monthStart = startOfMonth(now);
@@ -55,7 +55,7 @@ export const getDashboardSummary = async (req, res) => {
       },
     });
 
-    // 3. Novos Clientes do Mês
+    // 3. Novos Clientes no Mês
     const newClientsThisMonth = await prisma.client.count({
       where: {
         companyId,
