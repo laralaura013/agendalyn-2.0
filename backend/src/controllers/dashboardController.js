@@ -8,10 +8,13 @@ import {
   format
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { zonedTimeToUtc } from 'date-fns-tz'; // ✅ novo import
+
+// ✅ Correção compatível com ESM
+import tz from 'date-fns-tz';
+const { zonedTimeToUtc } = tz;
 
 const prisma = new PrismaClient();
-const timeZone = 'America/Sao_Paulo'; // ✅ definir o fuso
+const timeZone = 'America/Sao_Paulo';
 
 // Função para obter o resumo de dados do dashboard
 export const getDashboardSummary = async (req, res) => {
@@ -19,7 +22,7 @@ export const getDashboardSummary = async (req, res) => {
     const companyId = req.company.id;
     const now = new Date();
 
-    // Períodos de tempo com conversão correta para UTC
+    // Períodos ajustados para UTC
     const todayStart = zonedTimeToUtc(startOfDay(now), timeZone);
     const todayEnd = zonedTimeToUtc(endOfDay(now), timeZone);
     const monthStart = startOfMonth(now);
