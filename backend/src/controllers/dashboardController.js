@@ -9,26 +9,29 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const { zonedTimeToUtc } = require('date-fns-tz'); // ✅ Compatível com ESM
-
 const prisma = new PrismaClient();
-const timeZone = 'America/Sao_Paulo';
 
-// Função para obter o resumo de dados do dashboard
+// ✅ Função manual para aplicar -3h de fuso (Brasília)
+const toUtcFromBrazil = (date) => new Date(date.getTime() + 3 * 60 * 60 * 1000);
+
 export const getDashboardSummary = async (req, res) => {
   try {
     const companyId = req.company.id;
     const now = new Date();
 
-    // Corrigido: todas as datas ajustadas para fuso de SP
-    const todayStart = zonedTimeToUtc(startOfDay(now), timeZone);
-    const todayEnd = zonedTimeToUtc(endOfDay(now), timeZone);
-    const monthStart = zonedTimeToUtc(startOfMonth(now), timeZone);
-    const monthEnd = zonedTimeToUtc(endOfMonth(now), timeZone);
+    const todayStart = toUtcFromBrazil(startOfDay(now));
+    const todayEnd = toUtcFromBrazil(endOfDay(now));
+    const monthStart = toUtcFromBrazil(startOfMonth(now));
+    const monthEnd = toUtcFromBrazil(endOfMonth(now));
 
-    // 1. Faturamento de Hoje
+    // 🔍 DEBUG
+    console.log('--- DEBUG DASHBOARD ---');
+    console.log('todayStart:', todayStart.toISOString());
+    console.log('todayEnd:', todayEnd.toISOString());
+    console.log('monthStart:', monthStart.toISOString());
+    console.log('monthEnd:', monthEnd.toISOString());
+
+    // 1. Faturamento Hoje
     const revenueTodayResult = await prisma.order.aggregate({
       _sum: {
         total: true,
@@ -44,7 +47,7 @@ export const getDashboardSummary = async (req, res) => {
     });
     const revenueToday = revenueTodayResult._sum.total || 0;
 
-    // 2. Agendamentos de Hoje
+    // 2. Agendamentos Hoje
     const appointmentsToday = await prisma.appointment.count({
       where: {
         companyId,
@@ -55,7 +58,7 @@ export const getDashboardSummary = async (req, res) => {
       },
     });
 
-    // 3. Novos Clientes no Mês
+    // 3. Clientes do Mês
     const newClientsThisMonth = await prisma.client.count({
       where: {
         companyId,
@@ -71,14 +74,12 @@ export const getDashboardSummary = async (req, res) => {
       appointmentsToday,
       newClientsThisMonth,
     });
-
   } catch (error) {
     console.error('--- ERRO AO GERAR RESUMO DO DASHBOARD ---', error);
     res.status(500).json({ message: 'Erro ao gerar resumo do dashboard.' });
   }
 };
 
-// Função para obter o faturamento mensal dos últimos 6 meses
 export const getMonthlyRevenue = async (req, res) => {
   try {
     const companyId = req.company.id;
