@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import Sidebar from './Sidebar';
+import Sidebar from '../dashboard/Sidebar'; // ✅ Caminho corrigido
 
 const AdminLayout = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -34,7 +34,7 @@ const AdminLayout = ({ children }) => {
           <div className="font-semibold text-gray-700 text-lg">Painel</div>
         </header>
 
-        {/* Conteúdo renderizado (Dashboard, Orders, etc) */}
+        {/* Conteúdo renderizado */}
         <main className="flex-1 p-4 overflow-y-auto">{children}</main>
       </div>
     </div>
