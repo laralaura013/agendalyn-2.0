@@ -18,18 +18,18 @@ const OrderForm = ({ onSave, onCancel }) => {
       try {
         setLoading(true);
         const [clientsRes, staffRes, servicesRes, productsRes] = await Promise.all([
-          api.get('/clients'),
+          api.get('/clients/admin'), // 🔁 Corrigido aqui
           api.get('/staff'),
           api.get('/services'),
-          api.get('/products')
+          api.get('/products'),
         ]);
         setAvailableClients(clientsRes.data);
         setAvailableStaff(staffRes.data);
         setAvailableServices(servicesRes.data);
         setAvailableProducts(productsRes.data);
       } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-        alert("Não foi possível carregar os dados necessários.");
+        console.error('Erro ao carregar dados:', error);
+        alert('Não foi possível carregar os dados necessários.');
       } finally {
         setLoading(false);
       }
@@ -132,7 +132,9 @@ const OrderForm = ({ onSave, onCancel }) => {
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))
                   : availableProducts.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} (Estoque: {p.stock})</option>
+                      <option key={p.id} value={p.id}>
+                        {p.name} (Estoque: {p.stock})
+                      </option>
                     ))}
               </select>
             </div>
