@@ -4,6 +4,7 @@ import Modal from '../components/dashboard/Modal';
 import OrderForm from '../components/forms/OrderForm';
 import api from '../services/api';
 import { FileText, CheckCircle, XCircle } from 'lucide-react';
+import AdminLayout from '../components/layout/AdminLayout';
 
 const statusMap = {
   OPEN: { text: 'ABERTA', style: 'bg-yellow-100 text-yellow-800' },
@@ -122,41 +123,43 @@ const Orders = () => {
   };
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Comandas</h1>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition shadow-md"
-        >
-          <FileText size={18} /> Nova Comanda
-        </button>
-      </div>
-
-      {loading ? (
-        <p className="text-gray-500">Carregando comandas...</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {orders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              onFinish={handleFinishOrder}
-              onCancel={handleCancelOrder}
-            />
-          ))}
+    <AdminLayout>
+      <div className="p-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">Comandas</h1>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition shadow-md"
+          >
+            <FileText size={18} /> Nova Comanda
+          </button>
         </div>
-      )}
 
-      {isModalOpen && (
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <OrderForm
-            onSave={handleSave}
-            onCancel={() => setIsModalOpen(false)}
-          />
-        </Modal>
-      )}
-    </div>
+        {loading ? (
+          <p className="text-gray-500">Carregando comandas...</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {orders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                onFinish={handleFinishOrder}
+                onCancel={handleCancelOrder}
+              />
+            ))}
+          </div>
+        )}
+
+        {isModalOpen && (
+          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+            <OrderForm
+              onSave={handleSave}
+              onCancel={() => setIsModalOpen(false)}
+            />
+          </Modal>
+        )}
+      </div>
+    </AdminLayout>
   );
 };
 

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Modal from '../components/dashboard/Modal';
 import PackageForm from '../components/forms/PackageForm';
-import SellPackageForm from '../components/forms/SellPackageForm'; // Importa o novo formulário
+import SellPackageForm from '../components/forms/SellPackageForm';
 import api from '../services/api';
+import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
 
-// --- ATUALIZADO para incluir o botão de Vender ---
 const PackageCard = ({ pkg, onSell }) => (
   <div className="bg-white p-5 rounded-lg shadow-md border flex flex-col justify-between">
     <div>
@@ -82,7 +82,7 @@ const PackagesPage = () => {
   };
 
   return (
-    <div>
+    <AdminLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Pacotes de Serviços</h1>
         <button
@@ -92,6 +92,7 @@ const PackagesPage = () => {
           Criar Pacote
         </button>
       </div>
+
       {loading ? <p>Carregando...</p> : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {packages.length > 0 ? packages.map(pkg => (
@@ -99,17 +100,23 @@ const PackagesPage = () => {
           )) : <p className="col-span-full text-center text-gray-500">Nenhum pacote cadastrado.</p>}
         </div>
       )}
+
       {isCreateModalOpen && (
         <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)}>
           <PackageForm onSave={handleCreateSave} onCancel={() => setIsCreateModalOpen(false)} />
         </Modal>
       )}
+
       {isSellModalOpen && selectedPackage && (
         <Modal isOpen={isSellModalOpen} onClose={() => setIsSellModalOpen(false)}>
-          <SellPackageForm pkg={selectedPackage} onSave={handleSellSave} onCancel={() => setIsSellModalOpen(false)} />
+          <SellPackageForm
+            pkg={selectedPackage}
+            onSave={handleSellSave}
+            onCancel={() => setIsSellModalOpen(false)}
+          />
         </Modal>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

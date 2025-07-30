@@ -3,6 +3,7 @@ import api from '../services/api';
 import Modal from '../components/dashboard/Modal';
 import GoalForm from '../components/forms/GoalForm';
 import GoalProgress from '../components/goals/GoalProgress';
+import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
 
 const GoalsPage = () => {
   const [goals, setGoals] = useState([]);
@@ -37,7 +38,7 @@ const GoalsPage = () => {
   };
 
   return (
-    <div>
+    <AdminLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Metas de Faturação</h1>
         <button
@@ -65,7 +66,7 @@ const GoalsPage = () => {
           <GoalForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} />
         </Modal>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

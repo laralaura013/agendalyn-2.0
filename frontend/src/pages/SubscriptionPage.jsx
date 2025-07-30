@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../services/api';
 import PlanCard from '../components/subscription/PlanCard';
+import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
 
 const SubscriptionPage = () => {
   const [loading, setLoading] = useState(false);
@@ -8,8 +9,8 @@ const SubscriptionPage = () => {
   const plans = [
     {
       name: 'Plano Pro',
-      price: '27,00', // Valor real baseado no Stripe (2700 centavos = R$27,00)
-      stripePriceId: 'price_1RmO42Ru0UQiqSF4YzX9jB4O', // ID real do Stripe
+      price: '27,00',
+      stripePriceId: 'price_1RmO42Ru0UQiqSF4YzX9jB4O',
       features: [
         'Agendamentos Ilimitados',
         'Cadastro de Clientes',
@@ -22,7 +23,6 @@ const SubscriptionPage = () => {
   ];
 
   const handleChoosePlan = async (priceId) => {
-    // Validação para garantir que o ID do preço foi inserido corretamente
     if (!priceId || priceId.includes('COLE_AQUI')) {
       alert("Erro de configuração: O ID do preço do Stripe não foi definido no código.");
       return;
@@ -34,13 +34,13 @@ const SubscriptionPage = () => {
       window.location.href = response.data.url;
     } catch (error) {
       console.error("Erro ao iniciar assinatura:", error);
-      alert("Não foi possível iniciar o processo de assinatura. Tente novamente.");
+      alert("Não foi possível iniciar o processo de assinatura.");
       setLoading(false);
     }
   };
 
   return (
-    <div>
+    <AdminLayout>
       <h1 className="text-3xl font-bold text-center mb-4">Planos e Assinatura</h1>
       <p className="text-center text-gray-600 mb-10">Escolha o plano que melhor se adapta ao seu negócio.</p>
 
@@ -51,9 +51,9 @@ const SubscriptionPage = () => {
           ))}
         </div>
       </div>
-      
+
       {loading && <p className="text-center mt-4">A redirecionar para o portal de pagamento...</p>}
-    </div>
+    </AdminLayout>
   );
 };
 

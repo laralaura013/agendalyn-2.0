@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast'; // Importa a notificação
+import toast from 'react-hot-toast';
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import ServiceForm from '../components/forms/ServiceForm';
 import api from '../services/api';
+import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
 
 const Services = () => {
   const [services, setServices] = useState([]);
@@ -31,18 +32,18 @@ const Services = () => {
   const handleSave = async (data) => {
     const isEditing = selectedService && selectedService.id;
     const savePromise = isEditing
-        ? api.put(`/services/${selectedService.id}`, data)
-        : api.post('/services', data);
-    
+      ? api.put(`/services/${selectedService.id}`, data)
+      : api.post('/services', data);
+
     toast.promise(savePromise, {
-        loading: 'A salvar serviço...',
-        success: () => {
-            fetchServices();
-            setIsModalOpen(false);
-            setSelectedService(null);
-            return `Serviço ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
-        },
-        error: "Não foi possível salvar o serviço."
+      loading: 'A salvar serviço...',
+      success: () => {
+        fetchServices();
+        setIsModalOpen(false);
+        setSelectedService(null);
+        return `Serviço ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
+      },
+      error: "Não foi possível salvar o serviço."
     });
   };
 
@@ -50,12 +51,12 @@ const Services = () => {
     if (window.confirm("Tem certeza que deseja excluir este serviço?")) {
       const deletePromise = api.delete(`/services/${id}`);
       toast.promise(deletePromise, {
-          loading: 'A excluir serviço...',
-          success: () => {
-              fetchServices();
-              return 'Serviço excluído com sucesso!';
-          },
-          error: (err) => err.response?.data?.message || "Não foi possível excluir o serviço."
+        loading: 'A excluir serviço...',
+        success: () => {
+          fetchServices();
+          return 'Serviço excluído com sucesso!';
+        },
+        error: (err) => err.response?.data?.message || "Não foi possível excluir o serviço."
       });
     }
   };
@@ -67,7 +68,7 @@ const Services = () => {
   ];
 
   return (
-    <div>
+    <AdminLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Serviços</h1>
         <button
@@ -77,8 +78,8 @@ const Services = () => {
           Novo Serviço
         </button>
       </div>
-   
-       {loading ? <p>Carregando...</p> : (
+
+      {loading ? <p>Carregando...</p> : (
         <ResourceTable
           columns={columns}
           data={services}
@@ -86,17 +87,17 @@ const Services = () => {
           onDelete={(id) => handleDelete(id)}
         />
       )}
+
       {isModalOpen && (
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-    
-           <ServiceForm
+          <ServiceForm
             initialData={selectedService}
             onSave={handleSave}
             onCancel={() => setIsModalOpen(false)}
           />
         </Modal>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

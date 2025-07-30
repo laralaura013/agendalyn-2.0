@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
+import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
 import api from '../services/api';
 
-// Formulário simples para Categoria
+// Formulário para Categoria
 const CategoryForm = ({ initialData, onSave, onCancel }) => {
   const [name, setName] = useState(initialData?.name || '');
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave({ name });
   };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <h2 className="text-2xl font-bold mb-4">{initialData ? 'Editar Categoria' : 'Nova Categoria'}</h2>
@@ -25,8 +28,6 @@ const CategoryForm = ({ initialData, onSave, onCancel }) => {
   );
 };
 
-
-// Página Principal de Categorias
 const CategoriesPage = () => {
   const [categories, setCategories] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -78,7 +79,7 @@ const CategoriesPage = () => {
   const columns = [{ header: 'Nome', accessor: 'name' }];
 
   return (
-    <div>
+    <AdminLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Categorias de Produtos</h1>
         <button 
@@ -107,7 +108,7 @@ const CategoriesPage = () => {
           />
         </Modal>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

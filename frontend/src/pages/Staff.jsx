@@ -4,6 +4,7 @@ import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import StaffForm from '../components/forms/StaffForm';
 import api from '../services/api';
+import AdminLayout from '../components/layout/AdminLayout'; // Importa o AdminLayout
 
 const Staff = () => {
   const [staff, setStaff] = useState([]);
@@ -81,7 +82,7 @@ const Staff = () => {
   ];
 
   return (
-    <div>
+    <AdminLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Colaboradores</h1>
         <button
@@ -112,7 +113,7 @@ const Staff = () => {
           />
         </Modal>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

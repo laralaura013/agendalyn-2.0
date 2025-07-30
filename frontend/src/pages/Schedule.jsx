@@ -5,13 +5,13 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { parseISO } from 'date-fns';
 import { PlusCircle } from 'lucide-react';
+import AdminLayout from '../components/layout/AdminLayout';
 
 const Schedule = () => {
   const [events, setEvents] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
-
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -103,43 +103,45 @@ const Schedule = () => {
   };
 
   return (
-    <div className="relative animate-fade-in-up">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-800">📅 Agenda</h1>
+    <AdminLayout>
+      <div className="relative animate-fade-in-up">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-gray-800">📅 Agenda</h1>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-gray-500 animate-pulse">Carregando dados da agenda...</p>
+        ) : (
+          <Calendar
+            events={events}
+            onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
+          />
+        )}
+
+        <button
+          onClick={openEmptyModal}
+          className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition btn-animated"
+          title="Novo agendamento"
+        >
+          <PlusCircle size={28} />
+        </button>
+
+        {isModalOpen && (
+          <AppointmentModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSave={handleSave}
+            onDelete={handleDelete}
+            event={selectedEvent}
+            slot={selectedSlot}
+            clients={clients}
+            services={services}
+            staff={staff}
+          />
+        )}
       </div>
-
-      {loading ? (
-        <p className="text-sm text-gray-500 animate-pulse">Carregando dados da agenda...</p>
-      ) : (
-        <Calendar
-          events={events}
-          onSelectSlot={handleSelectSlot}
-          onSelectEvent={handleSelectEvent}
-        />
-      )}
-
-      <button
-        onClick={openEmptyModal}
-        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition btn-animated"
-        title="Novo agendamento"
-      >
-        <PlusCircle size={28} />
-      </button>
-
-      {isModalOpen && (
-        <AppointmentModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSave={handleSave}
-          onDelete={handleDelete}
-          event={selectedEvent}
-          slot={selectedSlot}
-          clients={clients}
-          services={services}
-          staff={staff}
-        />
-      )}
-    </div>
+    </AdminLayout>
   );
 };
 

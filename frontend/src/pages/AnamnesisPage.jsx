@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Modal from '../components/dashboard/Modal';
 import AnamnesisFormBuilder from '../components/anamnesis/AnamnesisFormBuilder';
-import AnamnesisViewer from '../components/anamnesis/AnamnesisViewer'; // Importa o novo componente
+import AnamnesisViewer from '../components/anamnesis/AnamnesisViewer';
 import api from '../services/api';
+import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
 
 const AnamnesisPage = () => {
   const [forms, setForms] = useState([]);
   const [isBuilderModalOpen, setIsBuilderModalOpen] = useState(false);
-  const [isViewerModalOpen, setIsViewerModalOpen] = useState(false); // Novo estado para o modal de preenchimento
-  const [selectedForm, setSelectedForm] = useState(null); // Para saber qual ficha preencher
+  const [isViewerModalOpen, setIsViewerModalOpen] = useState(false);
+  const [selectedForm, setSelectedForm] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchForms = useCallback(async () => {
@@ -44,17 +45,17 @@ const AnamnesisPage = () => {
 
   const handleAnswerSave = async (data) => {
     try {
-        await api.post('/anamnesis/answers', data);
-        alert("Respostas da ficha salvas com sucesso!");
-        setIsViewerModalOpen(false);
-        setSelectedForm(null);
+      await api.post('/anamnesis/answers', data);
+      alert("Respostas da ficha salvas com sucesso!");
+      setIsViewerModalOpen(false);
+      setSelectedForm(null);
     } catch (error) {
-        alert(error.response?.data?.message || "Não foi possível salvar as respostas.");
+      alert(error.response?.data?.message || "Não foi possível salvar as respostas.");
     }
   };
 
   return (
-    <div>
+    <AdminLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Modelos de Ficha de Anamnese</h1>
         <button
@@ -72,14 +73,14 @@ const AnamnesisPage = () => {
             {forms.length > 0 ? forms.map(form => (
               <li key={form.id} className="p-4 border rounded-md flex justify-between items-center">
                 <div>
-                    <span className="font-medium text-gray-800">{form.title}</span>
-                    <p className="text-sm text-gray-500">{form.questions.length} perguntas</p>
+                  <span className="font-medium text-gray-800">{form.title}</span>
+                  <p className="text-sm text-gray-500">{form.questions.length} perguntas</p>
                 </div>
-                <button 
-                    onClick={() => handleOpenViewer(form)}
-                    className="px-3 py-1 bg-green-500 text-white text-sm font-semibold rounded-md hover:bg-green-600"
+                <button
+                  onClick={() => handleOpenViewer(form)}
+                  className="px-3 py-1 bg-green-500 text-white text-sm font-semibold rounded-md hover:bg-green-600"
                 >
-                    Preencher Ficha
+                  Preencher Ficha
                 </button>
               </li>
             )) : <p className="text-center text-gray-500 py-4">Nenhum modelo de ficha criado ainda.</p>}
@@ -95,10 +96,10 @@ const AnamnesisPage = () => {
 
       {isViewerModalOpen && selectedForm && (
         <Modal isOpen={isViewerModalOpen} onClose={() => setIsViewerModalOpen(false)}>
-            <AnamnesisViewer form={selectedForm} onSave={handleAnswerSave} onCancel={() => setIsViewerModalOpen(false)} />
+          <AnamnesisViewer form={selectedForm} onSave={handleAnswerSave} onCancel={() => setIsViewerModalOpen(false)} />
         </Modal>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

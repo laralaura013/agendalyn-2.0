@@ -1,103 +1,73 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast';
-import ResourceTable from '../components/dashboard/ResourceTable';
-import Modal from '../components/dashboard/Modal';
-import ClientForm from '../components/forms/ClientForm';
+import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import toast from 'react-hot-toast';
+import AdminLayout from '../components/layout/AdminLayout';
+import { UserPlus, Pencil, Trash2 } from 'lucide-react';
 
 const Clients = () => {
   const [clients, setClients] = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedClient, setSelectedClient] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchClients = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await api.get('/clients/admin'); // ✅ Corrigido
-      setClients(response.data);
-    } catch (error) {
-      toast.error("Não foi possível carregar os clientes.");
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const res = await api.get('/clients/admin');
+        setClients(res.data);
+      } catch (err) {
+        toast.error('Erro ao carregar clientes');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClients();
   }, []);
 
-  useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
-
-  const handleSave = async (data) => {
-    const isEditing = selectedClient && selectedClient.id;
-    const savePromise = isEditing
-      ? api.put(`/clients/admin/${selectedClient.id}`, data) // ✅ Corrigido
-      : api.post('/clients/admin', data); // ✅ Corrigido
-
-    toast.promise(savePromise, {
-      loading: 'A salvar cliente...',
-      success: () => {
-        fetchClients();
-        setIsModalOpen(false);
-        setSelectedClient(null);
-        return `Cliente ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
-      },
-      error: "Não foi possível salvar o cliente."
-    });
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("Tem certeza que deseja excluir este cliente?")) {
-      const deletePromise = api.delete(`/clients/admin/${id}`); // ✅ Corrigido
-      toast.promise(deletePromise, {
-        loading: 'A excluir cliente...',
-        success: () => {
-          fetchClients();
-          return 'Cliente excluído com sucesso!';
-        },
-        error: "Não foi possível excluir o cliente."
-      });
-    }
-  };
-
-  const columns = [
-    { header: 'Nome', accessor: 'name' },
-    { header: 'Telefone', accessor: 'phone' },
-    { header: 'Email', accessor: 'email' },
-  ];
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Clientes</h1>
-        <button
-          onClick={() => { setSelectedClient(null); setIsModalOpen(true); }}
-          className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
-        >
-          Novo Cliente
-        </button>
+    <AdminLayout>
+      <div className="p-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">Clientes</h1>
+          <button className="flex items-center gap-2 px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition shadow-md">
+            <UserPlus size={18} /> Novo Cliente
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-gray-500">Carregando clientes...</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white rounded-xl shadow border">
+              <thead className="bg-gray-100 text-sm text-gray-600">
+                <tr>
+                  <th className="px-4 py-2 text-left">Nome</th>
+                  <th className="px-4 py-2 text-left">Email</th>
+                  <th className="px-4 py-2 text-left">Telefone</th>
+                  <th className="px-4 py-2 text-left">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clients.map((client) => (
+                  <tr key={client.id} className="border-t hover:bg-gray-50">
+                    <td className="px-4 py-2">{client.name}</td>
+                    <td className="px-4 py-2">{client.email}</td>
+                    <td className="px-4 py-2">{client.phone}</td>
+                    <td className="px-4 py-2 flex gap-2">
+                      <button className="text-blue-600 hover:text-blue-800">
+                        <Pencil size={16} />
+                      </button>
+                      <button className="text-red-600 hover:text-red-800">
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
-      {loading ? (
-        <p>A carregar clientes...</p>
-      ) : (
-        <ResourceTable
-          columns={columns}
-          data={clients}
-          onEdit={(client) => { setSelectedClient(client); setIsModalOpen(true); }}
-          onDelete={(id) => handleDelete(id)}
-        />
-      )}
-
-      {isModalOpen && (
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <ClientForm
-            initialData={selectedClient}
-            onSave={handleSave}
-            onCancel={() => setIsModalOpen(false)}
-          />
-        </Modal>
-      )}
-    </div>
+    </AdminLayout>
   );
 };
 

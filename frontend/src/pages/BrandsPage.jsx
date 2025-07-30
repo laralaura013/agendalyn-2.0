@@ -2,14 +2,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import api from '../services/api';
+import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
 
-// Formulário simples para Marca
+// Formulário para Marca
 const BrandForm = ({ initialData, onSave, onCancel }) => {
   const [name, setName] = useState(initialData?.name || '');
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave({ name });
   };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <h2 className="text-2xl font-bold mb-4">{initialData ? 'Editar Marca' : 'Nova Marca'}</h2>
@@ -25,7 +28,6 @@ const BrandForm = ({ initialData, onSave, onCancel }) => {
   );
 };
 
-// Página Principal de Marcas
 const BrandsPage = () => {
   const [brands, setBrands] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,7 +79,7 @@ const BrandsPage = () => {
   const columns = [{ header: 'Nome', accessor: 'name' }];
 
   return (
-    <div>
+    <AdminLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Marcas de Produtos</h1>
         <button 
@@ -106,7 +108,7 @@ const BrandsPage = () => {
           />
         </Modal>
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

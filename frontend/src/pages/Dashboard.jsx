@@ -7,6 +7,7 @@ import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend
 } from 'chart.js';
+import AdminLayout from '../components/layout/AdminLayout';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -41,8 +42,6 @@ const Dashboard = () => {
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-
-  if (loading) return <p className="text-gray-500 animate-pulse">Carregando dados do painel...</p>;
 
   const cards = [
     {
@@ -81,29 +80,43 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="p-4 space-y-8 max-w-5xl mx-auto animate-fade-in-up">
-      <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+    <AdminLayout>
+      <div className="p-4 space-y-8 max-w-5xl mx-auto animate-fade-in-up">
+        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        {cards.map((card) => (
-          <div
-            key={card.label}
-            className="bg-white rounded-xl shadow card-hover p-4 flex items-center gap-4 border border-gray-100 transition"
-          >
-            <div className="p-2 bg-gray-100 rounded-full">{card.icon}</div>
-            <div>
-              <p className="text-sm text-gray-500">{card.label}</p>
-              <p className="text-lg font-semibold">{card.value}</p>
+        {loading ? (
+          <p className="text-gray-500 animate-pulse">Carregando dados do painel...</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {cards.map((card) => (
+                <div
+                  key={card.label}
+                  className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 border border-gray-100"
+                >
+                  <div className="p-2 bg-gray-100 rounded-full">{card.icon}</div>
+                  <div>
+                    <p className="text-sm text-gray-500">{card.label}</p>
+                    <p className="text-lg font-semibold">{card.value}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        ))}
-      </div>
 
-      <div className="bg-white rounded-xl p-6 shadow border animate-fade-in-up">
-        <h2 className="text-lg font-semibold mb-4">Faturamento Mensal</h2>
-        <Bar data={chartData} options={{ responsive: true, plugins: { legend: { display: false } } }} />
+            <div className="bg-white rounded-xl p-6 shadow-sm border animate-fade-in-up">
+              <h2 className="text-lg font-semibold mb-4">Faturamento Mensal</h2>
+              <Bar
+                data={chartData}
+                options={{
+                  responsive: true,
+                  plugins: { legend: { display: false } },
+                }}
+              />
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

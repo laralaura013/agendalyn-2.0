@@ -18,7 +18,7 @@ const OrderForm = ({ onSave, onCancel }) => {
       try {
         setLoading(true);
         const [clientsRes, staffRes, servicesRes, productsRes] = await Promise.all([
-          api.get('/clients/admin'), // 🔁 Corrigido aqui
+          api.get('/clients/admin'),
           api.get('/staff'),
           api.get('/services'),
           api.get('/products'),
@@ -68,14 +68,14 @@ const OrderForm = ({ onSave, onCancel }) => {
     <form onSubmit={handleSubmit} className="space-y-6">
       <h2 className="text-2xl font-bold text-purple-700">Nova Comanda</h2>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="block text-sm font-medium mb-1">Cliente</label>
           <select
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
             required
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-3 text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Selecione um cliente</option>
             {availableClients.map(c => (
@@ -90,7 +90,7 @@ const OrderForm = ({ onSave, onCancel }) => {
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
             required
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-3 text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Selecione um colaborador</option>
             {availableStaff.map(u => (
@@ -105,26 +105,26 @@ const OrderForm = ({ onSave, onCancel }) => {
 
       <div className="space-y-4">
         {items.map((item, index) => (
-          <div key={index} className="grid grid-cols-12 gap-3 items-end">
-            <div className="col-span-3">
+          <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+            <div className="sm:col-span-3">
               <label className="text-xs font-medium">Tipo</label>
               <select
                 value={item.type}
                 onChange={(e) => handleItemChange(index, 'type', e.target.value)}
-                className="w-full px-2 py-2 border rounded"
+                className="w-full px-3 py-2 text-sm border rounded"
               >
                 <option value="service">Serviço</option>
                 <option value="product">Produto</option>
               </select>
             </div>
 
-            <div className="col-span-6">
+            <div className="sm:col-span-6">
               <label className="text-xs font-medium">Item</label>
               <select
                 value={item.id}
                 onChange={(e) => handleItemChange(index, 'id', e.target.value)}
                 required
-                className="w-full px-2 py-2 border rounded"
+                className="w-full px-3 py-2 text-sm border rounded"
               >
                 <option value="">Selecione</option>
                 {item.type === 'service'
@@ -139,7 +139,7 @@ const OrderForm = ({ onSave, onCancel }) => {
               </select>
             </div>
 
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="text-xs font-medium">Qtd.</label>
               <input
                 type="number"
@@ -147,11 +147,11 @@ const OrderForm = ({ onSave, onCancel }) => {
                 onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value, 10))}
                 min="1"
                 required
-                className="w-full px-2 py-2 border rounded"
+                className="w-full px-3 py-2 text-sm border rounded"
               />
             </div>
 
-            <div className="col-span-1 text-right">
+            <div className="sm:col-span-1 text-right">
               <button
                 type="button"
                 onClick={() => removeItem(index)}
@@ -173,17 +173,17 @@ const OrderForm = ({ onSave, onCancel }) => {
         </button>
       </div>
 
-      <div className="flex justify-end gap-4 pt-6">
+      <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition"
+          className="px-5 py-3 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition"
         >
           Cancelar
         </button>
         <button
           type="submit"
-          className="px-5 py-2 bg-purple-700 text-white font-medium rounded-md hover:bg-purple-800 transition"
+          className="px-6 py-3 bg-purple-700 text-white font-medium rounded-md hover:bg-purple-800 transition"
         >
           Salvar Comanda
         </button>
