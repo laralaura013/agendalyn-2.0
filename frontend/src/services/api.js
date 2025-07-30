@@ -4,14 +4,16 @@ const api = axios.create({
   baseURL: 'https://agendalyn-20-production.up.railway.app/api',
 });
 
-// Aplica token do cliente ou admin conforme a rota
 api.interceptors.request.use((config) => {
   const clientToken = localStorage.getItem('clientToken');
   const adminToken = localStorage.getItem('token');
 
-  if (config.url?.startsWith('/portal') && clientToken) {
+  const isPortalRoute = config.url?.startsWith('/portal');
+
+  // Define qual token usar baseado na rota
+  if (isPortalRoute && clientToken) {
     config.headers.Authorization = `Bearer ${clientToken}`;
-  } else if (adminToken) {
+  } else if (!isPortalRoute && adminToken) {
     config.headers.Authorization = `Bearer ${adminToken}`;
   }
 
