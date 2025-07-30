@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 🔽 Fade-in para entradas suaves (já existia) */
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -15,4 +16,60 @@
 
 .animate-fade-in-up {
   animation: fade-in-up 0.3s ease-out forwards;
+}
+
+/* 🔽 Entrada de modal com escala suave */
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-modal-enter {
+  animation: modal-enter 0.25s ease-out forwards;
+}
+
+/* 🔽 Card hover com scale e sombra */
+.card-hover {
+  @apply transition-transform transform hover:scale-[1.02] hover:shadow-lg;
+}
+
+/* 🔽 Botão padrão com animação */
+.btn-animated {
+  @apply transition-all duration-200 ease-out hover:scale-[1.03] active:scale-95;
+}
+
+/* 🔽 Fade com delay opcional */
+.fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 🔽 Slide para elementos que aparecem da esquerda (ex: sidebar, detalhes) */
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.4s ease-out forwards;
 }

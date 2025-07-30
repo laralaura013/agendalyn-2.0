@@ -1,28 +1,45 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import { X } from 'lucide-react';
 
 const Modal = ({ isOpen, onClose, children }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+
+      const handleEsc = (e) => {
+        if (e.key === 'Escape') onClose();
+      };
+
+      window.addEventListener('keydown', handleEsc);
+
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleEsc);
+      };
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="modal-title"
     >
       <div
-        className="bg-white w-full max-w-lg rounded-xl shadow-2xl p-6 md:p-8 relative animate-fade-in-up"
+        className="bg-white w-full max-w-xl rounded-2xl shadow-xl p-6 relative transform transition-all duration-300 animate-modal-enter"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 focus:outline-none"
-          aria-label="Fechar"
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
+          aria-label="Fechar modal"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X size={24} />
         </button>
         {children}
       </div>

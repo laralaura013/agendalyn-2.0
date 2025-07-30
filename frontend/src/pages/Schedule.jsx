@@ -17,7 +17,6 @@ const Schedule = () => {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Carregar agendamentos formatados para o calendário
   const fetchAppointments = useCallback(async () => {
     try {
       const response = await api.get('/appointments');
@@ -34,7 +33,6 @@ const Schedule = () => {
     }
   }, []);
 
-  // Carregar clientes, serviços e equipe
   useEffect(() => {
     const loadPageData = async () => {
       setLoading(true);
@@ -105,13 +103,13 @@ const Schedule = () => {
   };
 
   return (
-    <div className="relative">
+    <div className="relative animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-800">📅 Agenda</h1>
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-500">Carregando dados da agenda...</p>
+        <p className="text-sm text-gray-500 animate-pulse">Carregando dados da agenda...</p>
       ) : (
         <Calendar
           events={events}
@@ -120,16 +118,14 @@ const Schedule = () => {
         />
       )}
 
-      {/* Botão flutuante para criar novo agendamento */}
       <button
         onClick={openEmptyModal}
-        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition"
+        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition btn-animated"
         title="Novo agendamento"
       >
         <PlusCircle size={28} />
       </button>
 
-      {/* Modal de agendamento */}
       {isModalOpen && (
         <AppointmentModal
           isOpen={isModalOpen}

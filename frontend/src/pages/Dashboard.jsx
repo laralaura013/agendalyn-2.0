@@ -22,7 +22,7 @@ const Dashboard = () => {
     { month: 'Abr', value: 1000 },
     { month: 'Mai', value: 750 },
     { month: 'Jun', value: 1300 },
-    { month: 'Jul', value: 0 }, // Ponto de partida (real pode vir da API)
+    { month: 'Jul', value: 0 },
   ]);
 
   useEffect(() => {
@@ -42,7 +42,7 @@ const Dashboard = () => {
   const formatCurrency = (value) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-  if (loading) return <p>Carregando dados do painel...</p>;
+  if (loading) return <p className="text-gray-500 animate-pulse">Carregando dados do painel...</p>;
 
   const cards = [
     {
@@ -81,15 +81,14 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="p-4 space-y-8 max-w-5xl mx-auto">
+    <div className="p-4 space-y-8 max-w-5xl mx-auto animate-fade-in-up">
       <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
 
-      {/* Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {cards.map((card) => (
           <div
             key={card.label}
-            className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 border border-gray-100"
+            className="bg-white rounded-xl shadow card-hover p-4 flex items-center gap-4 border border-gray-100 transition"
           >
             <div className="p-2 bg-gray-100 rounded-full">{card.icon}</div>
             <div>
@@ -100,8 +99,7 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Gráfico */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border">
+      <div className="bg-white rounded-xl p-6 shadow border animate-fade-in-up">
         <h2 className="text-lg font-semibold mb-4">Faturamento Mensal</h2>
         <Bar data={chartData} options={{ responsive: true, plugins: { legend: { display: false } } }} />
       </div>
