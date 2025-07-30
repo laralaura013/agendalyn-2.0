@@ -8,8 +8,10 @@ import {
   format
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { zonedTimeToUtc } from 'date-fns-tz'; // ✅ novo import
 
 const prisma = new PrismaClient();
+const timeZone = 'America/Sao_Paulo'; // ✅ definir o fuso
 
 // Função para obter o resumo de dados do dashboard
 export const getDashboardSummary = async (req, res) => {
@@ -17,13 +19,13 @@ export const getDashboardSummary = async (req, res) => {
     const companyId = req.company.id;
     const now = new Date();
 
-    // Define os períodos de tempo
-    const todayStart = startOfDay(now);
-    const todayEnd = endOfDay(now);
+    // Períodos de tempo com conversão correta para UTC
+    const todayStart = zonedTimeToUtc(startOfDay(now), timeZone);
+    const todayEnd = zonedTimeToUtc(endOfDay(now), timeZone);
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
 
-    // 1. Calcula o Faturamento de Hoje
+    // 1. Faturamento de Hoje
     const revenueTodayResult = await prisma.order.aggregate({
       _sum: {
         total: true,
@@ -39,7 +41,7 @@ export const getDashboardSummary = async (req, res) => {
     });
     const revenueToday = revenueTodayResult._sum.total || 0;
 
-    // 2. Calcula o número de Agendamentos de Hoje
+    // 2. Agendamentos de Hoje
     const appointmentsToday = await prisma.appointment.count({
       where: {
         companyId,
@@ -50,7 +52,7 @@ export const getDashboardSummary = async (req, res) => {
       },
     });
 
-    // 3. Calcula o número de Novos Clientes no Mês
+    // 3. Novos Clientes do Mês
     const newClientsThisMonth = await prisma.client.count({
       where: {
         companyId,
@@ -61,7 +63,6 @@ export const getDashboardSummary = async (req, res) => {
       },
     });
 
-    // Envia a resposta com todos os dados calculados
     res.status(200).json({
       revenueToday: Number(revenueToday),
       appointmentsToday,
