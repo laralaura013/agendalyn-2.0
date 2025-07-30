@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import AdminLayout from '../components/layout/AdminLayout';
+import AdminLayout from '../components/layouts/AdminLayout';
 import { UserPlus, Pencil, Trash2 } from 'lucide-react';
 
 const Clients = () => {

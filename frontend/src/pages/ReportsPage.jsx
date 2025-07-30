@@ -3,7 +3,7 @@ import api from '../services/api';
 import BarChartComponent from '../components/reports/BarChartComponent';
 import PieChartComponent from '../components/reports/PieChartComponent';
 import toast from 'react-hot-toast';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const ReportsPage = () => {
   const [reportData, setReportData] = useState(null);

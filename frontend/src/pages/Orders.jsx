@@ -4,7 +4,7 @@ import Modal from '../components/dashboard/Modal';
 import OrderForm from '../components/forms/OrderForm';
 import api from '../services/api';
 import { FileText, CheckCircle, XCircle } from 'lucide-react';
-import AdminLayout from '../components/layout/AdminLayout';
+import AdminLayout from '../components/layouts/AdminLayout';
 
 const statusMap = {
   OPEN: { text: 'ABERTA', style: 'bg-yellow-100 text-yellow-800' },

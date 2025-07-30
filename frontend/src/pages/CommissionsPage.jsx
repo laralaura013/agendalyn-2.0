@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const CommissionsPage = () => {
   const [staffList, setStaffList] = useState([]);

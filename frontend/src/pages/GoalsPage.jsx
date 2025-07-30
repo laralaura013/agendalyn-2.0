@@ -3,7 +3,7 @@ import api from '../services/api';
 import Modal from '../components/dashboard/Modal';
 import GoalForm from '../components/forms/GoalForm';
 import GoalProgress from '../components/goals/GoalProgress';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const GoalsPage = () => {
   const [goals, setGoals] = useState([]);

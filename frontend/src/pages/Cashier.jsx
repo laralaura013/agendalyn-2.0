@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const Cashier = () => {
   const [cashierState, setCashierState] = useState({ isOpen: false, session: null });

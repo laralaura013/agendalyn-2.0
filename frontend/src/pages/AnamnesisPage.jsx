@@ -3,7 +3,7 @@ import Modal from '../components/dashboard/Modal';
 import AnamnesisFormBuilder from '../components/anamnesis/AnamnesisFormBuilder';
 import AnamnesisViewer from '../components/anamnesis/AnamnesisViewer';
 import api from '../services/api';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const AnamnesisPage = () => {
   const [forms, setForms] = useState([]);

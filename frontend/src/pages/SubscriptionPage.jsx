@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../services/api';
 import PlanCard from '../components/subscription/PlanCard';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const SubscriptionPage = () => {
   const [loading, setLoading] = useState(false);

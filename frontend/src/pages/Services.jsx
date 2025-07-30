@@ -4,7 +4,7 @@ import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import ServiceForm from '../components/forms/ServiceForm';
 import api from '../services/api';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const Services = () => {
   const [services, setServices] = useState([]);

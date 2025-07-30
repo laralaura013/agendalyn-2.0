@@ -3,7 +3,7 @@ import Modal from '../components/dashboard/Modal';
 import PackageForm from '../components/forms/PackageForm';
 import SellPackageForm from '../components/forms/SellPackageForm';
 import api from '../services/api';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const PackageCard = ({ pkg, onSell }) => (
   <div className="bg-white p-5 rounded-lg shadow-md border flex flex-col justify-between">

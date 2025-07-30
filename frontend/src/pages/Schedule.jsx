@@ -5,7 +5,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { parseISO } from 'date-fns';
 import { PlusCircle } from 'lucide-react';
-import AdminLayout from '../components/layout/AdminLayout';
+import AdminLayout from '../components/layouts/AdminLayout';
 
 const Schedule = () => {
   const [events, setEvents] = useState([]);

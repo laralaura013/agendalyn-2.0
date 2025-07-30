@@ -4,7 +4,7 @@ import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import StaffForm from '../components/forms/StaffForm';
 import api from '../services/api';
-import AdminLayout from '../components/layout/AdminLayout'; // Importa o AdminLayout
+import AdminLayout from '../components/layouts/AdminLayout'; // Importa o AdminLayout
 
 const Staff = () => {
   const [staff, setStaff] = useState([]);

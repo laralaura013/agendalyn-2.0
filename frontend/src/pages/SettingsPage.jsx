@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { Link, Copy } from 'lucide-react';
-import AdminLayout from '../components/layout/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const SettingsPage = () => {
   const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
