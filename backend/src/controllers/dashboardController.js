@@ -22,11 +22,11 @@ export const getDashboardSummary = async (req, res) => {
     const companyId = req.company.id;
     const now = new Date();
 
-    // Ajustes de data para UTC conforme o fuso brasileiro
+    // Corrigido: todas as datas ajustadas para fuso de SP
     const todayStart = zonedTimeToUtc(startOfDay(now), timeZone);
     const todayEnd = zonedTimeToUtc(endOfDay(now), timeZone);
-    const monthStart = startOfMonth(now);
-    const monthEnd = endOfMonth(now);
+    const monthStart = zonedTimeToUtc(startOfMonth(now), timeZone);
+    const monthEnd = zonedTimeToUtc(endOfMonth(now), timeZone);
 
     // 1. Faturamento de Hoje
     const revenueTodayResult = await prisma.order.aggregate({
