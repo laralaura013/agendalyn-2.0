@@ -7,9 +7,7 @@ import getDay from 'date-fns/getDay';
 import ptBR from 'date-fns/locale/pt-BR';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
-const locales = {
-  'pt-BR': ptBR,
-};
+const locales = { 'pt-BR': ptBR };
 
 const localizer = dateFnsLocalizer({
   format,
@@ -18,6 +16,12 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales,
 });
+
+// Cores fixas para até 10 colaboradores diferentes
+const COLORS = [
+  '#9333ea', '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+  '#6366f1', '#ec4899', '#14b8a6', '#8b5cf6', '#f43f5e'
+];
 
 const Calendar = ({ events, onSelectSlot, onSelectEvent }) => {
   return (
@@ -45,16 +49,21 @@ const Calendar = ({ events, onSelectSlot, onSelectEvent }) => {
           noEventsInRange: "Não há eventos neste período.",
           showMore: total => `+ Ver mais (${total})`
         }}
+        tooltipAccessor={(event) =>
+          `${event.resource.client?.name ?? ''} - ${event.resource.service?.name ?? ''}`
+        }
         eventPropGetter={(event) => {
-            const style = {
-                backgroundColor: '#3174ad',
-                borderRadius: '5px',
-                opacity: 0.8,
-                color: 'white',
-                border: '0px',
-                display: 'block'
-            };
-            return { style };
+          const staffId = event.resource?.user?.id || 0;
+          const color = COLORS[staffId % COLORS.length];
+          const style = {
+            backgroundColor: color,
+            borderRadius: '6px',
+            opacity: 0.9,
+            color: 'white',
+            border: 0,
+            fontWeight: '500',
+          };
+          return { style };
         }}
       />
     </div>

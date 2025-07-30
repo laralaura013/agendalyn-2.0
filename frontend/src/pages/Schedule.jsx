@@ -4,6 +4,7 @@ import AppointmentModal from '../components/schedule/AppointmentModal';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { parseISO } from 'date-fns';
+import { PlusCircle } from 'lucide-react';
 
 const Schedule = () => {
   const [events, setEvents] = useState([]);
@@ -16,6 +17,7 @@ const Schedule = () => {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Carregar agendamentos formatados para o calendário
   const fetchAppointments = useCallback(async () => {
     try {
       const response = await api.get('/appointments');
@@ -32,18 +34,19 @@ const Schedule = () => {
     }
   }, []);
 
+  // Carregar clientes, serviços e equipe
   useEffect(() => {
     const loadPageData = async () => {
       setLoading(true);
       try {
         await Promise.all([
           fetchAppointments(),
-          api.get('/clients/admin').then(res => setClients(res.data)), // ✅ Corrigido
+          api.get('/clients/admin').then(res => setClients(res.data)),
           api.get('/services').then(res => setServices(res.data)),
-          api.get('/staff').then(res => setStaff(res.data))
+          api.get('/staff').then(res => setStaff(res.data)),
         ]);
       } catch (error) {
-        toast.error("Não foi possível carregar os dados da página.");
+        toast.error("Não foi possível carregar os dados da agenda.");
       } finally {
         setLoading(false);
       }
@@ -68,15 +71,15 @@ const Schedule = () => {
     const savePromise = isEditing
       ? api.put(`/appointments/${selectedEvent.id}`, formData)
       : api.post('/appointments', formData);
-    
+
     toast.promise(savePromise, {
-      loading: 'A salvar agendamento...',
+      loading: 'Salvando agendamento...',
       success: () => {
         fetchAppointments();
         setIsModalOpen(false);
         return `Agendamento ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
       },
-      error: "Não foi possível salvar o agendamento."
+      error: "Não foi possível salvar o agendamento.",
     });
   };
 
@@ -84,27 +87,49 @@ const Schedule = () => {
     if (window.confirm("Tem certeza que deseja excluir este agendamento?")) {
       const deletePromise = api.delete(`/appointments/${id}`);
       toast.promise(deletePromise, {
-        loading: 'A excluir...',
+        loading: 'Excluindo agendamento...',
         success: () => {
           fetchAppointments();
           setIsModalOpen(false);
           return 'Agendamento excluído com sucesso!';
         },
-        error: "Não foi possível excluir o agendamento."
+        error: "Erro ao excluir agendamento.",
       });
     }
   };
 
+  const openEmptyModal = () => {
+    setSelectedEvent(null);
+    setSelectedSlot(null);
+    setIsModalOpen(true);
+  };
+
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Agenda</h1>
-      {loading ? <p>A carregar dados da agenda...</p> : (
+    <div className="relative">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-gray-800">📅 Agenda</h1>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-gray-500">Carregando dados da agenda...</p>
+      ) : (
         <Calendar
           events={events}
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
         />
       )}
+
+      {/* Botão flutuante para criar novo agendamento */}
+      <button
+        onClick={openEmptyModal}
+        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition"
+        title="Novo agendamento"
+      >
+        <PlusCircle size={28} />
+      </button>
+
+      {/* Modal de agendamento */}
       {isModalOpen && (
         <AppointmentModal
           isOpen={isModalOpen}
