@@ -45,7 +45,10 @@ function App() {
     <>
       <Toaster
         position="top-right"
-        toastOptions={{ duration: 5000, style: { background: '#333', color: '#fff' } }}
+        toastOptions={{
+          duration: 5000,
+          style: { background: '#333', color: '#fff' }
+        }}
       />
       <ReloadPrompt />
 
@@ -69,25 +72,27 @@ function App() {
           </Route>
         </Route>
 
-        {/* Painel do Admin */}
-        <Route path="/" element={<ProtectedRoute />}>
-          <Route path="dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />
-          <Route path="schedule" element={<AdminLayout><Schedule /></AdminLayout>} />
-          <Route path="clients" element={<AdminLayout><Clients /></AdminLayout>} />
-          <Route path="staff" element={<AdminLayout><Staff /></AdminLayout>} />
-          <Route path="services" element={<AdminLayout><Services /></AdminLayout>} />
-          <Route path="orders" element={<AdminLayout><Orders /></AdminLayout>} />
-          <Route path="cashier" element={<AdminLayout><Cashier /></AdminLayout>} />
-          <Route path="subscription" element={<AdminLayout><SubscriptionPage /></AdminLayout>} />
-          <Route path="reports" element={<AdminLayout><ReportsPage /></AdminLayout>} />
-          <Route path="goals" element={<AdminLayout><GoalsPage /></AdminLayout>} />
-          <Route path="anamnesis" element={<AdminLayout><AnamnesisPage /></AdminLayout>} />
-          <Route path="packages" element={<AdminLayout><PackagesPage /></AdminLayout>} />
-          <Route path="products" element={<AdminLayout><ProductsPage /></AdminLayout>} />
-          <Route path="categories" element={<AdminLayout><CategoriesPage /></AdminLayout>} />
-          <Route path="brands" element={<AdminLayout><BrandsPage /></AdminLayout>} />
-          <Route path="settings" element={<AdminLayout><SettingsPage /></AdminLayout>} />
-          <Route path="commissions" element={<AdminLayout><CommissionsPage /></AdminLayout>} />
+        {/* Painel do Admin (com AdminLayout aplicado em todas) */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="schedule" element={<Schedule />} />
+            <Route path="clients" element={<Clients />} />
+            <Route path="staff" element={<Staff />} />
+            <Route path="services" element={<Services />} />
+            <Route path="orders" element={<Orders />} />
+            <Route path="cashier" element={<Cashier />} />
+            <Route path="subscription" element={<SubscriptionPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="goals" element={<GoalsPage />} />
+            <Route path="anamnesis" element={<AnamnesisPage />} />
+            <Route path="packages" element={<PackagesPage />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+            <Route path="brands" element={<BrandsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="commissions" element={<CommissionsPage />} />
+          </Route>
         </Route>
       </Routes>
     </>
