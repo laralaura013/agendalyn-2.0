@@ -3,7 +3,6 @@ import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import ProductForm from '../components/forms/ProductForm';
 import api from '../services/api';
-import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
 
 const ProductsPage = () => {
   const [products, setProducts] = useState([]);
@@ -62,7 +61,7 @@ const ProductsPage = () => {
   ];
 
   return (
-    <AdminLayout>
+    <div className="p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Produtos</h1>
         <button 
@@ -73,7 +72,9 @@ const ProductsPage = () => {
         </button>
       </div>
 
-      {loading ? <p>Carregando produtos...</p> : (
+      {loading ? (
+        <p>Carregando produtos...</p>
+      ) : (
         <ResourceTable 
           columns={columns} 
           data={products} 
@@ -91,7 +92,7 @@ const ProductsPage = () => {
           />
         </Modal>
       )}
-    </AdminLayout>
+    </div>
   );
 };
 
