@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
-import AdminLayout from '../components/layouts/AdminLayout';
+// A importação do AdminLayout foi REMOVIDA daqui
 import api from '../services/api';
 
 const CategoryForm = ({ initialData, onSave, onCancel }) => {
@@ -87,44 +87,44 @@ const CategoriesPage = () => {
 
   const columns = [{ header: 'Nome', accessor: 'name' }];
 
+  // O <AdminLayout> foi REMOVIDO daqui. A página agora retorna apenas seu próprio conteúdo.
+  // O roteador em App.jsx já está cuidando de colocar esta página dentro do layout.
   return (
-    <AdminLayout>
-      <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Categorias de Produtos</h1>
-          <button
-            onClick={() => { setSelectedCategory(null); setIsModalOpen(true); }}
-            className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
-          >
-            Nova Categoria
-          </button>
-        </div>
-
-        {loading ? (
-          <p className="text-gray-500">Carregando...</p>
-        ) : (
-          <ResourceTable
-            columns={columns}
-            data={categories}
-            onEdit={(cat) => {
-              setSelectedCategory(cat);
-              setIsModalOpen(true);
-            }}
-            onDelete={handleDelete}
-          />
-        )}
-
-        {isModalOpen && (
-          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-            <CategoryForm
-              initialData={selectedCategory}
-              onSave={handleSave}
-              onCancel={() => setIsModalOpen(false)}
-            />
-          </Modal>
-        )}
+    <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Categorias de Produtos</h1>
+        <button
+          onClick={() => { setSelectedCategory(null); setIsModalOpen(true); }}
+          className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
+        >
+          Nova Categoria
+        </button>
       </div>
-    </AdminLayout>
+
+      {loading ? (
+        <p className="text-gray-500">Carregando...</p>
+      ) : (
+        <ResourceTable
+          columns={columns}
+          data={categories}
+          onEdit={(cat) => {
+            setSelectedCategory(cat);
+            setIsModalOpen(true);
+          }}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {isModalOpen && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+          <CategoryForm
+            initialData={selectedCategory}
+            onSave={handleSave}
+            onCancel={() => setIsModalOpen(false)}
+          />
+        </Modal>
+      )}
+    </div>
   );
 };
 
