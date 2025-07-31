@@ -75,47 +75,32 @@ const NavItem = ({ item }) => (
   </NavLink>
 );
 
-const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
+const Sidebar = ({ isMobileMenuOpen }) => {
   const { user } = useAuth();
 
   return (
-    <>
-      {/* Botão do menu para mobile */}
-      <div className="md:hidden fixed top-4 left-4 z-40">
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="bg-white p-2 rounded-md shadow"
-        >
-          <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" strokeWidth={2}
-            viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round"
-              d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+    <aside className={`fixed inset-y-0 left-0 z-30 flex flex-col w-64 bg-gray-800 text-white transform ${
+      isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+    } transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
+      <div className="h-16 flex items-center justify-center text-2xl font-bold border-b border-gray-700 flex-shrink-0">
+        Agendalyn
       </div>
-
-      {/* Menu lateral */}
-      <aside className={`fixed inset-y-0 left-0 z-30 flex flex-col w-64 bg-gray-800 text-white transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
-        <div className="h-16 flex items-center justify-center text-2xl font-bold border-b border-gray-700 flex-shrink-0">
-          Agendalyn
-        </div>
-        <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          {menuGroups.map((group) => (
-            <div key={group.title} className="mb-6">
-              <h3 className="px-4 mb-2 text-xs font-semibold tracking-wider text-gray-400 uppercase">
-                {group.title}
-              </h3>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const isAllowed = !item.allowedRoles || item.allowedRoles.includes(user?.role);
-                  return isAllowed ? <NavItem key={item.name} item={item} /> : null;
-                })}
-              </div>
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        {menuGroups.map((group) => (
+          <div key={group.title} className="mb-6">
+            <h3 className="px-4 mb-2 text-xs font-semibold tracking-wider text-gray-400 uppercase">
+              {group.title}
+            </h3>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isAllowed = !item.allowedRoles || item.allowedRoles.includes(user?.role);
+                return isAllowed ? <NavItem key={item.name} item={item} /> : null;
+              })}
             </div>
-          ))}
-        </nav>
-      </aside>
-    </>
+          </div>
+        ))}
+      </nav>
+    </aside>
   );
 };
 
