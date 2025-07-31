@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, CalendarDays, ClipboardList, Package, Users, UserCog,
   Scissors, Box, Folder, Bookmark, Truck, BarChart3, ArrowRightLeft,
-  Wallet, Target, FileText, ShoppingCart, CreditCard, Settings
+  Wallet, Target, FileText, ShoppingCart, CreditCard, Settings, X
 } from 'lucide-react';
 
 const menuGroups = [
@@ -75,16 +75,26 @@ const NavItem = ({ item }) => (
   </NavLink>
 );
 
-const Sidebar = ({ isMobileMenuOpen }) => {
+const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
   const { user } = useAuth();
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-30 flex flex-col w-64 bg-gray-800 text-white transform ${
-      isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-    } transition-transform duration-300 ease-in-out md:relative md:translate-x-0`}>
-      <div className="h-16 flex items-center justify-center text-2xl font-bold border-b border-gray-700 flex-shrink-0">
-        Agendalyn
+    <aside
+      className={`fixed inset-y-0 left-0 z-30 flex flex-col w-64 bg-gray-800 text-white transform transition-transform duration-300 ease-in-out
+      ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static`}
+    >
+      {/* Cabeçalho do menu */}
+      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
+        <span className="text-xl font-bold">Agendalyn</span>
+        {/* Botão fechar no mobile */}
+        <button
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="md:hidden text-gray-400 hover:text-white"
+        >
+          <X size={20} />
+        </button>
       </div>
+
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         {menuGroups.map((group) => (
           <div key={group.title} className="mb-6">
