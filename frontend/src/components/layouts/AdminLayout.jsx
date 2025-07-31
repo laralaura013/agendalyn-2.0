@@ -1,36 +1,31 @@
 import React, { useState } from 'react';
+import { Outlet } from 'react-router-dom';
 import Sidebar from '../dashboard/Sidebar';
 
-const AdminLayout = ({ children }) => {
+const AdminLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex bg-gray-100 min-h-screen relative">
-      {/* Botão de menu para mobile */}
-      <button
-        onClick={() => setIsMobileMenuOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-50 bg-purple-700 text-white p-2 rounded shadow"
-      >
-        ☰
-      </button>
-
+    <div className="flex h-screen bg-gray-100">
       {/* Overlay para fechar o menu no mobile */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-40 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-40 z-20 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar (visível no desktop, toggle no mobile) */}
+      {/* Sidebar */}
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      {/* Conteúdo */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto">{children}</main>
+      {/* Conteúdo principal */}
+      <div className="flex-1 flex flex-col">
+        <main className="flex-1 p-4 overflow-y-auto">
+          <Outlet />
+        </main>
       </div>
     </div>
   );
