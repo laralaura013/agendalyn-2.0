@@ -39,7 +39,7 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
         </p>
 
         {order.status === 'OPEN' && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
               onClick={() => onCancel(order.id)}
               className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-md hover:bg-red-700 transition"
@@ -124,8 +124,8 @@ const Orders = () => {
 
   return (
     <AdminLayout>
-      <div className="p-4">
-        <div className="flex justify-between items-center mb-6">
+      <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
           <h1 className="text-2xl md:text-3xl font-bold">Comandas</h1>
           <button
             onClick={() => setIsModalOpen(true)}
@@ -138,7 +138,7 @@ const Orders = () => {
         {loading ? (
           <p className="text-gray-500">Carregando comandas...</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {orders.map((order) => (
               <OrderCard
                 key={order.id}

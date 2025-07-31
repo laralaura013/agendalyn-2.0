@@ -20,7 +20,7 @@ const Schedule = () => {
   const fetchAppointments = useCallback(async () => {
     try {
       const response = await api.get('/appointments');
-      const formattedEvents = response.data.map(apt => ({
+      const formattedEvents = response.data.map((apt) => ({
         id: apt.id,
         title: `${apt.client.name} - ${apt.service.name}`,
         start: parseISO(apt.start),
@@ -39,9 +39,9 @@ const Schedule = () => {
       try {
         await Promise.all([
           fetchAppointments(),
-          api.get('/clients/admin').then(res => setClients(res.data)),
-          api.get('/services').then(res => setServices(res.data)),
-          api.get('/staff').then(res => setStaff(res.data)),
+          api.get('/clients/admin').then((res) => setClients(res.data)),
+          api.get('/services').then((res) => setServices(res.data)),
+          api.get('/staff').then((res) => setStaff(res.data)),
         ]);
       } catch (error) {
         toast.error("Não foi possível carregar os dados da agenda.");
@@ -104,7 +104,7 @@ const Schedule = () => {
 
   return (
     <AdminLayout>
-      <div className="relative animate-fade-in-up">
+      <div className="relative animate-fade-in-up p-4 max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-gray-800">📅 Agenda</h1>
         </div>

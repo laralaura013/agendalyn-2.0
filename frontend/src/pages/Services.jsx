@@ -4,7 +4,7 @@ import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import ServiceForm from '../components/forms/ServiceForm';
 import api from '../services/api';
-import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout';
 
 const Services = () => {
   const [services, setServices] = useState([]);
@@ -36,7 +36,7 @@ const Services = () => {
       : api.post('/services', data);
 
     toast.promise(savePromise, {
-      loading: 'A salvar serviço...',
+      loading: 'Salvando serviço...',
       success: () => {
         fetchServices();
         setIsModalOpen(false);
@@ -51,7 +51,7 @@ const Services = () => {
     if (window.confirm("Tem certeza que deseja excluir este serviço?")) {
       const deletePromise = api.delete(`/services/${id}`);
       toast.promise(deletePromise, {
-        loading: 'A excluir serviço...',
+        loading: 'Excluindo serviço...',
         success: () => {
           fetchServices();
           return 'Serviço excluído com sucesso!';
@@ -69,34 +69,38 @@ const Services = () => {
 
   return (
     <AdminLayout>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Serviços</h1>
-        <button
-          onClick={() => { setSelectedService(null); setIsModalOpen(true); }}
-          className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
-        >
-          Novo Serviço
-        </button>
-      </div>
+      <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">Serviços</h1>
+          <button
+            onClick={() => { setSelectedService(null); setIsModalOpen(true); }}
+            className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition shadow"
+          >
+            Novo Serviço
+          </button>
+        </div>
 
-      {loading ? <p>Carregando...</p> : (
-        <ResourceTable
-          columns={columns}
-          data={services}
-          onEdit={(service) => { setSelectedService(service); setIsModalOpen(true); }}
-          onDelete={(id) => handleDelete(id)}
-        />
-      )}
-
-      {isModalOpen && (
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <ServiceForm
-            initialData={selectedService}
-            onSave={handleSave}
-            onCancel={() => setIsModalOpen(false)}
+        {loading ? (
+          <p className="text-gray-500">Carregando...</p>
+        ) : (
+          <ResourceTable
+            columns={columns}
+            data={services}
+            onEdit={(service) => { setSelectedService(service); setIsModalOpen(true); }}
+            onDelete={handleDelete}
           />
-        </Modal>
-      )}
+        )}
+
+        {isModalOpen && (
+          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+            <ServiceForm
+              initialData={selectedService}
+              onSave={handleSave}
+              onCancel={() => setIsModalOpen(false)}
+            />
+          </Modal>
+        )}
+      </div>
     </AdminLayout>
   );
 };

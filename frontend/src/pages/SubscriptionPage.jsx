@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../services/api';
 import PlanCard from '../components/subscription/PlanCard';
-import AdminLayout from '../components/layouts/AdminLayout'; // ✅ Importado
+import AdminLayout from '../components/layouts/AdminLayout';
 
 const SubscriptionPage = () => {
   const [loading, setLoading] = useState(false);
@@ -41,18 +41,26 @@ const SubscriptionPage = () => {
 
   return (
     <AdminLayout>
-      <h1 className="text-3xl font-bold text-center mb-4">Planos e Assinatura</h1>
-      <p className="text-center text-gray-600 mb-10">Escolha o plano que melhor se adapta ao seu negócio.</p>
+      <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-center mb-4">Planos e Assinatura</h1>
+        <p className="text-center text-gray-600 mb-10">
+          Escolha o plano que melhor se adapta ao seu negócio.
+        </p>
 
-      <div className="flex justify-center">
-        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-8 max-w-sm">
-          {plans.map(plan => (
-            <PlanCard key={plan.name} plan={plan} onChoosePlan={handleChoosePlan} />
-          ))}
+        <div className="w-full max-w-md mx-auto">
+          <div className="grid grid-cols-1 gap-6">
+            {plans.map(plan => (
+              <PlanCard key={plan.name} plan={plan} onChoosePlan={handleChoosePlan} />
+            ))}
+          </div>
         </div>
-      </div>
 
-      {loading && <p className="text-center mt-4">A redirecionar para o portal de pagamento...</p>}
+        {loading && (
+          <p className="text-center mt-6 text-purple-700 font-medium animate-pulse">
+            A redirecionar para o portal de pagamento...
+          </p>
+        )}
+      </div>
     </AdminLayout>
   );
 };
