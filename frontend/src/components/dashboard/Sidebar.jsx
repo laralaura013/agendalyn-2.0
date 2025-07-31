@@ -83,7 +83,7 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
       className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-gray-800 text-white transform transition-transform duration-300 ease-in-out
       ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static`}
     >
-      {/* Cabeçalho */}
+      {/* Header da sidebar */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
         <span className="text-xl font-bold">Agendalyn</span>
         <button
@@ -94,6 +94,7 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
         </button>
       </div>
 
+      {/* Menu */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         {menuGroups.map((group) => (
           <div key={group.title} className="mb-6">

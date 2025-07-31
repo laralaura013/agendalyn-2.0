@@ -6,7 +6,7 @@ const AdminLayout = ({ children }) => {
 
   return (
     <div className="flex bg-gray-100 min-h-screen relative">
-      {/* Botão ☰ (mobile) */}
+      {/* Botão de menu para mobile */}
       <button
         onClick={() => setIsMobileMenuOpen(true)}
         className="md:hidden fixed top-4 left-4 z-50 bg-purple-700 text-white p-2 rounded shadow"
@@ -22,13 +22,13 @@ const AdminLayout = ({ children }) => {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar (visível no desktop, toggle no mobile) */}
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      {/* Conteúdo principal */}
+      {/* Conteúdo */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
