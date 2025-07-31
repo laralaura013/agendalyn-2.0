@@ -80,13 +80,12 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-30 flex flex-col w-64 bg-gray-800 text-white transform transition-transform duration-300 ease-in-out
+      className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-gray-800 text-white transform transition-transform duration-300 ease-in-out
       ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static`}
     >
-      {/* Cabeçalho do menu */}
+      {/* Cabeçalho */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
         <span className="text-xl font-bold">Agendalyn</span>
-        {/* Botão fechar no mobile */}
         <button
           onClick={() => setIsMobileMenuOpen(false)}
           className="md:hidden text-gray-400 hover:text-white"
