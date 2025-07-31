@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Sidebar from '../dashboard/Sidebar'; // ajuste conforme a estrutura
 
 const AdminLayout = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -15,7 +14,6 @@ const AdminLayout = ({ children }) => {
       )}
 
       {/* Sidebar única */}
-      <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
