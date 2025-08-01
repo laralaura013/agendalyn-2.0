@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
-// A importação do AdminLayout foi REMOVIDA daqui
 import api from '../services/api';
+// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const CategoryForm = ({ initialData, onSave, onCancel }) => {
   const [name, setName] = useState(initialData?.name || '');
@@ -87,8 +87,6 @@ const CategoriesPage = () => {
 
   const columns = [{ header: 'Nome', accessor: 'name' }];
 
-  // O <AdminLayout> foi REMOVIDO daqui. A página agora retorna apenas seu próprio conteúdo.
-  // O roteador em App.jsx já está cuidando de colocar esta página dentro do layout.
   return (
     <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

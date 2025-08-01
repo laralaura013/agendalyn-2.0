@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import api from '../services/api';
-import AdminLayout from '../components/layouts/AdminLayout';
+// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const BrandForm = ({ initialData, onSave, onCancel }) => {
   const [name, setName] = useState(initialData?.name || '');
@@ -88,43 +88,41 @@ const BrandsPage = () => {
   const columns = [{ header: 'Nome', accessor: 'name' }];
 
   return (
-    <AdminLayout>
-      <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Marcas de Produtos</h1>
-          <button
-            onClick={() => { setSelectedBrand(null); setIsModalOpen(true); }}
-            className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
-          >
-            Nova Marca
-          </button>
-        </div>
-
-        {loading ? (
-          <p className="text-gray-500">Carregando...</p>
-        ) : (
-          <ResourceTable
-            columns={columns}
-            data={brands}
-            onEdit={(brand) => {
-              setSelectedBrand(brand);
-              setIsModalOpen(true);
-            }}
-            onDelete={handleDelete}
-          />
-        )}
-
-        {isModalOpen && (
-          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-            <BrandForm
-              initialData={selectedBrand}
-              onSave={handleSave}
-              onCancel={() => setIsModalOpen(false)}
-            />
-          </Modal>
-        )}
+    <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Marcas de Produtos</h1>
+        <button
+          onClick={() => { setSelectedBrand(null); setIsModalOpen(true); }}
+          className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 shadow"
+        >
+          Nova Marca
+        </button>
       </div>
-    </AdminLayout>
+
+      {loading ? (
+        <p className="text-gray-500">Carregando...</p>
+      ) : (
+        <ResourceTable
+          columns={columns}
+          data={brands}
+          onEdit={(brand) => {
+            setSelectedBrand(brand);
+            setIsModalOpen(true);
+          }}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {isModalOpen && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+          <BrandForm
+            initialData={selectedBrand}
+            onSave={handleSave}
+            onCancel={() => setIsModalOpen(false)}
+          />
+        </Modal>
+      )}
+    </div>
   );
 };
 

@@ -4,7 +4,7 @@ import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import StaffForm from '../components/forms/StaffForm';
 import api from '../services/api';
-import AdminLayout from '../components/layouts/AdminLayout';
+// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const Staff = () => {
   const [staff, setStaff] = useState([]);
@@ -79,40 +79,38 @@ const Staff = () => {
   ];
 
   return (
-    <AdminLayout>
-      <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Colaboradores</h1>
-          <button
-            onClick={() => { setSelectedStaff(null); setIsModalOpen(true); }}
-            className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition shadow"
-          >
-            Novo Colaborador
-          </button>
-        </div>
-
-        {loading ? (
-          <p className="text-gray-500">Carregando colaboradores...</p>
-        ) : (
-          <ResourceTable
-            columns={columns}
-            data={staff}
-            onEdit={(staffMember) => { setSelectedStaff(staffMember); setIsModalOpen(true); }}
-            onDelete={handleDelete}
-          />
-        )}
-
-        {isModalOpen && (
-          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-            <StaffForm
-              initialData={selectedStaff}
-              onSave={handleSave}
-              onCancel={() => setIsModalOpen(false)}
-            />
-          </Modal>
-        )}
+    <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Colaboradores</h1>
+        <button
+          onClick={() => { setSelectedStaff(null); setIsModalOpen(true); }}
+          className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition shadow"
+        >
+          Novo Colaborador
+        </button>
       </div>
-    </AdminLayout>
+
+      {loading ? (
+        <p className="text-gray-500">Carregando colaboradores...</p>
+      ) : (
+        <ResourceTable
+          columns={columns}
+          data={staff}
+          onEdit={(staffMember) => { setSelectedStaff(staffMember); setIsModalOpen(true); }}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {isModalOpen && (
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+          <StaffForm
+            initialData={selectedStaff}
+            onSave={handleSave}
+            onCancel={() => setIsModalOpen(false)}
+          />
+        </Modal>
+      )}
+    </div>
   );
 };
 

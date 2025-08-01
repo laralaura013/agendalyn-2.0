@@ -3,7 +3,7 @@ import Modal from '../components/dashboard/Modal';
 import PackageForm from '../components/forms/PackageForm';
 import SellPackageForm from '../components/forms/SellPackageForm';
 import api from '../services/api';
-import AdminLayout from '../components/layouts/AdminLayout';
+// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const PackageCard = ({ pkg, onSell }) => (
   <div className="bg-white p-5 rounded-lg shadow-md border flex flex-col justify-between">
@@ -82,49 +82,47 @@ const PackagesPage = () => {
   };
 
   return (
-    <AdminLayout>
-      <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Pacotes de Serviços</h1>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
-          >
-            Criar Pacote
-          </button>
-        </div>
-
-        {loading ? (
-          <p className="text-gray-500">Carregando...</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {packages.length > 0 ? (
-              packages.map(pkg => (
-                <PackageCard key={pkg.id} pkg={pkg} onSell={handleSellClick} />
-              ))
-            ) : (
-              <p className="col-span-full text-center text-gray-500">Nenhum pacote cadastrado.</p>
-            )}
-          </div>
-        )}
-
-        {isCreateModalOpen && (
-          <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)}>
-            <PackageForm onSave={handleCreateSave} onCancel={() => setIsCreateModalOpen(false)} />
-          </Modal>
-        )}
-
-        {isSellModalOpen && selectedPackage && (
-          <Modal isOpen={isSellModalOpen} onClose={() => setIsSellModalOpen(false)}>
-            <SellPackageForm
-              pkg={selectedPackage}
-              onSave={handleSellSave}
-              onCancel={() => setIsSellModalOpen(false)}
-            />
-          </Modal>
-        )}
+    <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold">Pacotes de Serviços</h1>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
+        >
+          Criar Pacote
+        </button>
       </div>
-    </AdminLayout>
+
+      {loading ? (
+        <p className="text-gray-500">Carregando...</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {packages.length > 0 ? (
+            packages.map(pkg => (
+              <PackageCard key={pkg.id} pkg={pkg} onSell={handleSellClick} />
+            ))
+          ) : (
+            <p className="col-span-full text-center text-gray-500">Nenhum pacote cadastrado.</p>
+          )}
+        </div>
+      )}
+
+      {isCreateModalOpen && (
+        <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)}>
+          <PackageForm onSave={handleCreateSave} onCancel={() => setIsCreateModalOpen(false)} />
+        </Modal>
+      )}
+
+      {isSellModalOpen && selectedPackage && (
+        <Modal isOpen={isSellModalOpen} onClose={() => setIsSellModalOpen(false)}>
+          <SellPackageForm
+            pkg={selectedPackage}
+            onSave={handleSellSave}
+            onCancel={() => setIsSellModalOpen(false)}
+          />
+        </Modal>
+      )}
+    </div>
   );
 };
 
