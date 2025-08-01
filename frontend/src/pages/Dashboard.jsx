@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import api from '../services/api'
-import { DollarSign, CalendarDays, Users, TrendingUp } from 'lucide-react'
+import Card from '../components/ui/Card'
+import StatsCard from '../components/ui/StatsCard'
 import { Bar, Doughnut } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -11,7 +12,7 @@ import {
   BarElement,
   ArcElement,
   Tooltip,
-  Legend,
+  Legend
 } from 'chart.js'
 
 // registra Chart.js
@@ -24,13 +25,10 @@ const Dashboard = () => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    async function fetchData() {
+    async function load() {
       try {
-        // 1) resumo diário
         const { data: sum } = await api.get('/dashboard/summary')
-        // 2) faturamento por mês (espera array [{ month, value }, ...])
         const { data: rev } = await api.get('/dashboard/revenue-by-month')
-
         setSummary(sum)
         setMonthlyData(Array.isArray(rev) ? rev : [])
       } catch (e) {
@@ -40,125 +38,150 @@ const Dashboard = () => {
         setLoading(false)
       }
     }
-    fetchData()
+    load()
   }, [])
 
-  const fmtBRL = (v) =>
+  const fmtBRL = v =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
-  if (loading) {
-    return (
-      <div className="p-4">
-        <p className="text-gray-500 animate-pulse">Carregando dados do painel...</p>
-      </div>
-    )
-  }
+  if (loading) return <p className="text-center py-20 text-gray-500 animate-pulse">Carregando painel…</p>
+  if (error || !summary)
+    return <p className="text-center py-20 text-red-500">Erro ao carregar dashboard.</p>
 
-  if (error || !summary) {
-    return (
-      <div className="p-4">
-        <p className="text-red-500">Erro ao carregar dashboard.</p>
-      </div>
-    )
-  }
-
-  // cards diários
+  // prepara cards
   const cards = [
     {
-      label: 'Faturamento Hoje',
+      title: 'Faturamento Hoje',
       value: fmtBRL(summary.revenueToday),
-      icon: <DollarSign className="text-green-600" />,
+      variation: summary.revenueVarPct,
+      isPositive: summary.revenueVarPct >= 0,
+      iconColor: 'text-green-500',
+      icon: '💰'
     },
     {
-      label: 'Agendamentos Hoje',
+      title: 'Agendamentos Hoje',
       value: summary.appointmentsToday,
-      icon: <CalendarDays className="text-blue-600" />,
+      variation: summary.appointmentsVarPct,
+      isPositive: summary.appointmentsVarPct >= 0,
+      iconColor: 'text-blue-500',
+      icon: '📅'
     },
     {
-      label: 'Novos Clientes (Mês)',
+      title: 'Novos Clientes (Mês)',
       value: summary.newClientsThisMonth,
-      icon: <Users className="text-purple-600" />,
+      variation: summary.clientsVarPct,
+      isPositive: summary.clientsVarPct >= 0,
+      iconColor: 'text-purple-500',
+      icon: '👤'
     },
     {
-      label: 'Taxa de Ocupação',
+      title: 'Taxa de Ocupação',
       value: `${summary.occupationRate ?? 0}%`,
-      icon: <TrendingUp className="text-gray-500" />,
-    },
+      variation: 0,
+      isPositive: true,
+      iconColor: 'text-gray-400',
+      icon: '📈'
+    }
   ]
 
-  // Bar chart de faturamento mensal
+  // dados do gráfico de barras
   const barData = {
-    labels: monthlyData.map((d) => d.month),
+    labels: monthlyData.map(d => d.month),
     datasets: [
       {
         label: 'Faturamento',
-        data: monthlyData.map((d) => d.value),
-        backgroundColor: '#9333ea',
-        borderRadius: 6,
-        barThickness: 40,
-      },
-    ],
+        data: monthlyData.map(d => d.value),
+        backgroundColor: '#7C3AED', // roxo
+        borderRadius: 8,
+        barThickness: 30
+      }
+    ]
+  }
+  const barOptions = {
+    maintainAspectRatio: false,
+    scales: {
+      x: { grid: { display: false } },
+      y: {
+        grid: { color: '#E5E7EB' },
+        ticks: { callback: v => fmtBRL(v) }
+      }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => fmtBRL(ctx.parsed.y) } }
+    }
   }
 
-  // Doughnut estático
-  const productStats = [
-    { label: 'Eletrônicos', value: 2487 },
-    { label: 'Games', value: 1828 },
-    { label: 'Móveis', value: 1463 },
+  // dados do donut
+  const productStats = summary.productStats || [
+    { label: 'Eletrônicos', value: 0 },
+    { label: 'Games', value: 0 },
+    { label: 'Móveis', value: 0 }
   ]
   const doughnutData = {
-    labels: productStats.map((p) => p.label),
+    labels: productStats.map(p => p.label),
     datasets: [
       {
-        data: productStats.map((p) => p.value),
-        backgroundColor: ['#9333ea', '#3b82f6', '#10b981'],
-      },
-    ],
+        data: productStats.map(p => p.value),
+        backgroundColor: ['#6366F1','#FBBF24','#10B981']
+      }
+    ]
+  }
+  const doughnutOptions = {
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmtBRL(ctx.parsed)}` } }
+    }
   }
 
   return (
-    <div className="p-4 space-y-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+    <div className="space-y-8 p-6 max-w-6xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
 
-      {/* ▷ cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        {cards.map((c) => (
-          <div
-            key={c.label}
-            className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 border border-gray-100"
-          >
-            <div className="p-2 bg-gray-100 rounded-full">{c.icon}</div>
-            <div>
-              <p className="text-sm text-gray-500">{c.label}</p>
-              <p className="text-lg font-semibold">{c.value}</p>
+      {/* CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {cards.map(c => (
+          <Card key={c.title}>
+            <div className="flex items-center">
+              <div className={`p-3 rounded-lg bg-gray-100 ${c.iconColor} text-xl`}>{c.icon}</div>
+              <div className="ml-4">
+                <p className="text-sm text-gray-500">{c.title}</p>
+                <p className="text-2xl font-semibold">{c.value}</p>
+              </div>
             </div>
-          </div>
+            {typeof c.variation === 'number' && (
+              <div className="mt-2 text-sm">
+                <span
+                  className={`px-2 py-1 rounded-full ${
+                    c.isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {c.isPositive ? '+' : ''}
+                  {c.variation}%
+                </span>
+                <span className="ml-2 text-gray-400">vs mês anterior</span>
+              </div>
+            )}
+          </Card>
         ))}
       </div>
 
-      {/* ▷ faturamento mensal */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border">
+      {/* GRÁFICO DE BARRAS */}
+      <Card>
         <h2 className="text-lg font-semibold mb-4">Faturamento Mensal</h2>
-        <Bar
-          data={barData}
-          options={{
-            responsive: true,
-            plugins: { legend: { display: false } },
-          }}
-        />
-      </div>
+        <div className="h-80">
+          <Bar data={barData} options={barOptions} />
+        </div>
+      </Card>
 
-      {/* ▷ product statistic */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border">
+      {/* DONUT */}
+      <Card>
         <h2 className="text-lg font-semibold mb-4">Product Statistic</h2>
-        <Doughnut
-          data={doughnutData}
-          options={{
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-          }}
-        />
-      </div>
+        <div className="h-72">
+          <Doughnut data={doughnutData} options={doughnutOptions} />
+        </div>
+      </Card>
     </div>
   )
 }
