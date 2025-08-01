@@ -1,18 +1,18 @@
 // src/pages/Dashboard.jsx
 
 import React from 'react'
-import CustomerHabits from '../components/charts/CustomerHabits'
+import ProductStatistic from '../components/charts/ProductStatistic'
 
 const Dashboard = () => (
   <div className="p-4">
-    <h1 className="text-2xl font-bold mb-6">Dashboard – Teste CustomerHabits</h1>
+    <h1 className="text-2xl font-bold mb-6">Dashboard – Teste ProductStatistic</h1>
     <div className="bg-white rounded-2xl shadow-md p-6">
-      <CustomerHabits
-        data={{
-          categories: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul'],
-          seriesA:    [30, 40, 45, 50, 49, 60, 70],
-          seriesB:    [23, 32, 34, 52, 41, 59, 65],
-        }}
+      <ProductStatistic
+        data={[
+          { label: 'Eletrônicos', value: 2487 },
+          { label: 'Games',       value: 1828 },
+          { label: 'Móveis',      value: 1463 },
+        ]}
       />
     </div>
   </div>
