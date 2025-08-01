@@ -2,9 +2,8 @@
 
 import React, { useEffect, useState } from 'react'
 import api from '../services/api'
-import Card from '../components/ui/Card'
-import StatsCard from '../components/ui/StatsCard'
 import { Bar, Doughnut } from 'react-chartjs-2'
+import { motion } from 'framer-motion'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,15 +11,21 @@ import {
   BarElement,
   ArcElement,
   Tooltip,
-  Legend
+  Legend,
 } from 'chart.js'
+import {
+  DollarSign,
+  CalendarDays,
+  Users,
+  TrendingUp
+} from 'lucide-react'
 
 // registra Chart.js
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend)
 
 const Dashboard = () => {
   const [summary, setSummary] = useState(null)
-  const [monthlyData, setMonthlyData] = useState([])
+  const [monthly, setMonthly] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -30,7 +35,7 @@ const Dashboard = () => {
         const { data: sum } = await api.get('/dashboard/summary')
         const { data: rev } = await api.get('/dashboard/revenue-by-month')
         setSummary(sum)
-        setMonthlyData(Array.isArray(rev) ? rev : [])
+        setMonthly(Array.isArray(rev) ? rev : [])
       } catch (e) {
         console.error(e)
         setError(e)
@@ -44,58 +49,55 @@ const Dashboard = () => {
   const fmtBRL = v =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
-  if (loading) return <p className="text-center py-20 text-gray-500 animate-pulse">Carregando painel…</p>
+  if (loading)
+    return <p className="text-center py-20 text-gray-500 animate-pulse">Carregando painel…</p>
   if (error || !summary)
     return <p className="text-center py-20 text-red-500">Erro ao carregar dashboard.</p>
 
-  // prepara cards
+  // dados dos cards
   const cards = [
     {
-      title: 'Faturamento Hoje',
+      label: 'Faturamento Hoje',
       value: fmtBRL(summary.revenueToday),
-      variation: summary.revenueVarPct,
-      isPositive: summary.revenueVarPct >= 0,
-      iconColor: 'text-green-500',
-      icon: '💰'
+      pct: summary.appointmentsVarPct !== undefined ? summary.revenueVarPct : 0,
+      icon: <DollarSign size={28} />,
+      gradient: 'from-green-300 to-green-500',
     },
     {
-      title: 'Agendamentos Hoje',
+      label: 'Agendamentos Hoje',
       value: summary.appointmentsToday,
-      variation: summary.appointmentsVarPct,
-      isPositive: summary.appointmentsVarPct >= 0,
-      iconColor: 'text-blue-500',
-      icon: '📅'
+      pct: summary.appointmentsVarPct ?? 0,
+      icon: <CalendarDays size={28} />,
+      gradient: 'from-blue-300 to-blue-500',
     },
     {
-      title: 'Novos Clientes (Mês)',
+      label: 'Novos Clientes (Mês)',
       value: summary.newClientsThisMonth,
-      variation: summary.clientsVarPct,
-      isPositive: summary.clientsVarPct >= 0,
-      iconColor: 'text-purple-500',
-      icon: '👤'
+      pct: summary.clientsVarPct ?? 0,
+      icon: <Users size={28} />,
+      gradient: 'from-purple-300 to-purple-500',
     },
     {
-      title: 'Taxa de Ocupação',
+      label: 'Taxa de Ocupação',
       value: `${summary.occupationRate ?? 0}%`,
-      variation: 0,
-      isPositive: true,
-      iconColor: 'text-gray-400',
-      icon: '📈'
-    }
+      pct: summary.occupationRate ?? 0,
+      icon: <TrendingUp size={28} />,
+      gradient: 'from-gray-300 to-gray-500',
+    },
   ]
 
-  // dados do gráfico de barras
+  // Bar chart data
   const barData = {
-    labels: monthlyData.map(d => d.month),
+    labels: monthly.map(d => d.month),
     datasets: [
       {
         label: 'Faturamento',
-        data: monthlyData.map(d => d.value),
-        backgroundColor: '#7C3AED', // roxo
+        data: monthly.map(d => d.value),
+        backgroundColor: '#7C3AED',
         borderRadius: 8,
-        barThickness: 30
-      }
-    ]
+        barThickness: 30,
+      },
+    ],
   }
   const barOptions = {
     maintainAspectRatio: false,
@@ -103,85 +105,91 @@ const Dashboard = () => {
       x: { grid: { display: false } },
       y: {
         grid: { color: '#E5E7EB' },
-        ticks: { callback: v => fmtBRL(v) }
-      }
+        ticks: { callback: v => fmtBRL(v) },
+      },
     },
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: ctx => fmtBRL(ctx.parsed.y) } }
-    }
+      tooltip: { callbacks: { label: ctx => fmtBRL(ctx.parsed.y) } },
+    },
   }
 
-  // dados do donut
+  // Doughnut chart data (fallback estático se não vier do summary)
   const productStats = summary.productStats || [
     { label: 'Eletrônicos', value: 0 },
     { label: 'Games', value: 0 },
-    { label: 'Móveis', value: 0 }
+    { label: 'Móveis', value: 0 },
   ]
   const doughnutData = {
     labels: productStats.map(p => p.label),
     datasets: [
       {
         data: productStats.map(p => p.value),
-        backgroundColor: ['#6366F1','#FBBF24','#10B981']
-      }
-    ]
+        backgroundColor: ['#7C3AED', '#FBBF24', '#10B981'],
+      },
+    ],
   }
   const doughnutOptions = {
     maintainAspectRatio: false,
-    plugins: {
-      legend: { position: 'bottom' },
-      tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmtBRL(ctx.parsed)}` } }
-    }
+    plugins: { legend: { position: 'bottom' } },
   }
 
   return (
-    <div className="space-y-8 p-6 max-w-6xl mx-auto">
+    <div className="p-6 space-y-8 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
 
       {/* CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {cards.map(c => (
-          <Card key={c.title}>
-            <div className="flex items-center">
-              <div className={`p-3 rounded-lg bg-gray-100 ${c.iconColor} text-xl`}>{c.icon}</div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-500">{c.title}</p>
-                <p className="text-2xl font-semibold">{c.value}</p>
-              </div>
+        {cards.map((c) => (
+          <motion.div
+            key={c.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className={`bg-gradient-to-br ${c.gradient} rounded-2xl shadow-lg p-5 text-white flex justify-between items-center`}
+          >
+            <div>
+              <p className="text-sm opacity-90">{c.label}</p>
+              <p className="text-2xl font-bold mt-1">{c.value}</p>
             </div>
-            {typeof c.variation === 'number' && (
-              <div className="mt-2 text-sm">
-                <span
-                  className={`px-2 py-1 rounded-full ${
-                    c.isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  }`}
-                >
-                  {c.isPositive ? '+' : ''}
-                  {c.variation}%
-                </span>
-                <span className="ml-2 text-gray-400">vs mês anterior</span>
-              </div>
-            )}
-          </Card>
+            <div>
+              {c.icon}
+            </div>
+            <div className="absolute bottom-2 left-5 text-xs bg-white/30 px-2 py-1 rounded-full">
+              {c.pct >= 0 ? '+' : ''}
+              {c.pct}%
+            </div>
+          </motion.div>
         ))}
       </div>
 
       {/* GRÁFICO DE BARRAS */}
-      <Card>
-        <h2 className="text-lg font-semibold mb-4">Faturamento Mensal</h2>
-        <div className="h-80">
-          <Bar data={barData} options={barOptions} />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div className="bg-white rounded-2xl shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Faturamento Mensal</h2>
+          <div className="h-80">
+            <Bar data={barData} options={barOptions} />
+          </div>
         </div>
-      </Card>
+      </motion.div>
 
-      {/* DONUT */}
-      <Card>
-        <h2 className="text-lg font-semibold mb-4">Product Statistic</h2>
-        <div className="h-72">
-          <Doughnut data={doughnutData} options={doughnutOptions} />
+      {/* GRÁFICO DONUT */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <div className="bg-white rounded-2xl shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Product Statistic</h2>
+          <div className="h-72">
+            <Doughnut data={doughnutData} options={doughnutOptions} />
+          </div>
         </div>
-      </Card>
+      </motion.div>
     </div>
   )
 }
