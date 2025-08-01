@@ -33,39 +33,30 @@ export const getDashboardSummary = async (req, res) => {
     console.log('monthStart:', monthStart.toISOString())
     console.log('monthEnd:  ', monthEnd.toISOString())
 
-    // 1️⃣ Receita de hoje (agendamentos)
-    const revenueTodayResult = await prisma.appointment.aggregate({
-      _sum: { price: true },        // ajuste "price" conforme seu schema
+    // 1️⃣ Receita de Hoje (orders)
+    const revenueTodayResult = await prisma.order.aggregate({
+      _sum: { total: true },
       where: {
         companyId,
-        date: {
-          gte: todayStart,
-          lte: todayEnd,
-        },
-        status: 'CONFIRMED'         // ajuste status se necessário
+        status: 'FINISHED',
+        updatedAt: { gte: todayStart, lte: todayEnd },
       },
     })
-    const revenueToday = revenueTodayResult._sum.price || 0
+    const revenueToday = revenueTodayResult._sum.total || 0
 
-    // 2️⃣ Agendamentos hoje
+    // 2️⃣ Agendamentos de Hoje (appointments) — usa o campo `start`
     const appointmentsToday = await prisma.appointment.count({
       where: {
         companyId,
-        date: {
-          gte: todayStart,
-          lte: todayEnd,
-        },
+        start: { gte: todayStart, lte: todayEnd },
       },
     })
 
-    // 3️⃣ Clientes novos neste mês
+    // 3️⃣ Novos Clientes neste Mês
     const newClientsThisMonth = await prisma.client.count({
       where: {
         companyId,
-        createdAt: {
-          gte: monthStart,
-          lte: monthEnd,
-        },
+        createdAt: { gte: monthStart, lte: monthEnd },
       },
     })
 
@@ -77,9 +68,7 @@ export const getDashboardSummary = async (req, res) => {
 
   } catch (error) {
     console.error('--- ERRO AO GERAR RESUMO DO DASHBOARD ---', error)
-    return res
-      .status(500)
-      .json({ message: error.message })
+    return res.status(500).json({ message: error.message })
   }
 }
 
@@ -87,10 +76,13 @@ export const getMonthlyRevenue = async (req, res) => {
   try {
     const companyId = req.company.id
 
+    // últimos 6 meses
     const months = Array.from({ length: 6 }).map((_, i) => {
       const date = subMonths(new Date(), 5 - i)
       return {
-        month: format(date, 'MMM', { locale: ptBR }).replace('.', '').replace(/^\w/, c => c.toUpperCase()),
+        month: format(date, 'MMM', { locale: ptBR })
+                 .replace('.', '')
+                 .replace(/^\w/, c => c.toUpperCase()),
         start: toUtcFromBrazil(startOfMonth(date)),
         end:   toUtcFromBrazil(endOfMonth(date)),
       }
@@ -103,25 +95,17 @@ export const getMonthlyRevenue = async (req, res) => {
           where: {
             companyId,
             status: 'FINISHED',
-            updatedAt: {
-              gte: start,
-              lte: end,
-            },
+            updatedAt: { gte: start, lte: end },
           },
         })
-        return {
-          month,
-          value: agg._sum.total || 0,
-        }
+        return { month, value: agg._sum.total || 0 }
       })
     )
 
-    return res.status(200).json(data)
+    return res.json(data)
 
   } catch (error) {
     console.error('Erro ao calcular faturamento mensal:', error)
-    return res
-      .status(500)
-      .json({ message: error.message })
+    return res.status(500).json({ message: error.message })
   }
 }
