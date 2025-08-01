@@ -1,120 +1,115 @@
-import React, { useState, useEffect } from 'react';
-import api from '../services/api';
-import {
-  DollarSign, CalendarDays, Users, TrendingUp
-} from 'lucide-react';
-import { Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend
-} from 'chart.js';
+// src/pages/Dashboard.jsx
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+import React, { useEffect, useState } from 'react'
+import api from '../services/api'
+import StatsCard from '../components/ui/StatsCard'
+import CustomerHabits from '../components/charts/CustomerHabits'
+import ProductStatistic from '../components/charts/ProductStatistic'
 
 const Dashboard = () => {
-  const [summary, setSummary] = useState({
-    revenueToday: 0,
-    appointmentsToday: 0,
-    newClientsThisMonth: 0,
-  });
-  const [loading, setLoading] = useState(true);
-
-  const [monthlyData, setMonthlyData] = useState([
-    { month: 'Abr', value: 1000 },
-    { month: 'Mai', value: 750 },
-    { month: 'Jun', value: 1300 },
-    { month: 'Jul', value: 0 },
-  ]);
+  const [stats, setStats] = useState({
+    totalSales:     { value: 'R$ 0', var: 0 },
+    totalOrders:    { value: 0,    var: 0 },
+    visitor:        { value: 0,    var: 0 },
+    soldProducts:   { value: 0,    var: 0 },
+    months:   ['Jan','Fev','Mar','Abr','Mai','Jun','Jul'],
+    seenCounts: [0,0,0,0,0,0,0],
+    salesCounts:[0,0,0,0,0,0,0],
+    productStats: [
+      { label: 'Eletrônicos', value: 0 },
+      { label: 'Games',        value: 0 },
+      { label: 'Móveis',       value: 0 },
+    ],
+  })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchSummary = async () => {
+    async function fetchData() {
       try {
-        const res = await api.get('/dashboard/summary');
-        setSummary(res.data);
-      } catch (error) {
-        console.error("Erro ao buscar dados do dashboard:", error);
+        // summary: { totalSales: {value, var}, totalOrders, visitor, soldProducts }
+        const resSummary = await api.get('/dashboard/summary')
+        // revenue-by-month: { months, seenCounts, salesCounts, productStats }
+        const resRevenue = await api.get('/dashboard/revenue-by-month')
+
+        setStats({
+          ...stats,
+          totalSales:   resSummary.data.totalSales,
+          totalOrders:  resSummary.data.totalOrders,
+          visitor:      resSummary.data.visitor,
+          soldProducts: resSummary.data.soldProducts,
+          months:       resRevenue.data.months,
+          seenCounts:   resRevenue.data.seenCounts,
+          salesCounts:  resRevenue.data.salesCounts,
+          productStats: resRevenue.data.productStats,
+        })
+      } catch (err) {
+        console.error(err)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-    fetchSummary();
-  }, []);
-
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-
-  const cards = [
-    {
-      label: 'Faturamento Hoje',
-      value: formatCurrency(summary.revenueToday),
-      icon: <DollarSign className="text-green-600" />,
-    },
-    {
-      label: 'Agendamentos Hoje',
-      value: summary.appointmentsToday,
-      icon: <CalendarDays className="text-blue-600" />,
-    },
-    {
-      label: 'Novos Clientes (Mês)',
-      value: summary.newClientsThisMonth,
-      icon: <Users className="text-purple-600" />,
-    },
-    {
-      label: 'Taxa de Ocupação',
-      value: '0%',
-      icon: <TrendingUp className="text-gray-500" />,
-    },
-  ];
-
-  const chartData = {
-    labels: monthlyData.map((d) => d.month),
-    datasets: [
-      {
-        label: 'Faturamento',
-        data: monthlyData.map((d) => d.value),
-        backgroundColor: '#9333ea',
-        borderRadius: 6,
-        barThickness: 40,
-      },
-    ],
-  };
+    }
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="p-4 space-y-8 max-w-5xl mx-auto animate-fade-in-up">
       <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
 
-      {loading ? (
-        <p className="text-gray-500 animate-pulse">Carregando dados do painel...</p>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {cards.map((card) => (
-              <div
-                key={card.label}
-                className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 border border-gray-100"
-              >
-                <div className="p-2 bg-gray-100 rounded-full">{card.icon}</div>
-                <div>
-                  <p className="text-sm text-gray-500">{card.label}</p>
-                  <p className="text-lg font-semibold">{card.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {loading
+        ? <p className="text-gray-500 animate-pulse">Carregando dados do painel...</p>
+        : (
+          <>
+            {/* ▷ grid de métricas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StatsCard
+                title="Total Sales"
+                value={stats.totalSales.value}
+                variation={`${stats.totalSales.var}%`}
+                isPositive={stats.totalSales.var >= 0}
+              />
+              <StatsCard
+                title="Total Orders"
+                value={stats.totalOrders.value}
+                variation={`${stats.totalOrders.var}%`}
+                isPositive={stats.totalOrders.var >= 0}
+              />
+              <StatsCard
+                title="Visitor"
+                value={stats.visitor.value}
+                variation={`${stats.visitor.var}%`}
+                isPositive={stats.visitor.var >= 0}
+              />
+              <StatsCard
+                title="Total Sold Products"
+                value={stats.soldProducts.value}
+                variation={`${stats.soldProducts.var}%`}
+                isPositive={stats.soldProducts.var >= 0}
+              />
+            </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border animate-fade-in-up">
-            <h2 className="text-lg font-semibold mb-4">Faturamento Mensal</h2>
-            <Bar
-              data={chartData}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-              }}
-            />
-          </div>
-        </>
-      )}
+            {/* ▷ gráfico de barras */}
+            <div className="bg-white rounded-2xl shadow-md p-6">
+              <h3 className="text-lg font-semibold mb-4">Customer Habits</h3>
+              <CustomerHabits
+                data={{
+                  categories: stats.months,
+                  seriesA:    stats.seenCounts,
+                  seriesB:    stats.salesCounts,
+                }}
+              />
+            </div>
+
+            {/* ▷ gráfico donut */}
+            <div className="bg-white rounded-2xl shadow-md p-6">
+              <h3 className="text-lg font-semibold mb-4">Product Statistic</h3>
+              <ProductStatistic data={stats.productStats} />
+            </div>
+          </>
+        )
+      }
     </div>
-  );
-};
+  )
+}
 
-export default Dashboard;
+export default Dashboard
