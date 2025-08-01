@@ -1,71 +1,163 @@
 // src/pages/Dashboard.jsx
 
-import React from 'react'
-import StatsCard from '../components/ui/StatsCard'
-import CustomerHabits from '../components/charts/CustomerHabits'
-import ProductStatistic from '../components/charts/ProductStatistic'
+import React, { useEffect, useState } from 'react'
+import api from '../services/api'
+import { DollarSign, CalendarDays, Users, TrendingUp } from 'lucide-react'
+import { Bar, Doughnut } from 'react-chartjs-2'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+
+// registra Chart.js
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend)
 
 const Dashboard = () => {
-  // Dados estáticos de exemplo
-  const stats = {
-    totalSales:   { value: 'R$ 12.345', var: 5 },
-    totalOrders:  { value:  987,       var: -2 },
-    visitor:      { value:  4567,      var: 12 },
-    soldProducts: { value:  1234,      var: 8 },
+  const [summary, setSummary] = useState(null)
+  const [monthlyData, setMonthlyData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        // 1) resumo diário
+        const { data: sum } = await api.get('/dashboard/summary')
+        // 2) faturamento por mês (espera array [{ month, value }, ...])
+        const { data: rev } = await api.get('/dashboard/revenue-by-month')
+
+        setSummary(sum)
+        setMonthlyData(Array.isArray(rev) ? rev : [])
+      } catch (e) {
+        console.error(e)
+        setError(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  const fmtBRL = (v) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
+
+  if (loading) {
+    return (
+      <div className="p-4">
+        <p className="text-gray-500 animate-pulse">Carregando dados do painel...</p>
+      </div>
+    )
   }
-  const chartData = {
-    categories: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul'],
-    seriesA:    [30, 40, 45, 50, 49, 60, 70],
-    seriesB:    [23, 32, 34, 52, 41, 59, 65],
+
+  if (error || !summary) {
+    return (
+      <div className="p-4">
+        <p className="text-red-500">Erro ao carregar dashboard.</p>
+      </div>
+    )
   }
+
+  // cards diários
+  const cards = [
+    {
+      label: 'Faturamento Hoje',
+      value: fmtBRL(summary.revenueToday),
+      icon: <DollarSign className="text-green-600" />,
+    },
+    {
+      label: 'Agendamentos Hoje',
+      value: summary.appointmentsToday,
+      icon: <CalendarDays className="text-blue-600" />,
+    },
+    {
+      label: 'Novos Clientes (Mês)',
+      value: summary.newClientsThisMonth,
+      icon: <Users className="text-purple-600" />,
+    },
+    {
+      label: 'Taxa de Ocupação',
+      value: `${summary.occupationRate ?? 0}%`,
+      icon: <TrendingUp className="text-gray-500" />,
+    },
+  ]
+
+  // Bar chart de faturamento mensal
+  const barData = {
+    labels: monthlyData.map((d) => d.month),
+    datasets: [
+      {
+        label: 'Faturamento',
+        data: monthlyData.map((d) => d.value),
+        backgroundColor: '#9333ea',
+        borderRadius: 6,
+        barThickness: 40,
+      },
+    ],
+  }
+
+  // Doughnut estático
   const productStats = [
     { label: 'Eletrônicos', value: 2487 },
-    { label: 'Games',       value: 1828 },
-    { label: 'Móveis',      value: 1463 },
+    { label: 'Games', value: 1828 },
+    { label: 'Móveis', value: 1463 },
   ]
+  const doughnutData = {
+    labels: productStats.map((p) => p.label),
+    datasets: [
+      {
+        data: productStats.map((p) => p.value),
+        backgroundColor: ['#9333ea', '#3b82f6', '#10b981'],
+      },
+    ],
+  }
 
   return (
     <div className="p-4 space-y-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800">Dashboard – Teste Integrado</h1>
+      <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
 
-      {/* Estatísticas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard
-          title="Total Sales"
-          value={stats.totalSales.value}
-          variation={`${stats.totalSales.var}%`}
-          isPositive={stats.totalSales.var >= 0}
-        />
-        <StatsCard
-          title="Total Orders"
-          value={stats.totalOrders.value}
-          variation={`${stats.totalOrders.var}%`}
-          isPositive={stats.totalOrders.var >= 0}
-        />
-        <StatsCard
-          title="Visitor"
-          value={stats.visitor.value}
-          variation={`${stats.visitor.var}%`}
-          isPositive={stats.visitor.var >= 0}
-        />
-        <StatsCard
-          title="Total Sold Products"
-          value={stats.soldProducts.value}
-          variation={`${stats.soldProducts.var}%`}
-          isPositive={stats.soldProducts.var >= 0}
+      {/* ▷ cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        {cards.map((c) => (
+          <div
+            key={c.label}
+            className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-4 border border-gray-100"
+          >
+            <div className="p-2 bg-gray-100 rounded-full">{c.icon}</div>
+            <div>
+              <p className="text-sm text-gray-500">{c.label}</p>
+              <p className="text-lg font-semibold">{c.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ▷ faturamento mensal */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border">
+        <h2 className="text-lg font-semibold mb-4">Faturamento Mensal</h2>
+        <Bar
+          data={barData}
+          options={{
+            responsive: true,
+            plugins: { legend: { display: false } },
+          }}
         />
       </div>
 
-      {/* Gráfico de barras */}
-      <div className="bg-white rounded-2xl shadow-md p-6">
-        <h3 className="text-lg font-semibold mb-4">Customer Habits</h3>
-        <CustomerHabits data={chartData} />
-      </div>
-
-      {/* Gráfico donut */}
-      <div className="bg-white rounded-2xl shadow-md p-6">
-        <h3 className="text-lg font-semibold mb-4">Product Statistic</h3>
-        <ProductStatistic data={productStats} />
+      {/* ▷ product statistic */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border">
+        <h2 className="text-lg font-semibold mb-4">Product Statistic</h2>
+        <Doughnut
+          data={doughnutData}
+          options={{
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+          }}
+        />
       </div>
     </div>
   )
