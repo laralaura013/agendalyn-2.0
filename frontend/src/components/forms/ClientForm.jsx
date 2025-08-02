@@ -1,7 +1,9 @@
+// src/components/form/ClientForm.jsx
+
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import api from '../services/api'
+import api from '../../services/api' // ✅ caminho corrigido
 
 const ClientForm = () => {
   const { id } = useParams()
