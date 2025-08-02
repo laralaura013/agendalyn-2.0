@@ -1,3 +1,5 @@
+// src/App.jsx
+
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
@@ -28,7 +30,7 @@ import AdminLayout from './components/layouts/AdminLayout'
 import Dashboard from './pages/Dashboard'
 import Schedule from './pages/Schedule'
 import Clients from './pages/Clients'
-import ClientForm from './pages/ClientForm'
+import ClientForm from './components/form/ClientForm'  // <— caminho corrigido
 import Staff from './pages/Staff'
 import Services from './pages/Services'
 import Orders from './pages/Orders'
@@ -90,15 +92,10 @@ function App() {
             </ProtectedRoute>
           }
         >
-          {/* index → /dashboard */}
           <Route index element={<Dashboard />} />
-
-          {/* Clientes */}
           <Route path="clients" element={<Clients />} />
           <Route path="clients/new" element={<ClientForm />} />
           <Route path="clients/:id/edit" element={<ClientForm />} />
-
-          {/* Demais seções */}
           <Route path="schedule" element={<Schedule />} />
           <Route path="staff" element={<Staff />} />
           <Route path="services" element={<Services />} />
