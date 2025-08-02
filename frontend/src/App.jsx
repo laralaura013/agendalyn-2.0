@@ -11,7 +11,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import BookingPage from './pages/BookingPage'
 
-// Autenticação Cliente
+// Portal do Cliente
 import ClientLoginPage from './pages/ClientLoginPage'
 import ClientRegisterPage from './pages/ClientRegisterPage'
 import ClientProtectedRoute from './components/auth/ClientProtectedRoute'
@@ -22,15 +22,13 @@ import ClientPackagesPage from './pages/ClientPackagesPage'
 import ClientHistoryPage from './pages/ClientHistoryPage'
 import ClientNoticesPage from './pages/ClientNoticesPage'
 
-// Autenticação Admin
+// Portal do Admin
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import AdminLayout from './components/layouts/AdminLayout'
-
-// Páginas Admin
 import Dashboard from './pages/Dashboard'
 import Schedule from './pages/Schedule'
 import Clients from './pages/Clients'
-import ClientForm from './components/form/ClientForm' // ✅ Corrigido aqui
+import ClientForm from './components/form/ClientForm' // ✅ import corrigido
 import Staff from './pages/Staff'
 import Services from './pages/Services'
 import Orders from './pages/Orders'
