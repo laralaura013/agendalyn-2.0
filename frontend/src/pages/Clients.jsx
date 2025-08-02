@@ -1,5 +1,3 @@
-// src/pages/Clients.jsx
-
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -14,7 +12,7 @@ const Clients = () => {
   // Carrega a lista de clientes
   const fetchClients = async () => {
     try {
-      const res = await api.get('/clients/admin') 
+      const res = await api.get('/clients/admin')
       setClients(res.data)
     } catch {
       toast.error('Erro ao carregar clientes')
@@ -27,13 +25,15 @@ const Clients = () => {
     fetchClients()
   }, [])
 
-  // Navegação para criação/edição
-  const handleNew = () => navigate('new')       // relativa a /dashboard/clients
+  // Navega para criação/edição relativos a /dashboard/clients
+  const handleNew = () => navigate('new')
   const handleEdit = (id) => navigate(`${id}/edit`)
+
+  // Deleta cliente e recarrega lista
   const handleDelete = async (id) => {
     if (!window.confirm('Confirma exclusão deste cliente?')) return
     try {
-      await api.delete(`/clients/${id}`)
+      await api.delete(`/clients/admin/${id}`)
       toast.success('Cliente excluído')
       fetchClients()
     } catch {

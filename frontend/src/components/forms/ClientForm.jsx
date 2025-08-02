@@ -1,79 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import api from '../services/api'
 
-const ClientForm = ({ initialData, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({
+const ClientForm = () => {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [form, setForm] = useState({
     name: '',
-    phone: '',
-    email: '', // CAMPO ADICIONADO
-    birthDate: '',
-    notes: '',
-  });
+    email: '',
+    phone: ''
+  })
+  const [loading, setLoading] = useState(!!id)
 
+  // Se for edição, carrega dados existentes
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        name: initialData.name || '',
-        phone: initialData.phone || '',
-        email: initialData.email || '', // CAMPO ADICIONADO
-        birthDate: initialData.birthDate ? initialData.birthDate.split('T')[0] : '',
-        notes: initialData.notes || '',
-      });
-    } else {
-      // Reseta o formulário para um novo cliente
-      setFormData({ name: '', phone: '', email: '', birthDate: '', notes: '' });
+    if (id) {
+      (async () => {
+        try {
+          const { data } = await api.get(`/clients/admin/${id}`)
+          setForm({ name: data.name, email: data.email, phone: data.phone })
+        } catch {
+          toast.error('Erro ao carregar cliente')
+        } finally {
+          setLoading(false)
+        }
+      })()
     }
-  }, [initialData]);
+  }, [id])
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+    setForm({ ...form, [e.target.name]: e.target.value })
+  }
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const dataToSend = { ...formData };
-    if (!dataToSend.birthDate) {
-      delete dataToSend.birthDate; // Envia null se a data estiver vazia
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      if (id) {
+        await api.put(`/clients/admin/${id}`, form)
+        toast.success('Cliente atualizado!')
+      } else {
+        await api.post('/clients/admin', form)
+        toast.success('Cliente criado!')
+      }
+      navigate('/dashboard/clients')
+    } catch {
+      toast.error('Erro ao salvar cliente')
     }
-    onSave(dataToSend);
-  };
+  }
+
+  if (loading) {
+    return <p className="text-center py-20 text-gray-500 animate-pulse">Carregando...</p>
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-2xl font-bold mb-4">{initialData ? 'Editar Cliente' : 'Novo Cliente'}</h2>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Nome</label>
-        <input type="text" name="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required />
-      </div>
+    <div className="p-6 max-w-lg mx-auto">
+      <h1 className="text-2xl font-semibold text-gray-800 mb-6">
+        {id ? 'Editar Cliente' : 'Novo Cliente'}
+      </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded-2xl shadow p-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Telefone</label>
-          <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" />
+          <label className="block text-sm font-medium text-gray-700">Nome</label>
+          <input
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            required
+            className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm"
+          />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700">Email</label>
-          <input type="email" name="email" value={formData.email} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" />
+          <input
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={handleChange}
+            required
+            className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm"
+          />
         </div>
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Data de Nascimento</label>
-        <input type="date" name="birthDate" value={formData.birthDate} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" />
-      </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Telefone</label>
+          <input
+            name="phone"
+            value={form.phone}
+            onChange={handleChange}
+            className="mt-1 block w-full border-gray-300 rounded-lg shadow-sm"
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Observações</label>
-        <textarea name="notes" value={formData.notes} onChange={handleChange} rows="3" className="mt-1 block w-full p-2 border rounded"></textarea>
-      </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/clients')}
+            className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 mr-2"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
 
-      <div className="flex justify-end gap-4 pt-4">
-        <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 rounded-md">Cancelar</button>
-        <button type="submit" className="px-4 py-2 bg-purple-700 text-white rounded-md">Salvar</button>
-      </div>
-    </form>
-  );
-};
-
-export default ClientForm;
+export default ClientForm
