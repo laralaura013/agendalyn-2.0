@@ -30,7 +30,7 @@ import AdminLayout from './components/layouts/AdminLayout'
 import Dashboard from './pages/Dashboard'
 import Schedule from './pages/Schedule'
 import Clients from './pages/Clients'
-// import corrigido para o caminho real do componente
+// Import corrigido para o caminho real do componente
 import ClientForm from './components/form/ClientForm'
 import Staff from './pages/Staff'
 import Services from './pages/Services'
