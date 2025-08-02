@@ -248,6 +248,7 @@ const BookingPage = () => {
                 </div>
                 <h2 className="text-xl font-semibold">Escolha Data e Hora</h2>
               </div>
+
               <div className="mb-4">
                 <label htmlFor="date-picker" className="block text-sm font-medium text-gray-700 mb-1">
                   Selecione o dia
@@ -260,20 +261,27 @@ const BookingPage = () => {
                   className="w-full p-2 border rounded-md"
                 />
               </div>
+
               <p className="text-center font-semibold my-2">
                 {format(parseISO(`${selectedDate}T00:00:00`), "EEEE, dd 'de' MMMM", { locale: ptBR })}
               </p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                 {loadingSlots ? (
                   <p className="col-span-full text-center py-4">A procurar horários...</p>
                 ) : availableSlots.length > 0 ? (
-                  availableSlots.map(slot => (
+                  availableSlots.map((slot) => (
                     <button
                       key={slot.time}
                       onClick={() => handleSelectSlot(slot)}
-                      className="p-2 border rounded-xl text-center bg-purple-700 text-white hover:bg-purple-800 transition-colors"
+                      className={`p-2 rounded-full border font-medium text-sm transition-all
+                        ${
+                          selectedSlot?.time === slot.time
+                            ? 'bg-purple-700 text-white border-purple-700'
+                            : 'bg-white text-purple-700 border-purple-300 hover:bg-purple-100'
+                        }`}
                     >
-                      {format(parseISO(slot.time), 'HH:mm')}
+                      {slot.formatted}
                     </button>
                   ))
                 ) : (
