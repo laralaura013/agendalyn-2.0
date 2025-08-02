@@ -1,9 +1,9 @@
-// src/components/form/ClientForm.jsx
+// src/components/forms/ClientForm.jsx
 
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import api from '../../services/api' // ✅ caminho corrigido
+import api from '../../services/api'
 
 const ClientForm = () => {
   const { id } = useParams()
@@ -20,7 +20,7 @@ const ClientForm = () => {
     if (id) {
       (async () => {
         try {
-          const { data } = await api.get(`/clients/admin/${id}`)
+          const { data } = await api.get(`/admin/clients/${id}`) // ✅ corrigido
           setForm({ name: data.name, email: data.email, phone: data.phone })
         } catch {
           toast.error('Erro ao carregar cliente')
@@ -39,10 +39,10 @@ const ClientForm = () => {
     e.preventDefault()
     try {
       if (id) {
-        await api.put(`/clients/admin/${id}`, form)
+        await api.put(`/admin/clients/${id}`, form) // ✅ corrigido
         toast.success('Cliente atualizado!')
       } else {
-        await api.post('/clients/admin', form)
+        await api.post('/admin/clients', form) // ✅ corrigido
         toast.success('Cliente criado!')
       }
       navigate('/dashboard/clients')

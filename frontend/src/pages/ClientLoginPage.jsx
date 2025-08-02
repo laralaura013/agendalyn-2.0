@@ -25,7 +25,7 @@ const ClientLoginPage = () => {
     try {
       const response = await api.post('/portal/login', {
         ...formData,
-        companyId, // garante que companyId da URL está sendo enviado
+        companyId,
       });
 
       const { token, client } = response.data;
@@ -34,7 +34,7 @@ const ClientLoginPage = () => {
       localStorage.setItem('clientData', JSON.stringify(client));
 
       toast.success('Login bem-sucedido!');
-      navigate('/portal/dashboard');
+      navigate('/portal/agenda'); // ✅ corrigido
     } catch (error) {
       toast.error(error.response?.data?.message || 'Credenciais inválidas.');
     } finally {

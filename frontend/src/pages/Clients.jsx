@@ -12,7 +12,7 @@ const Clients = () => {
   // Carrega a lista de clientes
   const fetchClients = async () => {
     try {
-      const res = await api.get('/clients/admin')
+      const res = await api.get('/admin/clients') // ✅ CORRIGIDO
       setClients(res.data)
     } catch {
       toast.error('Erro ao carregar clientes')
@@ -33,7 +33,7 @@ const Clients = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('Confirma exclusão deste cliente?')) return
     try {
-      await api.delete(`/clients/admin/${id}`)
+      await api.delete(`/admin/clients/${id}`) // ✅ CORRIGIDO
       toast.success('Cliente excluído')
       fetchClients()
     } catch {
