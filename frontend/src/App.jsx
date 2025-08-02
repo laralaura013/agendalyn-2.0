@@ -28,7 +28,7 @@ import AdminLayout from './components/layouts/AdminLayout'
 import Dashboard from './pages/Dashboard'
 import Schedule from './pages/Schedule'
 import Clients from './pages/Clients'
-import ClientForm from './components/form/ClientForm' // ✅ import corrigido
+import ClientForm from './components/forms/ClientForm' // ✅ caminho corrigido
 import Staff from './pages/Staff'
 import Services from './pages/Services'
 import Orders from './pages/Orders'
