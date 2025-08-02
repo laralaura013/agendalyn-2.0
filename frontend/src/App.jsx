@@ -30,8 +30,7 @@ import AdminLayout from './components/layouts/AdminLayout'
 import Dashboard from './pages/Dashboard'
 import Schedule from './pages/Schedule'
 import Clients from './pages/Clients'
-// import corrigido para refletir sua pasta 'componets'
-import ClientForm from './componets/form/ClientForm'
+import ClientForm from './components/form/ClientForm' // ✅ Corrigido aqui
 import Staff from './pages/Staff'
 import Services from './pages/Services'
 import Orders from './pages/Orders'
@@ -93,15 +92,10 @@ function App() {
             </ProtectedRoute>
           }
         >
-          {/* Dashboard em /dashboard */}
           <Route index element={<Dashboard />} />
-
-          {/* Clientes */}
           <Route path="clients" element={<Clients />} />
           <Route path="clients/new" element={<ClientForm />} />
           <Route path="clients/:id/edit" element={<ClientForm />} />
-
-          {/* Demais seções */}
           <Route path="schedule" element={<Schedule />} />
           <Route path="staff" element={<Staff />} />
           <Route path="services" element={<Services />} />
