@@ -12,49 +12,49 @@ const menuGroups = [
     title: 'PRINCIPAL',
     items: [
       { name: 'Painel', icon: <LayoutDashboard size={18} />, path: '/dashboard' },
-      { name: 'Agenda', icon: <CalendarDays size={18} />, path: '/schedule' },
-      { name: 'Comandas', icon: <ClipboardList size={18} />, path: '/orders' },
-      { name: 'Pacotes', icon: <Package size={18} />, path: '/packages' },
+      { name: 'Agenda', icon: <CalendarDays size={18} />, path: '/dashboard/schedule' },
+      { name: 'Comandas', icon: <ClipboardList size={18} />, path: '/dashboard/orders' },
+      { name: 'Pacotes', icon: <Package size={18} />, path: '/dashboard/packages' },
     ],
   },
   {
     title: 'CADASTROS',
     items: [
-      { name: 'Clientes', icon: <Users size={18} />, path: '/clients' },
-      { name: 'Colaboradores', icon: <UserCog size={18} />, path: '/staff' },
-      { name: 'Serviços', icon: <Scissors size={18} />, path: '/services' },
-      { name: 'Produtos', icon: <Box size={18} />, path: '/products' },
-      { name: 'Categorias', icon: <Folder size={18} />, path: '/categories' },
-      { name: 'Marcas', icon: <Bookmark size={18} />, path: '/brands' },
-      { name: 'Fornecedores', icon: <Truck size={18} />, path: '/suppliers' },
+      { name: 'Clientes', icon: <Users size={18} />, path: '/dashboard/clients' },
+      { name: 'Colaboradores', icon: <UserCog size={18} />, path: '/dashboard/staff' },
+      { name: 'Serviços', icon: <Scissors size={18} />, path: '/dashboard/services' },
+      { name: 'Produtos', icon: <Box size={18} />, path: '/dashboard/products' },
+      { name: 'Categorias', icon: <Folder size={18} />, path: '/dashboard/categories' },
+      { name: 'Marcas', icon: <Bookmark size={18} />, path: '/dashboard/brands' },
+      { name: 'Fornecedores', icon: <Truck size={18} />, path: '/dashboard/suppliers' },
     ],
   },
   {
     title: 'FINANCEIRO',
     items: [
-      { name: 'Relatórios', icon: <BarChart3 size={18} />, path: '/reports', allowedRoles: ['OWNER'] },
-      { name: 'Comissões', icon: <ArrowRightLeft size={18} />, path: '/commissions', allowedRoles: ['OWNER'] },
-      { name: 'Caixa', icon: <Wallet size={18} />, path: '/cashier' },
+      { name: 'Relatórios', icon: <BarChart3 size={18} />, path: '/dashboard/reports', allowedRoles: ['OWNER'] },
+      { name: 'Comissões', icon: <ArrowRightLeft size={18} />, path: '/dashboard/commissions', allowedRoles: ['OWNER'] },
+      { name: 'Caixa', icon: <Wallet size={18} />, path: '/dashboard/cashier' },
     ],
   },
   {
     title: 'CONTROLE',
     items: [
-      { name: 'Metas', icon: <Target size={18} />, path: '/goals', allowedRoles: ['OWNER'] },
-      { name: 'Anamneses', icon: <FileText size={18} />, path: '/anamnesis' },
-      { name: 'Compras', icon: <ShoppingCart size={18} />, path: '/purchases' },
+      { name: 'Metas', icon: <Target size={18} />, path: '/dashboard/goals', allowedRoles: ['OWNER'] },
+      { name: 'Anamneses', icon: <FileText size={18} />, path: '/dashboard/anamnesis' },
+      { name: 'Compras', icon: <ShoppingCart size={18} />, path: '/dashboard/purchases' },
     ],
   },
   {
     title: 'CONTA',
     items: [
-      { name: 'Assinatura', icon: <CreditCard size={18} />, path: '/subscription', allowedRoles: ['OWNER'] },
+      { name: 'Assinatura', icon: <CreditCard size={18} />, path: '/dashboard/subscription', allowedRoles: ['OWNER'] },
     ]
   },
   {
     title: 'CONFIGURAÇÕES',
     items: [
-      { name: 'Empresa', icon: <Settings size={18} />, path: '/settings', allowedRoles: ['OWNER'] },
+      { name: 'Empresa', icon: <Settings size={18} />, path: '/dashboard/settings', allowedRoles: ['OWNER'] },
     ]
   }
 ];
