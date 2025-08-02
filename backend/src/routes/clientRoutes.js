@@ -1,12 +1,16 @@
+// src/routes/clientRoutes.js
 import express from 'express';
 import { protect, checkRole } from '../middlewares/authMiddleware.js';
 import { protectClient } from '../middlewares/clientAuthMiddleware.js';
+
 import {
   listClients,
   createClient,
   updateClient,
   deleteClient,
+  getClientById,
 } from '../controllers/clientController.js';
+
 import { cancelClientAppointment } from '../controllers/clientAppointmentController.js';
 
 const router = express.Router();
@@ -21,6 +25,7 @@ router
 
 router
   .route('/admin/:id')
+  .get(checkRole(['ADMIN', 'OWNER']), getClientById) // 🔍 nova rota GET para edição
   .put(checkRole(['ADMIN', 'OWNER']), updateClient)
   .delete(checkRole(['ADMIN', 'OWNER']), deleteClient);
 

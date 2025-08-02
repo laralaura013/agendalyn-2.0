@@ -1,3 +1,4 @@
+// src/controllers/clientController.js
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -17,6 +18,27 @@ export const listClients = async (req, res) => {
   }
 };
 
+// OBTER Cliente por ID
+export const getClientById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.company.id;
+
+    const client = await prisma.client.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!client) {
+      return res.status(404).json({ message: "Cliente não encontrado." });
+    }
+
+    res.status(200).json(client);
+  } catch (error) {
+    console.error("--- ERRO AO BUSCAR CLIENTE POR ID ---", error);
+    res.status(500).json({ message: "Erro ao buscar cliente." });
+  }
+};
+
 // CRIAR Cliente
 export const createClient = async (req, res) => {
   try {
@@ -24,7 +46,9 @@ export const createClient = async (req, res) => {
     const companyId = req.company.id;
 
     if (!name || !phone) {
-        return res.status(400).json({ message: "Nome e telefone são obrigatórios." });
+      return res
+        .status(400)
+        .json({ message: "Nome e telefone são obrigatórios." });
     }
 
     const newClient = await prisma.client.create({
@@ -39,7 +63,7 @@ export const createClient = async (req, res) => {
     res.status(201).json(newClient);
   } catch (error) {
     console.error("--- ERRO DETALHADO AO CRIAR CLIENTE ---", error);
-    res.status(500).json({ message: 'Erro ao criar cliente.' });
+    res.status(500).json({ message: "Erro ao criar cliente." });
   }
 };
 
@@ -50,11 +74,16 @@ export const updateClient = async (req, res) => {
     const { name, phone, birthDate, notes } = req.body;
     const companyId = req.company.id;
 
+    const existingClient = await prisma.client.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!existingClient) {
+      return res.status(404).json({ message: "Cliente não encontrado." });
+    }
+
     const updatedClient = await prisma.client.update({
-      where: {
-        id: id,
-        companyId: companyId,
-      },
+      where: { id },
       data: {
         name,
         phone,
@@ -62,28 +91,35 @@ export const updateClient = async (req, res) => {
         notes,
       },
     });
+
     res.status(200).json(updatedClient);
   } catch (error) {
     console.error("--- ERRO DETALHADO AO ATUALIZAR CLIENTE ---", error);
-    res.status(500).json({ message: 'Erro ao atualizar cliente.' });
+    res.status(500).json({ message: "Erro ao atualizar cliente." });
   }
 };
 
-// DELETAR Cliente
+// DELETAR Cliente (corrigido)
 export const deleteClient = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const companyId = req.company.id;
+  try {
+    const { id } = req.params;
+    const companyId = req.company.id;
 
-        await prisma.client.delete({
-            where: {
-                id: id,
-                companyId: companyId,
-            },
-        });
-        res.status(204).send(); // Sucesso, sem conteúdo
-    } catch (error) {
-        console.error("--- ERRO DETALHADO AO DELETAR CLIENTE ---", error);
-        res.status(500).json({ message: "Erro ao deletar cliente." });
+    const client = await prisma.client.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!client) {
+      return res.status(404).json({ message: "Cliente não encontrado." });
     }
+
+    await prisma.client.delete({
+      where: { id },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error("--- ERRO DETALHADO AO DELETAR CLIENTE ---", error);
+    res.status(500).json({ message: "Erro ao deletar cliente." });
+  }
 };
