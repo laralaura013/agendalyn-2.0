@@ -1,5 +1,3 @@
-// src/App.jsx
-
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
@@ -16,7 +14,7 @@ import ClientLoginPage from './pages/ClientLoginPage'
 import ClientRegisterPage from './pages/ClientRegisterPage'
 import ClientProtectedRoute from './components/auth/ClientProtectedRoute'
 import ClientLayout from './components/layouts/ClientLayout'
-import ClientDashboardPage from './pages/ClientDashboardPage'
+import ClientDashboardPage from './pages/ClientDashboardPage' // será usado como agenda
 import ClientProfilePage from './pages/ClientProfilePage'
 import ClientPackagesPage from './pages/ClientPackagesPage'
 import ClientHistoryPage from './pages/ClientHistoryPage'
@@ -28,7 +26,7 @@ import AdminLayout from './components/layouts/AdminLayout'
 import Dashboard from './pages/Dashboard'
 import Schedule from './pages/Schedule'
 import Clients from './pages/Clients'
-import ClientForm from './components/forms/ClientForm' // ✅ caminho corrigido
+import ClientForm from './components/forms/ClientForm'
 import Staff from './pages/Staff'
 import Services from './pages/Services'
 import Orders from './pages/Orders'
@@ -72,11 +70,11 @@ function App() {
             </ClientProtectedRoute>
           }
         >
-          <Route path="dashboard" element={<ClientDashboardPage />} />
+          <Route path="agenda" element={<ClientDashboardPage />} />
           <Route path="perfil" element={<ClientProfilePage />} />
           <Route path="pacotes" element={<ClientPackagesPage />} />
           <Route path="historico" element={<ClientHistoryPage />} />
-          <Route path="avisos" element={<ClientNoticesPage />} />
+          <Route path="notificacoes" element={<ClientNoticesPage />} />
         </Route>
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />

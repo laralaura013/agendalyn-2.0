@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import ClientBottomNav from './ClientBottomNav'; // Caminho corrigido (está na mesma pasta)
+import ClientBottomNav from './ClientBottomNav';
 
 const ClientLayout = () => {
   const navigate = useNavigate();

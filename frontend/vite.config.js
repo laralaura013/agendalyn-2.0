@@ -8,7 +8,6 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // registra o SW e expõe 'virtual:pwa-register/react'
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
@@ -17,14 +16,21 @@ export default defineConfig({
       manifest: {
         name: 'Agendalyn',
         short_name: 'Agendalyn',
-        start_url: '.',
+        start_url: '/',
+        scope: '/',
         display: 'standalone',
         background_color: '#ffffff',
+        theme_color: '#9333ea',
         icons: [
           {
-            src: 'favicon.svg',
-            sizes: '64x64',
-            type: 'image/svg+xml'
+            src: 'icon-192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'icon-512.png',
+            sizes: '512x512',
+            type: 'image/png'
           }
         ]
       }

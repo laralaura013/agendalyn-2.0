@@ -1,37 +1,27 @@
-// src/routes/clientRoutes.js
 import express from 'express';
-import { protect, checkRole } from '../middlewares/authMiddleware.js';
-import { protectClient } from '../middlewares/clientAuthMiddleware.js';
-
 import {
   listClients,
   createClient,
   updateClient,
   deleteClient,
-  getClientById,
+  getClientAppointmentHistory,
+  getClientNotifications,
 } from '../controllers/clientController.js';
-
-import { cancelClientAppointment } from '../controllers/clientAppointmentController.js';
+import { protect, checkRole } from '../middlewares/authMiddleware.js';
+import { protectClient } from '../middlewares/clientAuthMiddleware.js';
 
 const router = express.Router();
 
-// 🔐 Rotas de administração de clientes (painel admin)
-router.use('/admin', protect);
+// Rotas administrativas
+router.get('/admin/clients', protect, checkRole(['ADMIN', 'OWNER']), listClients);
+router.post('/admin/clients', protect, checkRole(['ADMIN', 'OWNER']), createClient);
+router.put('/admin/clients/:id', protect, checkRole(['ADMIN', 'OWNER']), updateClient);
+router.delete('/admin/clients/:id', protect, checkRole(['ADMIN', 'OWNER']), deleteClient);
 
-router
-  .route('/admin')
-  .get(checkRole(['ADMIN', 'OWNER']), listClients)
-  .post(checkRole(['ADMIN', 'OWNER']), createClient);
+// Rota para histórico de agendamentos (cliente)
+router.get('/portal/history', protectClient, getClientAppointmentHistory);
 
-router
-  .route('/admin/:id')
-  .get(checkRole(['ADMIN', 'OWNER']), getClientById) // 🔍 nova rota GET para edição
-  .put(checkRole(['ADMIN', 'OWNER']), updateClient)
-  .delete(checkRole(['ADMIN', 'OWNER']), deleteClient);
-
-// 👤 Rotas protegidas do cliente logado
-router.use(protectClient);
-
-router.delete('/appointments/:id', cancelClientAppointment);
+// Rota para notificações do cliente
+router.get('/portal/notifications', protectClient, getClientNotifications);
 
 export default router;

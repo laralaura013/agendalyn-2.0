@@ -3,10 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 import './client-bottom-nav.css';
 
 const navItems = [
-  { to: '/portal/dashboard', icon: 'home-outline', label: 'Início' },
+  { to: '/portal/agenda', icon: 'calendar-outline', label: 'Agenda' },
   { to: '/portal/pacotes', icon: 'cube-outline', label: 'Pacotes' },
   { to: '/portal/historico', icon: 'time-outline', label: 'Histórico' },
-  { to: '/portal/avisos', icon: 'notifications-outline', label: 'Avisos' },
+  { to: '/portal/notificacoes', icon: 'notifications-outline', label: 'Notificações' },
   { to: '/portal/perfil', icon: 'person-outline', label: 'Perfil' },
 ];
 
