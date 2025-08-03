@@ -15,12 +15,11 @@ const ClientForm = () => {
   })
   const [loading, setLoading] = useState(!!id)
 
-  // Se for edição, carrega dados existentes
   useEffect(() => {
     if (id) {
       (async () => {
         try {
-          const { data } = await api.get(`/admin/clients/${id}`) // ✅ corrigido
+          const { data } = await api.get(`/admin/clients/${id}`) // ✅ CORRIGIDO
           setForm({ name: data.name, email: data.email, phone: data.phone })
         } catch {
           toast.error('Erro ao carregar cliente')
@@ -39,10 +38,10 @@ const ClientForm = () => {
     e.preventDefault()
     try {
       if (id) {
-        await api.put(`/admin/clients/${id}`, form) // ✅ corrigido
+        await api.put(`/admin/clients/${id}`, form) // ✅ CORRIGIDO
         toast.success('Cliente atualizado!')
       } else {
-        await api.post('/admin/clients', form) // ✅ corrigido
+        await api.post('/admin/clients', form) // ✅ CORRIGIDO
         toast.success('Cliente criado!')
       }
       navigate('/dashboard/clients')

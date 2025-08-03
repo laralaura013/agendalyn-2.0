@@ -1,3 +1,5 @@
+// src/pages/Clients.jsx
+
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -9,7 +11,6 @@ const Clients = () => {
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
-  // Carrega a lista de clientes
   const fetchClients = async () => {
     try {
       const res = await api.get('/admin/clients') // ✅ CORRIGIDO
@@ -25,11 +26,9 @@ const Clients = () => {
     fetchClients()
   }, [])
 
-  // Navega para criação/edição relativos a /dashboard/clients
   const handleNew = () => navigate('new')
   const handleEdit = (id) => navigate(`${id}/edit`)
 
-  // Deleta cliente e recarrega lista
   const handleDelete = async (id) => {
     if (!window.confirm('Confirma exclusão deste cliente?')) return
     try {
