@@ -28,36 +28,28 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ Loga a origem de todas as requisições (útil para debugar CORS na Railway)
+// ✅ Log de origem da requisição (para debug CORS)
 app.use((req, res, next) => {
   console.log('🌐 Origem da requisição:', req.headers.origin);
   next();
 });
 
-// ✅ CORS configurado corretamente para Netlify e localhost
-const allowedOrigins = [
-  'https://frontlyn.netlify.app',
-  'http://localhost:5173',
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+// ✅ CORS temporário com origin: true (para resolver erro 502 no Railway)
+app.use(cors({
+  origin: true,           // Aceita qualquer origem — corrige erro 502
   credentials: true,
-};
+}));
 
+// ✅ Preflight OPTIONS global (essencial para funcionar no Railway)
+app.options('*', cors({
+  origin: true,
+  credentials: true,
+}));
+
+// ✅ Body parser
 app.use(express.json());
-app.use(cors(corsOptions));
 
-// ✅ Responde automaticamente a todas as requisições OPTIONS
-app.options('*', cors(corsOptions));
-
-// ✅ Webhooks (antes de auth)
+// ✅ Webhooks devem vir antes
 app.use('/api/webhooks', webhookRoutes);
 
 // ✅ Rotas da API
