@@ -20,10 +20,10 @@ function ReloadPrompt() {
     setNeedRefresh(false)
   }
 
-  // Este componente é mais para o futuro, para mostrar um pop-up de atualização.
-  // Por agora, a sua principal função é simplesmente existir e chamar o useRegisterSW(),
-  // que faz o registo do service worker automaticamente.
-  // Não vamos renderizar nada visualmente por enquanto.
+  // ✅ Atualiza automaticamente quando houver nova versão
+  if (needRefresh) {
+    updateServiceWorker(true)
+  }
 
   return null
 }
