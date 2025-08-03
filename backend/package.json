@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "db:create-admin": "node prisma/scripts/create-admin.js"
+    "db:create-admin": "node prisma/scripts/create-admin.js",
+    "migrate:deploy": "npx prisma migrate deploy"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
