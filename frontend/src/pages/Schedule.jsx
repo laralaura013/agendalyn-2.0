@@ -5,7 +5,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { parseISO } from 'date-fns';
 import { PlusCircle } from 'lucide-react';
-// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
+// import AdminLayout from '../components/layouts/AdminLayout'; // reintegrar se desejar
 
 const Schedule = () => {
   const [events, setEvents] = useState([]);
@@ -29,7 +29,8 @@ const Schedule = () => {
       }));
       setEvents(formattedEvents);
     } catch (error) {
-      toast.error("Não foi possível carregar os agendamentos.");
+      console.error('Erro ao buscar agendamentos:', error);
+      toast.error("Erro ao carregar os agendamentos.");
     }
   }, []);
 
@@ -39,12 +40,13 @@ const Schedule = () => {
       try {
         await Promise.all([
           fetchAppointments(),
-          api.get('/clients').then((res) => setClients(res.data)), // ✅ CORRIGIDO
+          api.get('/clients').then((res) => setClients(res.data)),
           api.get('/services').then((res) => setServices(res.data)),
           api.get('/staff').then((res) => setStaff(res.data)),
         ]);
       } catch (error) {
-        toast.error("Não foi possível carregar os dados da agenda.");
+        console.error('Erro ao carregar dados da agenda:', error);
+        toast.error("Erro ao carregar dados da agenda.");
       } finally {
         setLoading(false);
       }
@@ -77,7 +79,7 @@ const Schedule = () => {
         setIsModalOpen(false);
         return `Agendamento ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
       },
-      error: "Não foi possível salvar o agendamento.",
+      error: "Erro ao salvar o agendamento.",
     });
   };
 
