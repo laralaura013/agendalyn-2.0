@@ -6,6 +6,7 @@ import {
   deleteClient,
   getClientAppointmentHistory,
   getClientNotifications,
+  getClientById, // <-- Adicionado
 } from '../controllers/clientController.js';
 
 import { protect, checkRole } from '../middlewares/authMiddleware.js';
@@ -15,6 +16,7 @@ const router = express.Router();
 
 // Rotas administrativas (prefixo: /api/clients)
 router.get('/', protect, checkRole(['ADMIN', 'OWNER']), listClients);
+router.get('/:id', protect, checkRole(['ADMIN', 'OWNER']), getClientById); // <-- Adicionado
 router.post('/', protect, checkRole(['ADMIN', 'OWNER']), createClient);
 router.put('/:id', protect, checkRole(['ADMIN', 'OWNER']), updateClient);
 router.delete('/:id', protect, checkRole(['ADMIN', 'OWNER']), deleteClient);
