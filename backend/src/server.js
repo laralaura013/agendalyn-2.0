@@ -28,7 +28,13 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ CORS configurado corretamente
+// ✅ Loga a origem de todas as requisições (útil para debugar CORS na Railway)
+app.use((req, res, next) => {
+  console.log('🌐 Origem da requisição:', req.headers.origin);
+  next();
+});
+
+// ✅ CORS configurado corretamente para Netlify e localhost
 const allowedOrigins = [
   'https://frontlyn.netlify.app',
   'http://localhost:5173',
@@ -45,11 +51,13 @@ const corsOptions = {
   credentials: true,
 };
 
-// ✅ Middlewares
 app.use(express.json());
 app.use(cors(corsOptions));
 
-// ✅ Webhooks primeiro (antes de auth, se necessário)
+// ✅ Responde automaticamente a todas as requisições OPTIONS
+app.options('*', cors(corsOptions));
+
+// ✅ Webhooks (antes de auth)
 app.use('/api/webhooks', webhookRoutes);
 
 // ✅ Rotas da API
