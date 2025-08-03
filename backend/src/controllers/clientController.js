@@ -8,7 +8,7 @@ export const listClients = async (req, res) => {
     const companyId = req.company.id;
 
     const clients = await prisma.client.findMany({
-      where: { companyId, isActive: true }, // Filtra apenas clientes ativos
+      where: { companyId }, // ⛔ isActive removido
       orderBy: { createdAt: 'desc' },
     });
 
@@ -57,7 +57,6 @@ export const createClient = async (req, res) => {
         birthDate: birthDate ? new Date(birthDate) : null,
         notes,
         companyId,
-        isActive: true,
       },
     });
 
