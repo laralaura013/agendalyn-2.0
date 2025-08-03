@@ -14,32 +14,32 @@ export const listClients = async (req, res) => {
 
     res.status(200).json(clients);
   } catch (error) {
-    console.error('Erro ao listar clientes:', error);
+    console.error('❌ Erro ao listar clientes:', error);
     res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
-// BUSCAR CLIENTE POR ID (admin) - NOVA FUNÇÃO ADICIONADA
+// BUSCAR CLIENTE POR ID (admin)
 export const getClientById = async (req, res) => {
   try {
     const { id } = req.params;
     const companyId = req.company.id;
 
-    const client = await prisma.client.findUnique({
+    const client = await prisma.client.findFirst({
       where: {
-        id: id,
-        companyId: companyId,
+        id,
+        companyId,
       },
     });
 
     if (!client) {
-      return res.status(404).json({ message: "Cliente não encontrado." });
+      return res.status(404).json({ message: 'Cliente não encontrado.' });
     }
 
     res.status(200).json(client);
   } catch (error) {
-    console.error("Erro ao buscar cliente por ID:", error);
-    res.status(500).json({ message: "Erro interno do servidor." });
+    console.error('❌ Erro ao buscar cliente por ID:', error);
+    res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
@@ -57,12 +57,13 @@ export const createClient = async (req, res) => {
         birthDate: birthDate ? new Date(birthDate) : null,
         notes,
         companyId,
+        isActive: true,
       },
     });
 
     res.status(201).json(client);
   } catch (error) {
-    console.error('Erro ao criar cliente:', error);
+    console.error('❌ Erro ao criar cliente:', error);
     res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
@@ -74,7 +75,7 @@ export const updateClient = async (req, res) => {
     const { name, email, phone, birthDate, notes } = req.body;
     const companyId = req.company.id;
 
-    const client = await prisma.client.updateMany({
+    const result = await prisma.client.updateMany({
       where: { id, companyId },
       data: {
         name,
@@ -85,34 +86,34 @@ export const updateClient = async (req, res) => {
       },
     });
 
-    if (client.count === 0) {
+    if (result.count === 0) {
       return res.status(404).json({ message: 'Cliente não encontrado.' });
     }
 
     res.status(200).json({ message: 'Cliente atualizado com sucesso.' });
   } catch (error) {
-    console.error('Erro ao atualizar cliente:', error);
+    console.error('❌ Erro ao atualizar cliente:', error);
     res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
-// DELETAR CLIENTE (admin) - Com Cascade Delete
+// DELETAR CLIENTE (admin)
 export const deleteClient = async (req, res) => {
   try {
     const { id } = req.params;
     const companyId = req.company.id;
 
-    const client = await prisma.client.deleteMany({
+    const result = await prisma.client.deleteMany({
       where: { id, companyId },
     });
 
-    if (client.count === 0) {
+    if (result.count === 0) {
       return res.status(404).json({ message: 'Cliente não encontrado.' });
     }
 
     res.status(200).json({ message: 'Cliente deletado com sucesso.' });
   } catch (error) {
-    console.error('Erro ao deletar cliente:', error);
+    console.error('❌ Erro ao deletar cliente:', error);
     res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
