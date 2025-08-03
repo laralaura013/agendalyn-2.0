@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-// Importa todas as nossas rotas
 import authRoutes from './routes/authRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
@@ -29,6 +28,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ✅ CORS configurado corretamente
 const allowedOrigins = [
   'https://frontlyn.netlify.app',
   'http://localhost:5173',
@@ -42,15 +42,18 @@ const corsOptions = {
       callback(new Error('Not allowed by CORS'));
     }
   },
+  credentials: true,
 };
 
-// ✅ Ordem correta dos middlewares
-app.use(express.json());           // Primeiro: body parser
-app.use(cors());       // Depois: CORS (alterado para permitir todas as origens temporariamente)
-app.use('/api/webhooks', webhookRoutes); // Webhooks (antes de auth se necessário)
+// ✅ Middlewares
+app.use(express.json());
+app.use(cors(corsOptions));
 
-// --- Uso das Rotas na API ---
-app.use('/api/portal', clientPortalRoutes); // Portal do Cliente
+// ✅ Webhooks primeiro (antes de auth, se necessário)
+app.use('/api/webhooks', webhookRoutes);
+
+// ✅ Rotas da API
+app.use('/api/portal', clientPortalRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -71,16 +74,16 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/commissions', commissionRoutes);
 
-// Rota de teste
+// ✅ Health Check
 app.get('/api', (req, res) => {
   res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' });
 });
 
-// Rota de Health Check para a Railway
 app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' });
 });
 
+// ✅ Inicializa o servidor
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
