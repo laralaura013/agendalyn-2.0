@@ -46,7 +46,7 @@ const corsOptions = {
 
 // ✅ Ordem correta dos middlewares
 app.use(express.json());           // Primeiro: body parser
-app.use(cors(corsOptions));       // Depois: CORS
+app.use(cors());       // Depois: CORS (alterado para permitir todas as origens temporariamente)
 app.use('/api/webhooks', webhookRoutes); // Webhooks (antes de auth se necessário)
 
 // --- Uso das Rotas na API ---
