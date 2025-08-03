@@ -39,7 +39,7 @@ const Schedule = () => {
       try {
         await Promise.all([
           fetchAppointments(),
-          api.get('/clients/admin').then((res) => setClients(res.data)),
+          api.get('/clients').then((res) => setClients(res.data)), // ✅ CORRIGIDO
           api.get('/services').then((res) => setServices(res.data)),
           api.get('/staff').then((res) => setStaff(res.data)),
         ]);
