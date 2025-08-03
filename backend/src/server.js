@@ -28,31 +28,36 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ Log de origem da requisição (para debug CORS)
+// ✅ Loga a origem para debug
 app.use((req, res, next) => {
   console.log('🌐 Origem da requisição:', req.headers.origin);
   next();
 });
 
-// ✅ CORS temporário com origin: true (para resolver erro 502 no Railway)
-app.use(cors({
-  origin: true,           // Aceita qualquer origem — corrige erro 502
-  credentials: true,
-}));
+// ✅ Middleware manual para resolver preflight (CORS) no Railway
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    return res.sendStatus(204);
+  }
+  next();
+});
 
-// ✅ Preflight OPTIONS global (essencial para funcionar no Railway)
-app.options('*', cors({
+// ✅ CORS padrão com credentials
+app.use(cors({
   origin: true,
   credentials: true,
 }));
 
-// ✅ Body parser
 app.use(express.json());
 
-// ✅ Webhooks devem vir antes
+// ✅ Webhooks primeiro
 app.use('/api/webhooks', webhookRoutes);
 
-// ✅ Rotas da API
+// ✅ Rotas principais
 app.use('/api/portal', clientPortalRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
@@ -74,7 +79,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/commissions', commissionRoutes);
 
-// ✅ Health Check
+// ✅ Health check
 app.get('/api', (req, res) => {
   res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' });
 });
@@ -83,7 +88,6 @@ app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' });
 });
 
-// ✅ Inicializa o servidor
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
