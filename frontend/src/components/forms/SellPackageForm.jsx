@@ -3,7 +3,7 @@ import api from '../../services/api';
 
 const SellPackageForm = ({ pkg, onSave, onCancel }) => {
   const [clientId, setClientId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
+  const [paymentMethod, setPaymentMethod] = useState('CASH'); // valor padrão
   const [availableClients, setAvailableClients] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,13 +26,15 @@ const SellPackageForm = ({ pkg, onSave, onCancel }) => {
       alert("Por favor, selecione um cliente.");
       return;
     }
+    if (!paymentMethod) {
+      alert("Por favor, selecione uma forma de pagamento.");
+      return;
+    }
 
-    // ✅ Enviar também price e paymentMethod
     onSave({
       packageId: pkg.id,
       clientId,
-      price: Number(pkg.price), // Envia o preço
-      paymentMethod            // Envia o método de pagamento
+      paymentMethod, // ✅ Adicionado corretamente
     });
   };
 
@@ -41,21 +43,20 @@ const SellPackageForm = ({ pkg, onSave, onCancel }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <h2 className="text-2xl font-bold mb-2">Vender Pacote</h2>
-
       <div className="p-4 bg-gray-100 rounded-md">
         <p className="font-semibold text-lg">{pkg.name}</p>
         <p className="text-md text-gray-700">Valor: R$ {Number(pkg.price).toFixed(2)}</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Cliente</label>
+        <label className="block text-sm font-medium">Cliente</label>
         <select
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="mt-1 block w-full p-2 border rounded-md"
           required
+          className="mt-1 block w-full p-2 border rounded-md"
         >
-          <option value="">-- Escolha um cliente --</option>
+          <option value="">-- Selecione um cliente --</option>
           {availableClients.map(c => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -63,17 +64,19 @@ const SellPackageForm = ({ pkg, onSave, onCancel }) => {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Forma de Pagamento</label>
+        <label className="block text-sm font-medium">Forma de Pagamento</label>
         <select
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
-          className="mt-1 block w-full p-2 border rounded-md"
           required
+          className="mt-1 block w-full p-2 border rounded-md"
         >
-          <option value="DINHEIRO">Dinheiro</option>
+          <option value="">-- Selecione uma forma de pagamento --</option>
+          <option value="CASH">Dinheiro</option>
+          <option value="CREDIT_CARD">Cartão de Crédito</option>
+          <option value="DEBIT_CARD">Cartão de Débito</option>
           <option value="PIX">PIX</option>
-          <option value="CARTAO_CREDITO">Cartão de Crédito</option>
-          <option value="CARTAO_DEBITO">Cartão de Débito</option>
+          <option value="OTHER">Outro</option>
         </select>
       </div>
 
