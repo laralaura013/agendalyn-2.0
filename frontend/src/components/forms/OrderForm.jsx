@@ -18,7 +18,7 @@ const OrderForm = ({ onSave, onCancel }) => {
       try {
         setLoading(true);
         const [clientsRes, staffRes, servicesRes, productsRes] = await Promise.all([
-          api.get('/clients/admin'),
+          api.get('/clients'), // ✅ ROTA CORRIGIDA
           api.get('/staff'),
           api.get('/services'),
           api.get('/products'),
