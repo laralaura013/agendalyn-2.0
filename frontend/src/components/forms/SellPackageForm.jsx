@@ -3,7 +3,7 @@ import api from '../../services/api';
 
 const SellPackageForm = ({ pkg, onSave, onCancel }) => {
   const [clientId, setClientId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('PIX');
+  const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
   const [availableClients, setAvailableClients] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,11 +27,12 @@ const SellPackageForm = ({ pkg, onSave, onCancel }) => {
       return;
     }
 
+    // ✅ Enviar também price e paymentMethod
     onSave({
       packageId: pkg.id,
       clientId,
-      paymentMethod,
-      price: pkg.price
+      price: Number(pkg.price), // Envia o preço
+      paymentMethod            // Envia o método de pagamento
     });
   };
 
@@ -47,9 +48,8 @@ const SellPackageForm = ({ pkg, onSave, onCancel }) => {
       </div>
 
       <div>
-        <label htmlFor="client-select" className="block text-sm font-medium text-gray-700">Selecione o Cliente</label>
+        <label className="block text-sm font-medium mb-1">Cliente</label>
         <select
-          id="client-select"
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
           className="mt-1 block w-full p-2 border rounded-md"
@@ -63,34 +63,23 @@ const SellPackageForm = ({ pkg, onSave, onCancel }) => {
       </div>
 
       <div>
-        <label htmlFor="payment-method" className="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
+        <label className="block text-sm font-medium mb-1">Forma de Pagamento</label>
         <select
-          id="payment-method"
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
           className="mt-1 block w-full p-2 border rounded-md"
+          required
         >
-          <option value="PIX">PIX</option>
           <option value="DINHEIRO">Dinheiro</option>
+          <option value="PIX">PIX</option>
           <option value="CARTAO_CREDITO">Cartão de Crédito</option>
           <option value="CARTAO_DEBITO">Cartão de Débito</option>
         </select>
       </div>
 
       <div className="flex justify-end gap-4 pt-4">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-        >
-          Confirmar Venda
-        </button>
+        <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
+        <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">Confirmar Venda</button>
       </div>
     </form>
   );
