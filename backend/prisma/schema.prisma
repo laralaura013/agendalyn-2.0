@@ -29,6 +29,7 @@ model Company {
   services         Service[]
   subscription     Subscription?
   users            User[]
+  scheduleBlocks   ScheduleBlock[]   // <-- adicionado
 }
 
 model User {
@@ -49,6 +50,7 @@ model User {
   packageSessionUsages PackageSessionUsage[]
   company              Company               @relation(fields: [companyId], references: [id])
   services             Service[]             @relation("ServiceToUser")
+  scheduleBlocks       ScheduleBlock[]       // <-- adicionado (bloqueios por profissional)
 }
 
 model Service {
@@ -292,6 +294,27 @@ model Product {
   brand       Brand?      @relation(fields: [brandId], references: [id])
   category    Category?   @relation(fields: [categoryId], references: [id])
   company     Company     @relation(fields: [companyId], references: [id])
+}
+
+//
+// ---- NOVO MODELO PARA BLOQUEIO DE HORÁRIOS ----
+//
+model ScheduleBlock {
+  id             String   @id @default(cuid())
+  companyId      String
+  professionalId String?   // opcional: bloqueio geral da empresa ou por profissional
+  date           DateTime  // data (00:00); horas em startTime/endTime
+  startTime      String    // "HH:mm"
+  endTime        String    // "HH:mm"
+  reason         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company        Company   @relation(fields: [companyId], references: [id])
+  professional   User?     @relation(fields: [professionalId], references: [id])
+
+  @@index([companyId, date])
+  @@index([professionalId, date])
 }
 
 enum Role {

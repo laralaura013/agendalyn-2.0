@@ -17,24 +17,47 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-// Cores fixas para até 10 colaboradores diferentes
+// Paleta base para colorir por profissional
 const COLORS = [
   '#9333ea', '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
   '#6366f1', '#ec4899', '#14b8a6', '#8b5cf6', '#f43f5e'
 ];
 
-const Calendar = ({ events, onSelectSlot, onSelectEvent }) => {
+export default function Calendar({
+  events = [],
+  onSelectSlot,
+  onSelectEvent,
+  // novos props para sincronizar com Schedule.jsx
+  view,          // 'day' | 'week' | 'month'
+  date,          // Date
+  onView,        // (v) => void
+  onNavigate,    // (d) => void
+}) {
   return (
     <div className="bg-white p-4 rounded-lg shadow-lg" style={{ height: '75vh' }}>
       <BigCalendar
         localizer={localizer}
+        culture="pt-BR"
         events={events}
         startAccessor="start"
         endAccessor="end"
-        culture="pt-BR"
         selectable
         onSelectSlot={onSelectSlot}
         onSelectEvent={onSelectEvent}
+        // sincronização com o contêiner (Schedule.jsx)
+        view={view}
+        date={date}
+        onView={onView}
+        onNavigate={onNavigate}
+        // UX
+        popup
+        views={['day', 'week', 'month']}
+        step={30}
+        timeslots={2}
+        min={new Date(1970, 0, 1, 7, 0)}
+        max={new Date(1970, 0, 1, 21, 0)}
+        longPressThreshold={250}
+        // Texto em PT-BR
         messages={{
           next: "Próximo",
           previous: "Anterior",
@@ -49,25 +72,52 @@ const Calendar = ({ events, onSelectSlot, onSelectEvent }) => {
           noEventsInRange: "Não há eventos neste período.",
           showMore: total => `+ Ver mais (${total})`
         }}
-        tooltipAccessor={(event) =>
-          `${event.resource.client?.name ?? ''} - ${event.resource.service?.name ?? ''}`
-        }
+        // Tooltip: mostra cliente e serviço quando existir
+        tooltipAccessor={(event) => {
+          const r = event?.resource || {};
+          if (r?.type === 'BLOCK') {
+            return r.reason ? `Bloqueado - ${r.reason}` : 'Bloqueado';
+          }
+          const client = r?.client?.name ?? '';
+          const service = r?.service?.name ?? '';
+          return [client, service].filter(Boolean).join(' - ') || event?.title || '';
+        }}
+        // Estilização por evento
         eventPropGetter={(event) => {
-          const staffId = event.resource?.user?.id || 0;
-          const color = COLORS[staffId % COLORS.length];
-          const style = {
-            backgroundColor: color,
-            borderRadius: '6px',
-            opacity: 0.9,
-            color: 'white',
-            border: 0,
-            fontWeight: '500',
+          // bloqueios em azul
+          if (event?.resource?.type === 'BLOCK') {
+            return {
+              style: {
+                backgroundColor: '#60a5fa',
+                borderColor: '#60a5fa',
+                color: '#0b1324',
+                borderRadius: '6px',
+                opacity: 0.95,
+                fontWeight: 600,
+              },
+            };
+          }
+
+          // demais eventos: cor por profissional
+          const staffId =
+            event?.resource?.user?.id ??
+            event?.resource?.userId ??
+            0;
+          const idx = Math.abs(String(staffId).split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % COLORS.length;
+          const color = COLORS[idx];
+
+          return {
+            style: {
+              backgroundColor: color,
+              borderRadius: '6px',
+              opacity: 0.95,
+              color: 'white',
+              border: 0,
+              fontWeight: 500,
+            },
           };
-          return { style };
         }}
       />
     </div>
   );
-};
-
-export default Calendar;
+}

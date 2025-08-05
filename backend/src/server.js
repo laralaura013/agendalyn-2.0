@@ -24,11 +24,14 @@ import commissionRoutes from './routes/commissionRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import clientPortalRoutes from './routes/clientPortalRoutes.js';
 
+// 🆕 Rotas de bloqueio de horários
+import blockRoutes from './routes/blockRoutes.js';
+
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ Loga a origem para debug
+// ✅ Log da origem para debug
 app.use((req, res, next) => {
   console.log('🌐 Origem da requisição:', req.headers.origin);
   next();
@@ -78,6 +81,9 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/commissions', commissionRoutes);
+
+// 🆕 Bloqueios de horário
+app.use('/api/agenda/blocks', blockRoutes);
 
 // ✅ Health check
 app.get('/api', (req, res) => {

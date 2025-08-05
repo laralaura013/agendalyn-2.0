@@ -1,107 +1,149 @@
-import { PrismaClient } from '@prisma/client';
-import { addMinutes, parseISO } from 'date-fns';
+import prisma from '../prismaClient.js';
 
-const prisma = new PrismaClient();
-
-// LISTAR Agendamentos
+/**
+ * GET /api/appointments
+ * Lista todos os agendamentos da empresa
+ */
 export const listAppointments = async (req, res) => {
   try {
     const appointments = await prisma.appointment.findMany({
-      where: { companyId: req.company.id },
+      where: {
+        companyId: req.company.id,
+      },
       include: {
+        client: true,
         service: true,
         user: true,
-        client: true, // Inclui os dados do cliente
+      },
+      orderBy: {
+        start: 'asc',
       },
     });
-    res.status(200).json(appointments);
-  } catch (error) {
-    console.error("--- ERRO AO LISTAR AGENDAMENTOS ---", error);
-    res.status(500).json({ message: "Erro interno do servidor." });
+
+    res.json(appointments);
+  } catch (err) {
+    console.error('Erro ao listar agendamentos:', err);
+    res.status(500).json({ message: 'Erro interno do servidor.' });
   }
 };
 
-// CRIAR Agendamento
+/**
+ * POST /api/appointments
+ * Cria um novo agendamento
+ */
 export const createAppointment = async (req, res) => {
   try {
-    const { clientId, start, serviceId, userId, notes, status } = req.body;
     const companyId = req.company.id;
+    const { clientId, serviceId, userId, start, end, notes } = req.body;
 
-    if (!clientId || !start || !serviceId || !userId) {
-      return res.status(400).json({ message: "Cliente, data, serviço e colaborador são obrigatórios." });
+    if (!clientId || !serviceId || !userId || !start || !end) {
+      return res.status(400).json({ message: 'Campos obrigatórios ausentes.' });
     }
 
-    const service = await prisma.service.findUnique({ where: { id: serviceId } });
-    if (!service) {
-      return res.status(404).json({ message: "Serviço não encontrado." });
-    }
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const dateOnly = new Date(startDate.toISOString().split('T')[0]);
 
-    const startDate = parseISO(start);
-    const endDate = addMinutes(startDate, service.duration);
+    // ⛔ Verifica conflito com bloqueios
+    const conflict = await prisma.scheduleBlock.findFirst({
+      where: {
+        companyId,
+        OR: [
+          { professionalId: userId },
+          { professionalId: null }, // bloqueio geral
+        ],
+        date: dateOnly,
+        startTime: { lt: endDate.toTimeString().slice(0, 5) },
+        endTime: { gt: startDate.toTimeString().slice(0, 5) },
+      },
+    });
+
+    if (conflict) {
+      return res.status(400).json({
+        message: 'Horário indisponível. Existe um bloqueio neste período.',
+      });
+    }
 
     const newAppointment = await prisma.appointment.create({
       data: {
-        clientId,
-        start: startDate,
-        end: endDate,
-        notes,
         companyId,
+        clientId,
         serviceId,
         userId,
-        status: status || 'SCHEDULED',
+        start: startDate,
+        end: endDate,
+        notes: notes || '',
       },
     });
+
     res.status(201).json(newAppointment);
-  } catch (error) {
-    console.error("--- ERRO AO CRIAR AGENDAMENTO ---", error);
-    res.status(500).json({ message: "Erro ao criar agendamento." });
+  } catch (err) {
+    console.error('Erro ao criar agendamento:', err);
+    res.status(500).json({ message: 'Erro interno ao criar agendamento.' });
   }
 };
 
-// ATUALIZAR (EDITAR) Agendamento
+/**
+ * PUT /api/appointments/:id
+ * Atualiza um agendamento existente
+ */
 export const updateAppointment = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { clientId, start, serviceId, userId, notes, status } = req.body;
-        const companyId = req.company.id;
+  try {
+    const companyId = req.company.id;
+    const { id } = req.params;
+    const { clientId, serviceId, userId, start, end, notes, status } = req.body;
 
-        const service = await prisma.service.findUnique({ where: { id: serviceId } });
-        if (!service) {
-            return res.status(404).json({ message: "Serviço não encontrado." });
-        }
+    const appointment = await prisma.appointment.findFirst({
+      where: { id, companyId },
+    });
 
-        const startDate = parseISO(start);
-        const endDate = addMinutes(startDate, service.duration);
-
-        const updatedAppointment = await prisma.appointment.update({
-            where: { id: id, companyId: companyId },
-            data: {
-                clientId,
-                start: startDate,
-                end: endDate,
-                notes,
-                serviceId,
-                userId,
-                status,
-            },
-        });
-        res.status(200).json(updatedAppointment);
-    } catch (error) {
-        console.error("--- ERRO AO ATUALIZAR AGENDAMENTO ---", error);
-        res.status(500).json({ message: "Erro ao atualizar agendamento." });
+    if (!appointment) {
+      return res.status(404).json({ message: 'Agendamento não encontrado.' });
     }
+
+    const updated = await prisma.appointment.update({
+      where: { id },
+      data: {
+        clientId,
+        serviceId,
+        userId,
+        start: new Date(start),
+        end: new Date(end),
+        notes,
+        status,
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Erro ao atualizar agendamento:', err);
+    res.status(500).json({ message: 'Erro interno ao atualizar agendamento.' });
+  }
 };
 
-// DELETAR Agendamento
+/**
+ * DELETE /api/appointments/:id
+ */
 export const deleteAppointment = async (req, res) => {
-    try {
-        const { id } = req.params;
-        await prisma.appointment.delete({
-            where: { id: id, companyId: req.company.id },
-        });
-        res.status(204).send();
-    } catch (error) {
-        console.error("--- ERRO AO DELETAR AGENDAMENTO ---", error);
-        res.status(500).json({ message: "Erro ao deletar agendamento." });
+  try {
+    const companyId = req.company.id;
+    const { id } = req.params;
+
+    const appointment = await prisma.appointment.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Agendamento não encontrado.' });
     }
+
+    await prisma.appointment.delete({
+      where: { id },
+    });
+
+    res.status(204).send();
+  } catch (err) {
+    console.error('Erro ao excluir agendamento:', err);
+    res.status(500).json({ message: 'Erro interno ao excluir agendamento.' });
+  }
 };
