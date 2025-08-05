@@ -1,3 +1,4 @@
+// ✅ ARQUIIVO: src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
@@ -17,8 +18,25 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+/**
+ * Rotas usadas (ajuste se seu back for diferente):
+ * - GET  /appointments?professionalId&date | date_from&date_to
+ * - POST /appointments
+ * - PUT  /appointments/:id
+ * - DELETE /appointments/:id
+ *
+ * - GET  /agenda/blocks?professionalId&date | date_from&date_to
+ * - POST /agenda/blocks  { professionalId, date:'YYYY-MM-DD', startTime:'HH:mm', endTime:'HH:mm', reason }
+ * - DELETE /agenda/blocks/:id
+ *
+ * - GET  /public/available-slots?professionalId&date&duration=30  (retorna ["HH:mm"] ou [{time:"HH:mm"}])
+ * - GET  /waitlist  (se existir)
+ */
+
+const DEFAULT_SLOT_MINUTES = 30;
+
 const Schedule = () => {
-  // ----- Estados do fluxo já existente -----
+  // ----- Estados principais -----
   const [events, setEvents] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -28,14 +46,14 @@ const Schedule = () => {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ----- Novos estados (bloqueios + layout rico) -----
+  // ----- Bloqueios / filtros -----
   const [blocks, setBlocks] = useState([]);
-  const [view, setView] = useState("day"); // day|week|month
+  const [view, setView] = useState("day"); // 'day' | 'week' | 'month'
   const [date, setDate] = useState(() => new Date());
   const [selectedPro, setSelectedPro] = useState(null);
   const [blockEnabled, setBlockEnabled] = useState(false);
 
-  // Modais auxiliares
+  // ----- Modais -----
   const [openSlots, setOpenSlots] = useState(false);
   const [openApptList, setOpenApptList] = useState(false);
   const [openWaitlist, setOpenWaitlist] = useState(false);
@@ -43,29 +61,20 @@ const Schedule = () => {
   const [openProducts, setOpenProducts] = useState(true);
   const [openLegend, setOpenLegend] = useState(true);
 
-  // ----- API: agendamentos -----
-  const fetchAppointments = useCallback(async () => {
-    try {
-      const response = await api.get("/appointments");
-      const formattedEvents = response.data.map((apt) => ({
-        id: apt.id,
-        title: `${apt.client?.name ?? "Cliente"} - ${apt.service?.name ?? "Serviço"}`,
-        start: parseISO(apt.start),
-        end: parseISO(apt.end),
-        resource: apt,
-      }));
-      setEvents(formattedEvents);
-    } catch (error) {
-      console.error("Erro ao buscar agendamentos:", error);
-      toast.error("Erro ao carregar os agendamentos.");
-    }
-  }, []);
+  // ----- Estados auxiliares -----
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState([]); // ["07:00","07:30",...]
+  const [waitlist, setWaitlist] = useState([]);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
 
-  // ----- API: bloqueios -----
-  const fetchBlocks = useCallback(async () => {
+  // ====== APIs ======
+
+  // Agendamentos
+  const fetchAppointments = useCallback(async () => {
     try {
       const params = {};
       if (selectedPro) params.professionalId = selectedPro;
+
       if (view === "day") {
         params.date = toYMD(date);
       } else if (view === "week") {
@@ -75,33 +84,105 @@ const Schedule = () => {
         params.date_from = toYMD(startOfMonth(date));
         params.date_to = toYMD(endOfMonth(date));
       }
+
+      const response = await api.get("/appointments", { params });
+      const formatted = (response.data || []).map((apt) => ({
+        id: apt.id,
+        title: `${apt.client?.name ?? "Cliente"} - ${apt.service?.name ?? "Serviço"}`,
+        start: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
+        end: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
+        resource: apt,
+      }));
+      setEvents(formatted);
+    } catch (error) {
+      console.error("Erro ao buscar agendamentos:", error);
+      toast.error("Erro ao carregar os agendamentos.");
+    }
+  }, [date, view, selectedPro]);
+
+  // Bloqueios
+  const fetchBlocks = useCallback(async () => {
+    try {
+      const params = {};
+      if (selectedPro) params.professionalId = selectedPro;
+
+      if (view === "day") {
+        params.date = toYMD(date);
+      } else if (view === "week") {
+        params.date_from = toYMD(startOfWeek(date));
+        params.date_to = toYMD(endOfWeek(date));
+      } else {
+        params.date_from = toYMD(startOfMonth(date));
+        params.date_to = toYMD(endOfMonth(date));
+      }
+
       const res = await api.get("/agenda/blocks", { params });
       setBlocks(res.data || []);
     } catch (e) {
       console.error("Erro ao carregar bloqueios:", e);
+      toast.error("Erro ao carregar bloqueios.");
     }
   }, [date, view, selectedPro]);
 
+  // Horários disponíveis
+  const fetchAvailableSlots = useCallback(
+    async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES) => {
+      try {
+        setSlotsLoading(true);
+        const params = { date: toYMD(targetDate), duration: minutes };
+        if (proId) params.professionalId = proId;
+
+        // ✅ endpoint correto do seu back
+        const res = await api.get("/public/available-slots", { params });
+
+        const items = (res.data || [])
+          .map((s) => (typeof s === "string" ? s : s?.time))
+          .filter(Boolean);
+
+        setAvailableSlots(items);
+      } catch (e) {
+        console.error("Erro ao carregar horários disponíveis:", e);
+        toast.error("Erro ao carregar horários disponíveis.");
+      } finally {
+        setSlotsLoading(false);
+      }
+    },
+    [date, selectedPro]
+  );
+
+  // Lista de espera (se existir)
+  const fetchWaitlist = useCallback(async () => {
+    try {
+      setWaitlistLoading(true);
+      const res = await api.get("/waitlist");
+      setWaitlist(res.data || []);
+    } catch (e) {
+      console.error("Erro ao carregar lista de espera:", e);
+      toast.error("Erro ao carregar a lista de espera.");
+    } finally {
+      setWaitlistLoading(false);
+    }
+  }, []);
+
   // Load inicial
   useEffect(() => {
-    const loadPageData = async () => {
+    const load = async () => {
       setLoading(true);
       try {
         await Promise.all([
           fetchAppointments(),
           fetchBlocks(),
-          api.get("/clients").then((res) => setClients(res.data)),
-          api.get("/services").then((res) => setServices(res.data)),
-          api.get("/staff").then((res) => setStaff(res.data)),
+          api.get("/clients").then((r) => setClients(r.data || [])),
+          api.get("/services").then((r) => setServices(r.data || [])),
+          api.get("/staff").then((r) => setStaff(r.data || [])),
         ]);
-      } catch (error) {
-        console.error("Erro ao carregar dados da agenda:", error);
+      } catch {
         toast.error("Erro ao carregar dados da agenda.");
       } finally {
         setLoading(false);
       }
     };
-    loadPageData();
+    load();
   }, [fetchAppointments, fetchBlocks]);
 
   // Profissional padrão quando staff carregar
@@ -109,24 +190,27 @@ const Schedule = () => {
     if (!selectedPro && staff?.length) setSelectedPro(staff[0]?.id);
   }, [staff, selectedPro]);
 
-  // Recarregar bloqueios quando filtros/período mudarem
+  // Recarregar quando filtros mudam
   useEffect(() => {
     fetchBlocks();
-  }, [fetchBlocks]);
+    fetchAppointments();
+  }, [fetchBlocks, fetchAppointments]);
 
-  // ----- Handlers agendamento -----
+  // ====== Handlers ======
+
   const handleSelectSlot = useCallback(
     (slotInfo) => {
-      // Bloquear agendamento em horário bloqueado
       const { start, end } = slotInfo;
+
+      // Impede agendar dentro de bloqueio
       const conflito = (blocks || []).some((b) => {
         const base = new Date(b.date);
         const [sh, sm] = (b.startTime || "00:00").split(":").map(Number);
         const [eh, em] = (b.endTime || "00:00").split(":").map(Number);
         const bStart = new Date(base);
-        bStart.setHours(sh, sm, 0, 0); // ✅ corrige fuso no cliente
+        bStart.setHours(sh, sm, 0, 0);
         const bEnd = new Date(base);
-        bEnd.setHours(eh, em, 0, 0); // ✅ corrige fuso no cliente
+        bEnd.setHours(eh, em, 0, 0);
         return start < bEnd && end > bStart;
       });
       if (conflito) {
@@ -144,6 +228,7 @@ const Schedule = () => {
   const handleSelectEvent = useCallback(
     (event) => {
       const data = event.resource;
+
       // Clique em bloqueio => excluir
       if (data?.type === "BLOCK") {
         if (window.confirm("Deseja remover este bloqueio?")) {
@@ -168,11 +253,11 @@ const Schedule = () => {
 
   const handleSave = async (formData) => {
     const isEditing = selectedEvent && selectedEvent.id;
-    const savePromise = isEditing
+    const p = isEditing
       ? api.put(`/appointments/${selectedEvent.id}`, formData)
       : api.post("/appointments", formData);
 
-    toast.promise(savePromise, {
+    toast.promise(p, {
       loading: "Salvando agendamento...",
       success: () => {
         fetchAppointments();
@@ -184,18 +269,17 @@ const Schedule = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Tem certeza que deseja excluir este agendamento?")) {
-      const deletePromise = api.delete(`/appointments/${id}`);
-      toast.promise(deletePromise, {
-        loading: "Excluindo agendamento...",
-        success: () => {
-          fetchAppointments();
-          setIsModalOpen(false);
-          return "Agendamento excluído com sucesso!";
-        },
-        error: "Erro ao excluir agendamento.",
-      });
-    }
+    if (!window.confirm("Tem certeza que deseja excluir este agendamento?")) return;
+
+    toast.promise(api.delete(`/appointments/${id}`), {
+      loading: "Excluindo agendamento...",
+      success: () => {
+        fetchAppointments();
+        setIsModalOpen(false);
+        return "Agendamento excluído com sucesso!";
+      },
+      error: "Erro ao excluir agendamento.",
+    });
   };
 
   const openEmptyModal = () => {
@@ -204,7 +288,7 @@ const Schedule = () => {
     setIsModalOpen(true);
   };
 
-  // ----- Navegação de datas -----
+  // Navegação de datas
   const goToday = () => setDate(new Date());
   const goPrev = () => {
     const d = new Date(date);
@@ -234,7 +318,7 @@ const Schedule = () => {
     return formatter.format(date);
   }, [date, view]);
 
-  // ----- Converter bloqueios em eventos do calendário -----
+  // Converter bloqueios em eventos do calendário (usando setHours local)
   const blockEvents = useMemo(() => {
     return (blocks || []).map((b) => {
       const base = new Date(b.date);
@@ -242,10 +326,10 @@ const Schedule = () => {
       const [eh, em] = (b.endTime || "00:00").split(":").map(Number);
 
       const start = new Date(base);
-      start.setHours(sh, sm, 0, 0); // ✅ usar setHours (não UTC)
+      start.setHours(sh, sm, 0, 0);
 
       const end = new Date(base);
-      end.setHours(eh, em, 0, 0); // ✅ usar setHours (não UTC)
+      end.setHours(eh, em, 0, 0);
 
       return {
         id: `block_${b.id}`,
@@ -260,9 +344,40 @@ const Schedule = () => {
     });
   }, [blocks]);
 
-  // Eventos combinados
   const combinedEvents = useMemo(() => [...events, ...blockEvents], [events, blockEvents]);
 
+  // Ações auxiliares (abrir modal a partir de listas)
+  const handlePickAvailableSlot = useCallback(
+    (hhmm) => {
+      const [h, m] = String(hhmm).split(":").map(Number);
+      const s = new Date(date);
+      s.setHours(h, m, 0, 0);
+      const e = new Date(s);
+      e.setMinutes(e.getMinutes() + DEFAULT_SLOT_MINUTES);
+      setSelectedEvent(null);
+      setSelectedSlot({ start: s, end: e });
+      setIsModalOpen(true);
+    },
+    [date]
+  );
+
+  const handleOpenEventFromList = useCallback(
+    (id) => {
+      const ev = events.find((x) => x.id === id);
+      if (!ev) return;
+      setSelectedEvent(ev.resource);
+      setSelectedSlot(null);
+      setIsModalOpen(true);
+    },
+    [events]
+  );
+
+  const handleWaitlistAgendar = useCallback(() => {
+    setOpenSlots(true);
+    fetchAvailableSlots(date, selectedPro);
+  }, [date, selectedPro, fetchAvailableSlots]);
+
+  // ====== Render ======
   return (
     <div className="relative animate-fade-in-up p-4 max-w-7xl mx-auto">
       {/* Toolbar */}
@@ -288,6 +403,17 @@ const Schedule = () => {
 
         <div className="flex items-center gap-2">
           <ViewToggle value={view} onChange={setView} />
+          <button
+            onClick={() => {
+              setOpenSlots(true);
+              fetchAvailableSlots(date, selectedPro);
+            }}
+            className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center gap-2"
+            title="Horários disponíveis"
+          >
+            <CalendarIcon className="w-4 h-4" />
+            Horários
+          </button>
           <button
             onClick={openEmptyModal}
             className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
@@ -347,7 +473,7 @@ const Schedule = () => {
               </button>
             </div>
 
-            {/* Mini calendario + ações */}
+            {/* Mini calendário + ações */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <input
@@ -366,7 +492,10 @@ const Schedule = () => {
 
               <div className="grid grid-cols-1 gap-2">
                 <button
-                  onClick={() => setOpenSlots(true)}
+                  onClick={() => {
+                    setOpenSlots(true);
+                    fetchAvailableSlots(date, selectedPro);
+                  }}
                   className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
                 >
                   <CalendarIcon className="w-4 h-4" />
@@ -382,7 +511,10 @@ const Schedule = () => {
                 </button>
 
                 <button
-                  onClick={() => setOpenWaitlist(true)}
+                  onClick={() => {
+                    setOpenWaitlist(true);
+                    fetchWaitlist();
+                  }}
                   className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
                 >
                   <List className="w-4 h-4" />
@@ -438,22 +570,29 @@ const Schedule = () => {
         />
       )}
 
-      {/* Modais/Drawers auxiliares */}
+      {/* Modais/Drawers */}
       {openSlots && (
         <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
-          <SlotsModalContent date={date} />
+          <SlotsModalContent
+            date={date}
+            proId={selectedPro}
+            loading={slotsLoading}
+            slots={availableSlots}
+            onReload={() => fetchAvailableSlots(date, selectedPro)}
+            onPick={handlePickAvailableSlot}
+          />
         </BaseModal>
       )}
 
       {openApptList && (
         <SideDrawer title="Lista de Agendamentos" onClose={() => setOpenApptList(false)}>
-          <AppointmentsListContent events={events} />
+          <AppointmentsListContent events={events} onOpen={handleOpenEventFromList} onRefresh={fetchAppointments} />
         </SideDrawer>
       )}
 
       {openWaitlist && (
         <SideDrawer title="Lista de Espera" onClose={() => setOpenWaitlist(false)}>
-          <WaitlistContent />
+          <WaitlistContent items={waitlist} loading={waitlistLoading} onRefresh={fetchWaitlist} onAgendar={handleWaitlistAgendar} />
         </SideDrawer>
       )}
 
@@ -462,13 +601,14 @@ const Schedule = () => {
           <BlockTimeForm
             date={date}
             proId={selectedPro}
+            onCancel={() => setOpenBlockTime(false)}
             onSubmit={async (payload) => {
               try {
                 await api.post("/agenda/blocks", {
                   professionalId: payload.professionalId || null,
-                  date: payload.date, // "YYYY-MM-DD"
-                  start: payload.start, // "HH:mm"
-                  end: payload.end, // "HH:mm"
+                  date: payload.date,       // "YYYY-MM-DD"
+                  startTime: payload.start, // backend espera startTime
+                  endTime: payload.end,     // backend espera endTime
                   reason: payload.reason || "",
                 });
                 toast.success("Bloqueio criado com sucesso!");
@@ -604,39 +744,71 @@ function SideDrawer({ title, children, onClose }) {
   );
 }
 
-/* --------- Conteúdos placeholder (podem ser ligados à API depois) -------- */
+/* --------- Conteúdos ligados às APIs -------- */
 
-function SlotsModalContent({ date }) {
-  const slots = ["07:00", "07:30", "08:00", "08:30", "09:00", "14:00", "14:30", "15:00", "15:30", "16:00"];
+function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick }) {
   return (
-    <div>
-      <div className="text-sm text-gray-600 mb-3">
-        {new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(date)}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-600">
+          {new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(date)}
+        </div>
+        <button onClick={onReload} className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50" title="Recarregar">
+          Recarregar
+        </button>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        {slots.map((s) => (
-          <button key={s} className="px-3 py-2 rounded border bg-white hover:bg-gray-50">
-            {s}
-          </button>
-        ))}
+
+      {loading ? (
+        <div className="text-sm text-gray-500">Carregando horários...</div>
+      ) : slots.length === 0 ? (
+        <div className="text-sm text-gray-500">Sem horários disponíveis para este dia.</div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {slots.map((s) => (
+            <button key={s} onClick={() => onPick(s)} className="px-3 py-2 rounded border bg-white hover:bg-gray-50">
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="text-xs text-gray-500">
+        Profissional: <span className="font-medium">{proId || "—"}</span>
       </div>
     </div>
   );
 }
 
-function AppointmentsListContent({ events = [] }) {
+function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
+  const [q, setQ] = useState("");
+
+  const filtered = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return events;
+    return events.filter((ev) => (ev.title || "").toLowerCase().includes(t));
+  }, [events, q]);
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <input className="border rounded px-2 py-1.5 text-sm flex-1" placeholder="Buscar cliente/serviço" />
-        <button className="px-2 py-1.5 border rounded hover:bg-gray-50">
+        <input
+          className="border rounded px-2 py-1.5 text-sm flex-1"
+          placeholder="Buscar cliente/serviço"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <button className="px-2 py-1.5 border rounded hover:bg-gray-50" onClick={onRefresh} title="Recarregar">
           <Filter className="w-4 h-4" />
         </button>
       </div>
       <div className="divide-y border rounded">
-        {events.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
-        {events.map((ev) => (
-          <div key={ev.id} className="p-3 flex items-center justify-between">
+        {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
+        {filtered.map((ev) => (
+          <button
+            key={ev.id}
+            onClick={() => onOpen?.(ev.id)}
+            className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50"
+          >
             <div className="text-sm">
               <div className="font-medium">{ev.title}</div>
               <div className="text-gray-500">
@@ -644,46 +816,54 @@ function AppointmentsListContent({ events = [] }) {
                 {ev.end?.toLocaleTimeString?.([], { hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
-            <span className="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700">Confirmado</span>
-          </div>
+            <span className="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700">Abrir</span>
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
-function WaitlistContent() {
-  const items = [
-    { id: "w1", client: "Carlos", phone: "(11) 90000-0000", pref: "Manhã" },
-    { id: "w2", client: "Paula", phone: "(11) 95555-1111", pref: "Tarde" },
-  ];
+function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <input className="border rounded px-2 py-1.5 text-sm flex-1" placeholder="Buscar na espera" />
-        <button className="px-2 py-1.5 border rounded hover:bg-gray-50">
-          <ClipboardList className="w-4 h-4" />
+      <div className="flex items-center justify-between">
+        <div className="font-medium">Pessoas na espera</div>
+        <button className="px-2 py-1.5 border rounded hover:bg-gray-50" onClick={onRefresh} title="Recarregar">
+          Recarregar
         </button>
       </div>
-      <div className="divide-y border rounded">
-        {items.map((it) => (
-          <div key={it.id} className="p-3">
-            <div className="text-sm font-medium">{it.client}</div>
-            <div className="text-xs text-gray-500">
-              {it.phone} • Preferência: {it.pref}
+
+      {loading ? (
+        <div className="text-sm text-gray-500">Carregando...</div>
+      ) : items.length === 0 ? (
+        <div className="text-sm text-gray-500">Ninguém na lista de espera.</div>
+      ) : (
+        <div className="divide-y border rounded">
+          {items.map((it) => (
+            <div key={it.id} className="p-3">
+              <div className="text-sm font-medium">{it.client?.name ?? it.clientName ?? "Cliente"}</div>
+              <div className="text-xs text-gray-500">
+                {(it.client?.phone ?? it.phone) || ""} {it.pref ? `• Preferência: ${it.pref}` : ""}
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                {/* <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
+                    onClick={async () => { await api.post(`/waitlist/${it.id}/notify`); toast.success("Cliente notificado!"); }}>
+                    Notificar
+                  </button> */}
+                <button className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700" onClick={onAgendar}>
+                  Agendar
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Notificar</button>
-              <button className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700">Agendar</button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function BlockTimeForm({ date, proId, onSubmit }) {
+function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
   const [reason, setReason] = useState("");
@@ -730,7 +910,7 @@ function BlockTimeForm({ date, proId, onSubmit }) {
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button type="button" className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">
           Cancelar
         </button>
         <button type="submit" className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black flex items-center gap-2">
@@ -749,7 +929,6 @@ function formatDateInput(d) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
 function startOfWeek(d) {
   const copy = new Date(d);
   const day = copy.getDay(); // 0=Dom, 1=Seg...
@@ -777,5 +956,3 @@ function toYMD(dateObj) {
   const day = String(dateObj.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
-export {};
