@@ -1,3 +1,4 @@
+import prisma from '../prismaClient.js';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 

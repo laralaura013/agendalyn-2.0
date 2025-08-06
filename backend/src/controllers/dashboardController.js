@@ -1,5 +1,6 @@
 // src/controllers/dashboardController.js
 
+import prisma from '../prismaClient.js';
 import { PrismaClient } from '@prisma/client'
 import {
   startOfDay,

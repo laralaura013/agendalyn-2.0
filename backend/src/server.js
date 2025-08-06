@@ -1,3 +1,4 @@
+// server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -23,6 +24,7 @@ import brandRoutes from './routes/brandRoutes.js';
 import commissionRoutes from './routes/commissionRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import clientPortalRoutes from './routes/clientPortalRoutes.js';
+import waitlistRoutes from './routes/waitlistRoutes.js'; // ✅ NOVO
 
 // 🆕 Rotas de bloqueio de horários
 import blockRoutes from './routes/blockRoutes.js';
@@ -84,6 +86,8 @@ app.use('/api/commissions', commissionRoutes);
 
 // 🆕 Bloqueios de horário
 app.use('/api/agenda/blocks', blockRoutes);
+// 🆕 Lista de espera
+app.use('/api/waitlist', waitlistRoutes); // ✅ NOVO
 
 // ✅ Health check
 app.get('/api', (req, res) => {

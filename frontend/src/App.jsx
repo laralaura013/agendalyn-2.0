@@ -42,6 +42,10 @@ import BrandsPage from './pages/BrandsPage'
 import SettingsPage from './pages/SettingsPage'
 import CommissionsPage from './pages/CommissionsPage'
 
+// ✅ NOVO: página dedicada para a Lista de Espera (opcional)
+// Se ainda não existir o arquivo, crie src/pages/WaitlistPage.jsx
+import WaitlistPage from './pages/WaitlistPage'
+
 function App() {
   return (
     <>
@@ -93,6 +97,8 @@ function App() {
           <Route path="clients/new" element={<ClientForm />} />
           <Route path="clients/:id/edit" element={<ClientForm />} />
           <Route path="schedule" element={<Schedule />} />
+          {/* ✅ NOVO: rota para a Lista de Espera */}
+          <Route path="waitlist" element={<WaitlistPage />} />
           <Route path="staff" element={<Staff />} />
           <Route path="services" element={<Services />} />
           <Route path="orders" element={<Orders />} />

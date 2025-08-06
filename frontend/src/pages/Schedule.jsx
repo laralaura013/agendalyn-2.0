@@ -1,4 +1,4 @@
-// ✅ ARQUIIVO: src/pages/Schedule.jsx
+// ✅ ARQUIVO: src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
@@ -30,7 +30,7 @@ import {
  * - DELETE /agenda/blocks/:id
  *
  * - GET  /public/available-slots?professionalId&date&duration=30  (retorna ["HH:mm"] ou [{time:"HH:mm"}])
- * - GET  /waitlist  (se existir)
+ * - GET  /waitlist
  */
 
 const DEFAULT_SLOT_MINUTES = 30;
@@ -124,22 +124,38 @@ const Schedule = () => {
     }
   }, [date, view, selectedPro]);
 
-  // Horários disponíveis
+  // Horários disponíveis (com fallback por serviceId)
   const fetchAvailableSlots = useCallback(
     async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES) => {
       try {
         setSlotsLoading(true);
-        const params = { date: toYMD(targetDate), duration: minutes };
-        if (proId) params.professionalId = proId;
 
-        // ✅ endpoint correto do seu back
-        const res = await api.get("/public/available-slots", { params });
+        const baseParams = { date: toYMD(targetDate) };
+        if (proId) baseParams.professionalId = proId;
+
+        // 1ª tentativa: com duration
+        let res = await api.get("/public/available-slots", {
+          params: { ...baseParams, duration: minutes },
+          headers: { "X-Public": "1" },
+        });
 
         const items = (res.data || [])
           .map((s) => (typeof s === "string" ? s : s?.time))
           .filter(Boolean);
 
-        setAvailableSlots(items);
+        // 2ª tentativa se vier vazio: com serviceId
+        if ((!items || items.length === 0) && services?.[0]?.id) {
+          res = await api.get("/public/available-slots", {
+            params: { ...baseParams, serviceId: services[0].id },
+            headers: { "X-Public": "1" },
+          });
+          const items2 = (res.data || [])
+            .map((s) => (typeof s === "string" ? s : s?.time))
+            .filter(Boolean);
+          setAvailableSlots(items2);
+        } else {
+          setAvailableSlots(items);
+        }
       } catch (e) {
         console.error("Erro ao carregar horários disponíveis:", e);
         toast.error("Erro ao carregar horários disponíveis.");
@@ -147,10 +163,10 @@ const Schedule = () => {
         setSlotsLoading(false);
       }
     },
-    [date, selectedPro]
+    [date, selectedPro, services]
   );
 
-  // Lista de espera (se existir)
+  // Waitlist
   const fetchWaitlist = useCallback(async () => {
     try {
       setWaitlistLoading(true);
@@ -510,6 +526,7 @@ const Schedule = () => {
                   Lista de Agendamentos
                 </button>
 
+                {/* ✅ Lista de Espera ATIVA */}
                 <button
                   onClick={() => {
                     setOpenWaitlist(true);
@@ -590,9 +607,15 @@ const Schedule = () => {
         </SideDrawer>
       )}
 
+      {/* ✅ Drawer da Waitlist */}
       {openWaitlist && (
         <SideDrawer title="Lista de Espera" onClose={() => setOpenWaitlist(false)}>
-          <WaitlistContent items={waitlist} loading={waitlistLoading} onRefresh={fetchWaitlist} onAgendar={handleWaitlistAgendar} />
+          <WaitlistContent
+            items={waitlist}
+            loading={waitlistLoading}
+            onRefresh={fetchWaitlist}
+            onAgendar={handleWaitlistAgendar}
+          />
         </SideDrawer>
       )}
 
@@ -847,10 +870,16 @@ function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
                 {(it.client?.phone ?? it.phone) || ""} {it.pref ? `• Preferência: ${it.pref}` : ""}
               </div>
               <div className="flex items-center gap-2 mt-2">
-                {/* <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
-                    onClick={async () => { await api.post(`/waitlist/${it.id}/notify`); toast.success("Cliente notificado!"); }}>
-                    Notificar
-                  </button> */}
+                {/* Exemplo de ação futura:
+                <button
+                  className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
+                  onClick={async () => {
+                    await api.post(`/waitlist/${it.id}/notify`);
+                    toast.success("Cliente notificado!");
+                  }}
+                >
+                  Notificar
+                </button> */}
                 <button className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700" onClick={onAgendar}>
                   Agendar
                 </button>
