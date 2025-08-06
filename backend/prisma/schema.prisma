@@ -30,6 +30,7 @@ model Company {
   subscription     Subscription?
   users            User[]
   scheduleBlocks   ScheduleBlock[]   // <-- adicionado
+  waitlists        Waitlist[]
 }
 
 model User {
@@ -51,6 +52,7 @@ model User {
   company              Company               @relation(fields: [companyId], references: [id])
   services             Service[]             @relation("ServiceToUser")
   scheduleBlocks       ScheduleBlock[]       // <-- adicionado (bloqueios por profissional)
+  waitlists            Waitlist[]
 }
 
 model Service {
@@ -67,6 +69,7 @@ model Service {
   company      Company       @relation(fields: [companyId], references: [id])
   packages     Package[]     @relation("PackageServices")
   availableTo  User[]        @relation("ServiceToUser")
+  waitlists    Waitlist[]
 }
 
 model Client {
@@ -85,6 +88,7 @@ model Client {
   company          Company           @relation(fields: [companyId], references: [id])
   packages         ClientPackage[]
   orders           Order[]
+  waitlists        Waitlist[]
 
   @@unique([companyId, email])
 }
@@ -356,4 +360,44 @@ enum GoalType {
   TOTAL
   BY_USER
   BY_SERVICE
+}
+
+// --- ENUMS ---
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  SCHEDULED
+  CANCELLED
+}
+
+// --- MODELS ---
+model Waitlist {
+  id              String          @id @default(cuid())
+  companyId       String
+  company         Company         @relation(fields: [companyId], references: [id])
+
+  // Relacionar com cliente já existente (opcional)
+  clientId        String?
+  client          Client?         @relation(fields: [clientId], references: [id])
+
+  // Caso não tenha client no sistema
+  clientName      String?
+  phone           String?
+
+  // Preferências
+  serviceId       String?
+  service         Service?        @relation(fields: [serviceId], references: [id])
+
+  professionalId  String?
+  professional    User?           @relation(fields: [professionalId], references: [id])
+
+  preferredDate   DateTime?
+  preferredTime   String?         // "HH:mm"
+  pref            String?         // texto livre: manhã/tarde/noite, sábado, etc.
+
+  notes           String?
+  status          WaitlistStatus  @default(WAITING)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 }
