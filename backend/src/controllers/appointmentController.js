@@ -80,7 +80,7 @@ export const createAppointment = async (req, res) => {
     const created = await prisma.appointment.create({
       data: {
         companyId,
-        clientId,
+        client: { connect: { id: clientId } },
         serviceId,
         professionalId: professionalId || null,
         start: dStart,
