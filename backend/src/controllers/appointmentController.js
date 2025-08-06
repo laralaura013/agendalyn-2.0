@@ -82,8 +82,7 @@ export const createAppointment = async (req, res) => {
         company: { connect: { id: companyId } },
         client: { connect: { id: clientId } },
         service: { connect: { id: serviceId } },
-        user: { connect: { id: professionalId } }, // 👈 linha adicionada
-        professional: { connect: { id: professionalId } },
+        user: { connect: { id: professionalId } }, // ✅ Linha correta
         start: dStart,
         end: dEnd,
         notes: notes || '',
