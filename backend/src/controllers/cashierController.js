@@ -1,7 +1,4 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
 // OBTER STATUS do Caixa
 export const getCashierStatus = async (req, res) => {
   try {

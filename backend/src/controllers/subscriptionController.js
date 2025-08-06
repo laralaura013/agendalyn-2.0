@@ -1,8 +1,6 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 
-const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // CRIAR SESSÃO DE CHECKOUT

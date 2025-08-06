@@ -1,8 +1,5 @@
 // ✅ ARQUIVO: src/controllers/waitlistController.js
 import prisma from '../prismaClient.js';
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
-
 /**
  * GET /waitlist
  * Lista todos os registros da empresa logada (req.company.id)

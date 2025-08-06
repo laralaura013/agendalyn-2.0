@@ -1,7 +1,4 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
 // --- FUNÇÃO LISTAR ATUALIZADA COM DEBUG ---
 export const listAnamnesisForms = async (req, res) => {
     console.log("--- DEBUG: 1. Entrou na função listAnamnesisForms ---");

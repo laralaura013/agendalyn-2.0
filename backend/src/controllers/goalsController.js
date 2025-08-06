@@ -1,8 +1,5 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
 import { startOfMonth, endOfMonth } from 'date-fns';
-
-const prisma = new PrismaClient();
 
 // --- FUNÇÃO LISTAR ATUALIZADA COM A CORREÇÃO ---
 export const listGoals = async (req, res) => {

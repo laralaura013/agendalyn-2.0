@@ -1,7 +1,4 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
 // Listar todos os produtos
 export const listProducts = async (req, res) => {
   try {

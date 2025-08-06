@@ -1,7 +1,4 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
 // Helper: Prisma Decimal -> number (ou Number() seguro)
 const toNumber = (v) =>
   v && typeof v === 'object' && typeof v.toNumber === 'function'

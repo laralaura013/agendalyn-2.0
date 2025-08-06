@@ -1,10 +1,7 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { addDays } from 'date-fns';
-
-const prisma = new PrismaClient();
 
 export const register = async (req, res) => {
   try {

@@ -1,8 +1,5 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
 import { parseISO, startOfDay, endOfDay } from 'date-fns';
-
-const prisma = new PrismaClient();
 
 export const getCommissionReport = async (req, res) => {
     try {

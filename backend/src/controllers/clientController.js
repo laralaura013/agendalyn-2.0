@@ -1,8 +1,4 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
 // LISTAR CLIENTES (admin)
 export const listClients = async (req, res) => {
   try {

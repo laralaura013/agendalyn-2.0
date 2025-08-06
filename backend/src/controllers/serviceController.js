@@ -1,7 +1,4 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
 // LISTAR Serviços
 export const listServices = async (req, res) => {
   try {

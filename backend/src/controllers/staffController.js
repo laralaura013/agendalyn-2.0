@@ -1,8 +1,5 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
 
 // Listar Colaboradores
 export const listStaff = async (req, res) => {

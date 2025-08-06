@@ -1,7 +1,4 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
 // Buscar o perfil da empresa logada
 export const getCompanyProfile = async (req, res) => {
   try {

@@ -1,11 +1,8 @@
 import prisma from '../prismaClient.js';
-import { PrismaClient } from '@prisma/client';
 import {
   startOfDay, endOfDay, parseISO, addMinutes, format
 } from 'date-fns';
 import { sendAppointmentConfirmationEmail } from '../services/emailService.js';
-
-const prisma = new PrismaClient();
 
 // Dados públicos da empresa para a tela de agendamento
 export const getBookingPageData = async (req, res) => {
