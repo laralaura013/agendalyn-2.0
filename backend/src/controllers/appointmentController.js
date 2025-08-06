@@ -33,28 +33,41 @@ export const listAppointments = async (req, res) => {
  */
 export const createAppointment = async (req, res) => {
   try {
-    const companyId = req.company.id;
-    const { clientId, serviceId, userId, start, end, notes } = req.body;
+    const companyId = req.company?.id;
+    const { clientId, serviceId, professionalId, start, end, notes } = req.body || {};
 
-    if (!clientId || !serviceId || !userId || !start || !end) {
-      return res.status(400).json({ message: 'Campos obrigatórios ausentes.' });
+    const missing = [];
+    if (!companyId) missing.push('companyId (do token)');
+    if (!clientId) missing.push('clientId');
+    if (!serviceId) missing.push('serviceId');
+    if (!start) missing.push('start');
+    if (!end) missing.push('end');
+
+    const dStart = new Date(start);
+    const dEnd = new Date(end);
+    if (isNaN(dStart.getTime())) missing.push('start inválido (formato ISO)');
+    if (isNaN(dEnd.getTime())) missing.push('end inválido (formato ISO)');
+
+    if (missing.length) {
+      return res.status(400).json({
+        message: 'Dados inválidos para agendamento.',
+        missing,
+      });
     }
 
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const dateOnly = new Date(startDate.toISOString().split('T')[0]);
+    const dateOnly = new Date(dStart.toISOString().split('T')[0]);
 
-    // ⛔ Verifica conflito com bloqueios
+    // Verifica conflito com bloqueios
     const conflict = await prisma.scheduleBlock.findFirst({
       where: {
         companyId,
         OR: [
-          { professionalId: userId },
+          { professionalId: professionalId },
           { professionalId: null }, // bloqueio geral
         ],
         date: dateOnly,
-        startTime: { lt: endDate.toTimeString().slice(0, 5) },
-        endTime: { gt: startDate.toTimeString().slice(0, 5) },
+        startTime: { lt: dEnd.toTimeString().slice(0, 5) },
+        endTime: { gt: dStart.toTimeString().slice(0, 5) },
       },
     });
 
@@ -64,22 +77,23 @@ export const createAppointment = async (req, res) => {
       });
     }
 
-    const newAppointment = await prisma.appointment.create({
+    const created = await prisma.appointment.create({
       data: {
         companyId,
         clientId,
         serviceId,
-        userId,
-        start: startDate,
-        end: endDate,
+        professionalId: professionalId || null,
+        start: dStart,
+        end: dEnd,
         notes: notes || '',
+        status: 'SCHEDULED',
       },
     });
 
-    res.status(201).json(newAppointment);
-  } catch (err) {
-    console.error('Erro ao criar agendamento:', err);
-    res.status(500).json({ message: 'Erro interno ao criar agendamento.' });
+    return res.status(201).json(created);
+  } catch (e) {
+    console.error('Erro ao criar agendamento:', e);
+    return res.status(500).json({ message: e.message });
   }
 };
 
@@ -123,6 +137,7 @@ export const updateAppointment = async (req, res) => {
 
 /**
  * DELETE /api/appointments/:id
+ * Exclui um agendamento existente
  */
 export const deleteAppointment = async (req, res) => {
   try {
