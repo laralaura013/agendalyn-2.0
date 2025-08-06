@@ -1,6 +1,6 @@
 import prisma from "../prismaClient.js";
 
-// "YYYY-MM-DD" -> Date UTC 00:00
+// Converte string "YYYY-MM-DD" para Date UTC
 function parseDateOnly(dateStr) {
   const [y, m, d] = String(dateStr).split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
@@ -34,7 +34,11 @@ export async function listBlocks(req, res) {
     const blocks = await prisma.scheduleBlock.findMany({
       where,
       orderBy: [{ date: "asc" }, { startTime: "asc" }],
-      include: { professional: { select: { id: true, name: true } } },
+      include: {
+        professional: {
+          select: { id: true, name: true },
+        },
+      },
     });
 
     return res.json(blocks);
@@ -46,25 +50,44 @@ export async function listBlocks(req, res) {
 
 /**
  * POST /api/agenda/blocks
- * body: { professionalId?, date: "YYYY-MM-DD", start: "HH:mm", end: "HH:mm", reason? }
+ * Body: { professionalId?, date: "YYYY-MM-DD", start/startTime: "HH:mm", end/endTime: "HH:mm", reason? }
  */
 export async function createBlock(req, res) {
   try {
     const companyId = req.company?.id || req.user?.companyId;
     if (!companyId) return res.status(400).json({ message: "Empresa não identificada." });
 
-    const { professionalId, date, start, end, reason } = req.body;
+    const {
+      professionalId,
+      date,
+      start,
+      startTime,
+      end,
+      endTime,
+      reason,
+    } = req.body;
 
-    if (!date || !start || !end) {
-      return res.status(400).json({ message: "Campos obrigatórios: date, start, end." });
+    const finalStart = start || startTime;
+    const finalEnd = end || endTime;
+
+    if (!date || !finalStart || !finalEnd) {
+      return res.status(400).json({
+        message: "Campos obrigatórios: date, start/end.",
+        required: ["date", "start", "end"],
+      });
     }
 
     const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
-    if (!hhmm.test(start) || !hhmm.test(end)) {
-      return res.status(400).json({ message: "Horário inválido. Use HH:mm." });
+    if (!hhmm.test(finalStart) || !hhmm.test(finalEnd)) {
+      return res.status(400).json({ message: "Horário inválido. Use o formato HH:mm." });
     }
-    if (start >= end) {
-      return res.status(400).json({ message: "Horário inicial deve ser menor que o final." });
+
+    if (finalStart >= finalEnd) {
+      return res.status(400).json({
+        message: "Horário inicial deve ser menor que o final.",
+        start: finalStart,
+        end: finalEnd,
+      });
     }
 
     const created = await prisma.scheduleBlock.create({
@@ -72,8 +95,8 @@ export async function createBlock(req, res) {
         companyId,
         professionalId: professionalId || null,
         date: parseDateOnly(date),
-        startTime: start,
-        endTime: end,
+        startTime: finalStart,
+        endTime: finalEnd,
         reason: reason || null,
       },
     });
@@ -95,10 +118,18 @@ export async function deleteBlock(req, res) {
 
     const { id } = req.params;
 
-    const block = await prisma.scheduleBlock.findFirst({ where: { id, companyId } });
-    if (!block) return res.status(404).json({ message: "Bloqueio não encontrado." });
+    const block = await prisma.scheduleBlock.findFirst({
+      where: { id, companyId },
+    });
 
-    await prisma.scheduleBlock.delete({ where: { id } });
+    if (!block) {
+      return res.status(404).json({ message: "Bloqueio não encontrado." });
+    }
+
+    await prisma.scheduleBlock.delete({
+      where: { id },
+    });
+
     return res.status(204).send();
   } catch (err) {
     console.error("deleteBlock error:", err);
