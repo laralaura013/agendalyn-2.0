@@ -2,14 +2,28 @@ import prisma from '../prismaClient.js';
 
 /**
  * GET /api/appointments
- * Lista todos os agendamentos da empresa
+ * Lista os agendamentos da empresa com filtros
+ * Query: professionalId?, date_from?, date_to?
  */
 export const listAppointments = async (req, res) => {
   try {
+    const companyId = req.company.id;
+    const { professionalId, date_from, date_to } = req.query;
+
+    const where = { companyId };
+
+    if (professionalId) {
+      where.userId = professionalId;
+    }
+
+    if (date_from || date_to) {
+      where.start = {};
+      if (date_from) where.start.gte = new Date(date_from);
+      if (date_to) where.start.lte = new Date(date_to);
+    }
+
     const appointments = await prisma.appointment.findMany({
-      where: {
-        companyId: req.company.id,
-      },
+      where,
       include: {
         client: true,
         service: true,
@@ -82,7 +96,7 @@ export const createAppointment = async (req, res) => {
         company: { connect: { id: companyId } },
         client: { connect: { id: clientId } },
         service: { connect: { id: serviceId } },
-        user: { connect: { id: professionalId } }, // ✅ Linha correta
+        user: { connect: { id: professionalId } },
         start: dStart,
         end: dEnd,
         notes: notes || '',
