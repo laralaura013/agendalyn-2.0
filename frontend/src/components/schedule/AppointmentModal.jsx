@@ -19,7 +19,7 @@ const AppointmentModal = ({ isOpen, onClose, event, slot, clients, services, sta
       setFormData({
         clientId: event.clientId || '',
         serviceId: event.serviceId || '',
-        professionalId: event.professionalId || '',
+        professionalId: event.userId || '', // Corrigido para event.userId
         start: new Date(event.start),
         end: new Date(event.end),
         notes: event.notes || '',
@@ -58,10 +58,11 @@ const AppointmentModal = ({ isOpen, onClose, event, slot, clients, services, sta
     const payload = {
       clientId: formData.clientId,
       serviceId: formData.serviceId,
-      professionalId: formData.professionalId || null,
+      userId: formData.professionalId || null, // ✅ Corrigido aqui
       start: formData.start.toISOString(),
       end: formData.end.toISOString(),
       notes: formData.notes || '',
+      status: formData.status || 'SCHEDULED',
     };
 
     try {
@@ -174,7 +175,7 @@ const AppointmentModal = ({ isOpen, onClose, event, slot, clients, services, sta
           </select>
         </div>
 
-        {/* Status (visível apenas ao editar) */}
+        {/* Status (somente em edição) */}
         {event && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
