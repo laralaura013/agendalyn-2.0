@@ -29,7 +29,7 @@ import {
  * - POST /agenda/blocks  { professionalId, date:'YYYY-MM-DD', startTime:'HH:mm', endTime:'HH:mm', reason }
  * - DELETE /agenda/blocks/:id
  *
- * - GET  /public/available-slots?professionalId&date&duration=30  (retorna ["HH:mm"] ou [{time:"HH:mm"}])
+ * - GET  /public/available-slots?professionalId&date&duration=30
  * - GET  /waitlist
  */
 
@@ -69,7 +69,7 @@ const Schedule = () => {
 
   // ====== APIs ======
 
-  // Agendamentos
+  // Agendamentos (com cache-busting e filtro de status cancelado/deletado)
   const fetchAppointments = useCallback(async () => {
     try {
       const params = {};
@@ -85,8 +85,15 @@ const Schedule = () => {
         params.date_to = toYMD(endOfMonth(date));
       }
 
-      const response = await api.get("/appointments", { params });
-      const formatted = (response.data || []).map((apt) => ({
+      // quebra cache de proxies/CDNs
+      const response = await api.get("/appointments", { params: { ...params, _: Date.now() } });
+
+      const rows = (response.data || []).filter((apt) => {
+        const st = String(apt.status || "").toUpperCase();
+        return !["CANCELED", "DELETED", "REMOVED"].includes(st);
+      });
+
+      const formatted = rows.map((apt) => ({
         id: apt.id,
         title: `${apt.client?.name ?? "Cliente"} - ${apt.service?.name ?? "Serviço"}`,
         start: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
@@ -116,7 +123,7 @@ const Schedule = () => {
         params.date_to = toYMD(endOfMonth(date));
       }
 
-      const res = await api.get("/agenda/blocks", { params });
+      const res = await api.get("/agenda/blocks", { params: { ...params, _: Date.now() } });
       setBlocks(res.data || []);
     } catch (e) {
       console.error("Erro ao carregar bloqueios:", e);
@@ -124,7 +131,7 @@ const Schedule = () => {
     }
   }, [date, view, selectedPro]);
 
-  // Horários disponíveis (com fallback por serviceId)
+  // Horários disponíveis
   const fetchAvailableSlots = useCallback(
     async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES) => {
       try {
@@ -135,7 +142,7 @@ const Schedule = () => {
 
         // 1ª tentativa: com duration
         let res = await api.get("/public/available-slots", {
-          params: { ...baseParams, duration: minutes },
+          params: { ...baseParams, duration: minutes, _: Date.now() },
           headers: { "X-Public": "1" },
         });
 
@@ -146,7 +153,7 @@ const Schedule = () => {
         // 2ª tentativa se vier vazio: com serviceId
         if ((!items || items.length === 0) && services?.[0]?.id) {
           res = await api.get("/public/available-slots", {
-            params: { ...baseParams, serviceId: services[0].id },
+            params: { ...baseParams, serviceId: services[0].id, _: Date.now() },
             headers: { "X-Public": "1" },
           });
           const items2 = (res.data || [])
@@ -170,7 +177,7 @@ const Schedule = () => {
   const fetchWaitlist = useCallback(async () => {
     try {
       setWaitlistLoading(true);
-      const res = await api.get("/waitlist");
+      const res = await api.get("/waitlist", { params: { _: Date.now() } });
       setWaitlist(res.data || []);
     } catch (e) {
       console.error("Erro ao carregar lista de espera:", e);
@@ -188,9 +195,9 @@ const Schedule = () => {
         await Promise.all([
           fetchAppointments(),
           fetchBlocks(),
-          api.get("/clients").then((r) => setClients(r.data || [])),
-          api.get("/services").then((r) => setServices(r.data || [])),
-          api.get("/staff").then((r) => setStaff(r.data || [])),
+          api.get("/clients", { params: { _: Date.now() } }).then((r) => setClients(r.data || [])),
+          api.get("/services", { params: { _: Date.now() } }).then((r) => setServices(r.data || [])),
+          api.get("/staff", { params: { _: Date.now() } }).then((r) => setStaff(r.data || [])),
         ]);
       } catch {
         toast.error("Erro ao carregar dados da agenda.");
@@ -267,11 +274,12 @@ const Schedule = () => {
     [fetchBlocks]
   );
 
-  const handleSave = async (formData) => {
-    const isEditing = selectedEvent && selectedEvent.id;
+  const handleSave = async (payload) => {
+    const isEditing = !!(selectedEvent && selectedEvent.id);
+
     const p = isEditing
-      ? api.put(`/appointments/${selectedEvent.id}`, formData)
-      : api.post("/appointments", formData);
+      ? api.put(`/appointments/${selectedEvent.id}`, payload)
+      : api.post("/appointments", payload);
 
     toast.promise(p, {
       loading: "Salvando agendamento...",
@@ -280,21 +288,28 @@ const Schedule = () => {
         setIsModalOpen(false);
         return `Agendamento ${isEditing ? "atualizado" : "criado"} com sucesso!`;
       },
-      error: "Erro ao salvar o agendamento.",
+      error: (e) => e?.response?.data?.message || "Erro ao salvar o agendamento.",
     });
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir este agendamento?")) return;
 
+    // Remoção otimista na UI
+    setEvents((prev) => prev.filter((ev) => ev.id !== id));
+
     toast.promise(api.delete(`/appointments/${id}`), {
       loading: "Excluindo agendamento...",
       success: () => {
-        fetchAppointments();
+        fetchAppointments(); // reforça atualização
         setIsModalOpen(false);
         return "Agendamento excluído com sucesso!";
       },
-      error: "Erro ao excluir agendamento.",
+      error: (e) => {
+        // rollback simples
+        fetchAppointments();
+        return e?.response?.data?.message || "Erro ao excluir agendamento.";
+      },
     });
   };
 
@@ -334,7 +349,7 @@ const Schedule = () => {
     return formatter.format(date);
   }, [date, view]);
 
-  // Converter bloqueios em eventos do calendário (usando setHours local)
+  // Converter bloqueios em eventos do calendário
   const blockEvents = useMemo(() => {
     return (blocks || []).map((b) => {
       const base = new Date(b.date);
@@ -577,13 +592,14 @@ const Schedule = () => {
         <AppointmentModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onSave={handleSave}
-          onDelete={handleDelete}
           event={selectedEvent}
           slot={selectedSlot}
           clients={clients}
           services={services}
           staff={staff}
+          fetchAppointments={fetchAppointments}
+          onSave={handleSave}
+          onDelete={handleDelete}
         />
       )}
 
@@ -870,16 +886,6 @@ function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
                 {(it.client?.phone ?? it.phone) || ""} {it.pref ? `• Preferência: ${it.pref}` : ""}
               </div>
               <div className="flex items-center gap-2 mt-2">
-                {/* Exemplo de ação futura:
-                <button
-                  className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
-                  onClick={async () => {
-                    await api.post(`/waitlist/${it.id}/notify`);
-                    toast.success("Cliente notificado!");
-                  }}
-                >
-                  Notificar
-                </button> */}
                 <button className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700" onClick={onAgendar}>
                   Agendar
                 </button>

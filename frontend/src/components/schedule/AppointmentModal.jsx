@@ -3,7 +3,18 @@ import Modal from '../dashboard/Modal';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const AppointmentModal = ({ isOpen, onClose, event, slot, clients, services, staff, fetchAppointments }) => {
+const AppointmentModal = ({
+  isOpen,
+  onClose,
+  event,
+  slot,
+  clients = [],
+  services = [],
+  staff = [],
+  fetchAppointments,    // opcional (para dar refresh)
+  onSave,               // opcional (se quiser que o Schedule controle salvar)
+  onDelete,             // opcional (se quiser que o Schedule controle excluir)
+}) => {
   const [formData, setFormData] = useState({
     clientId: '',
     serviceId: '',
@@ -19,77 +30,87 @@ const AppointmentModal = ({ isOpen, onClose, event, slot, clients, services, sta
       setFormData({
         clientId: event.clientId || '',
         serviceId: event.serviceId || '',
-        professionalId: event.userId || '', // Corrigido para event.userId
+        professionalId: event.userId || '', // ✅ mapeia para userId no payload
         start: new Date(event.start),
         end: new Date(event.end),
         notes: event.notes || '',
         status: event.status || 'SCHEDULED',
       });
-    } else if (slot) {
-      const start = new Date(slot.start);
-      const end = new Date(start.getTime() + 60 * 60 * 1000); // 1h depois
-      setFormData(prev => ({ ...prev, start, end }));
+    } else {
+      const start = slot?.start ? new Date(slot.start) : new Date();
+      const end = slot?.end ? new Date(slot.end) : new Date(start.getTime() + 60 * 60 * 1000);
+      setFormData((prev) => ({ ...prev, start, end }));
     }
   }, [event, slot]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((p) => ({ ...p, [name]: value }));
   };
 
   const handleDateChange = (e) => {
-    const date = e.target.value;
-    const time = formData.start.toTimeString().split(' ')[0];
+    const date = e.target.value; // YYYY-MM-DD
+    const time = formData.start.toTimeString().split(' ')[0]; // HH:mm:ss
     const newStart = new Date(`${date}T${time}`);
     const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
-    setFormData(prev => ({ ...prev, start: newStart, end: newEnd }));
+    setFormData((p) => ({ ...p, start: newStart, end: newEnd }));
   };
 
   const handleTimeChange = (e) => {
-    const time = e.target.value;
-    const date = formData.start.toISOString().split('T')[0];
+    const time = e.target.value; // HH:mm
+    const date = formData.start.toISOString().split('T')[0]; // YYYY-MM-DD
     const newStart = new Date(`${date}T${time}`);
     const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
-    setFormData(prev => ({ ...prev, start: newStart, end: newEnd }));
+    setFormData((p) => ({ ...p, start: newStart, end: newEnd }));
   };
+
+  const buildPayload = () => ({
+    clientId: formData.clientId,
+    serviceId: formData.serviceId,
+    userId: formData.professionalId || null, // ✅ backend usa userId
+    start: formData.start.toISOString(),
+    end: formData.end.toISOString(),
+    notes: formData.notes || '',
+    status: formData.status || 'SCHEDULED',
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      clientId: formData.clientId,
-      serviceId: formData.serviceId,
-      userId: formData.professionalId || null, // ✅ Corrigido aqui
-      start: formData.start.toISOString(),
-      end: formData.end.toISOString(),
-      notes: formData.notes || '',
-      status: formData.status || 'SCHEDULED',
-    };
+    const payload = buildPayload();
 
     try {
-      if (event) {
+      if (onSave) {
+        await onSave(payload);
+      } else if (event) {
         await api.put(`/appointments/${event.id}`, payload);
         toast.success('Agendamento atualizado com sucesso!');
       } else {
         await api.post('/appointments', payload);
         toast.success('Agendamento criado com sucesso!');
       }
+
       fetchAppointments?.();
       onClose();
-    } catch (e) {
-      const msg = e?.response?.data?.message || 'Erro ao salvar agendamento.';
-      const missing = e?.response?.data?.missing;
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Erro ao salvar agendamento.';
+      const missing = err?.response?.data?.missing;
       toast.error(missing ? `${msg}: ${missing.join(', ')}` : msg);
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      await api.delete(`/appointments/${id}`);
-      toast.success('Agendamento excluído com sucesso!');
-      fetchAppointments?.();
+      if (onDelete) {
+        await onDelete(id);
+      } else {
+        await api.delete(`/appointments/${id}`);
+        toast.success('Agendamento excluído com sucesso!');
+        fetchAppointments?.();
+      }
       onClose();
     } catch (e) {
-      toast.error('Erro ao excluir agendamento.');
+      const msg = e?.response?.data?.message || 'Erro ao excluir agendamento.';
+      toast.error(msg);
     }
   };
 
@@ -111,7 +132,7 @@ const AppointmentModal = ({ isOpen, onClose, event, slot, clients, services, sta
             required
           >
             <option value="">Selecione um cliente</option>
-            {clients.map(c => (
+            {clients.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -152,7 +173,7 @@ const AppointmentModal = ({ isOpen, onClose, event, slot, clients, services, sta
             required
           >
             <option value="">Selecione um serviço</option>
-            {services.map(s => (
+            {services.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
@@ -169,7 +190,7 @@ const AppointmentModal = ({ isOpen, onClose, event, slot, clients, services, sta
             required
           >
             <option value="">Selecione um profissional</option>
-            {staff.map(s => (
+            {staff.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>

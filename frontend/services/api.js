@@ -7,30 +7,30 @@ const api = axios.create({
 });
 
 // Interceptor para aplicar token dinamicamente com base na rota
-api.interceptors.request.use((config) => {
-  const clientToken = localStorage.getItem('clientToken');
-  const adminToken = localStorage.getItem('token');
+api.interceptors.request.use(
+  (config) => {
+    const clientToken = localStorage.getItem('clientToken');
+    const adminToken = localStorage.getItem('token');
 
-  if (config.url?.startsWith('/portal') && clientToken) {
-    config.headers.Authorization = `Bearer ${clientToken}`;
+    // Evita cache agressivo (ajuda depois de excluir/editar)
+    config.headers['Cache-Control'] = 'no-cache';
+    config.headers['Pragma'] = 'no-cache';
 
-    // Debug temporário – remova após testes
-    console.log('[CLIENT REQUEST]');
-    console.log('URL:', config.url);
-    console.log('Authorization:', config.headers.Authorization);
+    if (config.url?.startsWith('/portal') && clientToken) {
+      config.headers.Authorization = `Bearer ${clientToken}`;
 
-  } else if (!config.url?.startsWith('/portal') && adminToken) {
-    config.headers.Authorization = `Bearer ${adminToken}`;
+      // Debug temporário – remova após testes
+      // console.log('[CLIENT REQUEST]', config.url, config.headers.Authorization);
+    } else if (!config.url?.startsWith('/portal') && adminToken) {
+      config.headers.Authorization = `Bearer ${adminToken}`;
 
-    // Debug temporário – remova após testes
-    console.log('[ADMIN REQUEST]');
-    console.log('URL:', config.url);
-    console.log('Authorization:', config.headers.Authorization);
-  }
+      // Debug temporário – remova após testes
+      // console.log('[ADMIN REQUEST]', config.url, config.headers.Authorization);
+    }
 
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export default api;
