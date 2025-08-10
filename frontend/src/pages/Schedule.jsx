@@ -136,7 +136,7 @@ const Schedule = () => {
         // 1ª tentativa: usando duration
         let res = await api.get("/public/available-slots", {
           params: { ...baseParams, duration: minutes },
-          headers: { "X-Public": "1" },
+          
         });
 
         const items = (res.data || [])
@@ -147,7 +147,7 @@ const Schedule = () => {
         if ((!items || items.length === 0) && services?.[0]?.id) {
           res = await api.get("/public/available-slots", {
             params: { ...baseParams, serviceId: services[0].id },
-            headers: { "X-Public": "1" },
+            
           });
           const items2 = (res.data || [])
             .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time))
@@ -919,3 +919,4 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
     </form>
   );
 }
+

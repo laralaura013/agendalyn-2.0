@@ -1,36 +1,81 @@
+// src/services/api.js
 import axios from 'axios';
 
-const API_URL = 'https://agendalyn-20-production.up.railway.app/api';
+const API_URL =
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+  'https://agendalyn-20-production.up.railway.app/api';
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 15000,
 });
+
+// helper: garante objeto headers
+function ensureHeaders(config) {
+  if (!config.headers) config.headers = {};
+  return config.headers;
+}
 
 // Interceptor para aplicar token dinamicamente com base na rota
 api.interceptors.request.use(
   (config) => {
+    const headers = ensureHeaders(config);
+
+    // anti-cache (útil após criar/editar/excluir)
+    headers['Cache-Control'] = 'no-cache';
+    headers['Pragma'] = 'no-cache';
+
+    // normaliza pathname da URL
+    const urlPath = (() => {
+      if (!config.url) return '';
+      if (config.url.startsWith('http')) {
+        try {
+          return new URL(config.url).pathname || '';
+        } catch {
+          return config.url;
+        }
+      }
+      return config.url;
+    })();
+
+    const isPublic = urlPath.startsWith('/public');
+    const isPortal = urlPath.startsWith('/portal');
+
+    // nunca envie X-Public
+    delete headers['X-Public'];
+    delete headers['x-public'];
+
+    // tokens
     const clientToken = localStorage.getItem('clientToken');
     const adminToken = localStorage.getItem('token');
 
-    // Evita cache agressivo (ajuda depois de excluir/editar)
-    config.headers['Cache-Control'] = 'no-cache';
-    config.headers['Pragma'] = 'no-cache';
-
-    if (config.url?.startsWith('/portal') && clientToken) {
-      config.headers.Authorization = `Bearer ${clientToken}`;
-
-      // Debug temporário – remova após testes
-      // console.log('[CLIENT REQUEST]', config.url, config.headers.Authorization);
-    } else if (!config.url?.startsWith('/portal') && adminToken) {
-      config.headers.Authorization = `Bearer ${adminToken}`;
-
-      // Debug temporário – remova após testes
-      // console.log('[ADMIN REQUEST]', config.url, config.headers.Authorization);
+    if (isPublic) {
+      // endpoints públicos não devem levar Authorization
+      delete headers.Authorization;
+    } else if (isPortal && clientToken) {
+      headers.Authorization = `Bearer ${clientToken}`;
+    } else if (!isPortal && adminToken) {
+      headers.Authorization = `Bearer ${adminToken}`;
+    } else {
+      delete headers.Authorization;
     }
 
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// (Opcional) Interceptor de resposta para 401/403
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    // exemplo:
+    // if (err?.response?.status === 401) {
+    //   localStorage.removeItem('token');
+    //   localStorage.removeItem('clientToken');
+    // }
+    return Promise.reject(err);
+  }
 );
 
 export default api;

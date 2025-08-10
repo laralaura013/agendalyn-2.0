@@ -1,3 +1,4 @@
+// server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -30,34 +31,50 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// log origem (debug)
-app.use((req, res, next) => {
-  console.log('🌐 Origem da requisição:', req.headers.origin);
+/* ------------------------------- Logs úteis ------------------------------- */
+app.use((req, _res, next) => {
+  // Origem ajuda a debugar CORS em produção
+  console.log('🌐 Origin:', req.headers.origin || '—', '| URL:', req.method, req.originalUrl);
   next();
 });
 
-// preflight cors railway
+/* -------------------------- Preflight CORS robusto ------------------------- */
+/**
+ * Importante:
+ * - Colocar ANTES do cors()
+ * - Repetir os métodos e headers que o navegador solicitar
+ * - Não usar "*" quando credentials: true
+ */
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    const reqOrigin  = req.headers.origin || 'https://frontlyn.netlify.app';
+    const reqHeaders = req.headers['access-control-request-headers'] || 'Content-Type, Authorization';
+
+    res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+    res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', reqHeaders);
+
     return res.sendStatus(204);
   }
   next();
 });
 
-// CORS
-app.use(cors({ origin: true, credentials: true }));
+/* ---------------------------------- CORS ---------------------------------- */
+app.use(cors({
+  origin: true,                  // reflete o Origin recebido
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
 app.use(express.json());
 
-// webhooks primeiro
+/* ----------------------------- Webhooks primeiro ---------------------------- */
 app.use('/api/webhooks', webhookRoutes);
 
-// rotas
+/* ---------------------------------- Rotas --------------------------------- */
 app.use('/api/portal', clientPortalRoutes);
-app.use('/api/public', publicRoutes);          // sem protect
+app.use('/api/public', publicRoutes); // público (sem protect)
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/company', companyRoutes);
@@ -79,10 +96,11 @@ app.use('/api/commissions', commissionRoutes);
 app.use('/api/agenda/blocks', blockRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 
-// health
+/* --------------------------------- Health --------------------------------- */
 app.get('/api', (_req, res) => res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' }));
 app.get('/', (_req, res) => res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' }));
 
+/* --------------------------------- Server --------------------------------- */
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });

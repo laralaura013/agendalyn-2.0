@@ -179,7 +179,7 @@ function WaitlistPage() {
         // 1ª tentativa: com duration
         let res = await api.get("/public/available-slots", {
           params: { ...baseParams, duration: minutes },
-          headers: { "X-Public": "1" },
+          
         });
 
         const items = (res.data || [])
@@ -191,7 +191,7 @@ function WaitlistPage() {
         if ((!items || items.length === 0) && fallbackServiceId) {
           res = await api.get("/public/available-slots", {
             params: { ...baseParams, serviceId: fallbackServiceId },
-            headers: { "X-Public": "1" },
+            
           });
           const items2 = (res.data || [])
             .map((s) => (typeof s === "string" ? s : s?.time))
@@ -859,3 +859,4 @@ function SlotsContent({
 }
 
 export default WaitlistPage;
+
