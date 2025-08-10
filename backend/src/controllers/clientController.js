@@ -1,11 +1,12 @@
 import prisma from '../prismaClient.js';
+
 // LISTAR CLIENTES (admin)
 export const listClients = async (req, res) => {
   try {
     const companyId = req.company.id;
 
     const clients = await prisma.client.findMany({
-      where: { companyId }, // ⛔ isActive removido
+      where: { companyId },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -23,15 +24,10 @@ export const getClientById = async (req, res) => {
     const companyId = req.company.id;
 
     const client = await prisma.client.findFirst({
-      where: {
-        id,
-        companyId,
-      },
+      where: { id, companyId },
     });
 
-    if (!client) {
-      return res.status(404).json({ message: 'Cliente não encontrado.' });
-    }
+    if (!client) return res.status(404).json({ message: 'Cliente não encontrado.' });
 
     res.status(200).json(client);
   } catch (error) {
@@ -82,9 +78,7 @@ export const updateClient = async (req, res) => {
       },
     });
 
-    if (result.count === 0) {
-      return res.status(404).json({ message: 'Cliente não encontrado.' });
-    }
+    if (result.count === 0) return res.status(404).json({ message: 'Cliente não encontrado.' });
 
     res.status(200).json({ message: 'Cliente atualizado com sucesso.' });
   } catch (error) {
@@ -103,9 +97,7 @@ export const deleteClient = async (req, res) => {
       where: { id, companyId },
     });
 
-    if (result.count === 0) {
-      return res.status(404).json({ message: 'Cliente não encontrado.' });
-    }
+    if (result.count === 0) return res.status(404).json({ message: 'Cliente não encontrado.' });
 
     res.status(200).json({ message: 'Cliente deletado com sucesso.' });
   } catch (error) {

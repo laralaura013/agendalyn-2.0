@@ -3,8 +3,8 @@ import { getBookingPageData, getAvailableSlots, createPublicAppointment } from '
 
 const router = express.Router();
 
-router.get('/booking-page/:companyId', getBookingPageData); // A rota está aqui
-router.get('/available-slots', getAvailableSlots);
+router.get('/booking-page/:companyId', getBookingPageData);
+router.get('/available-slots', getAvailableSlots);   // público (sem protect)
 router.post('/create-appointment', createPublicAppointment);
 
 export default router;

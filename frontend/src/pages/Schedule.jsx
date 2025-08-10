@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 /**
- * Rotas usadas (ajuste se seu back for diferente):
+ * Rotas usadas:
  * - GET  /appointments?professionalId&date | date_from&date_to
  * - POST /appointments
  * - PUT  /appointments/:id
@@ -29,14 +29,13 @@ import {
  * - POST /agenda/blocks  { professionalId, date:'YYYY-MM-DD', startTime:'HH:mm', endTime:'HH:mm', reason }
  * - DELETE /agenda/blocks/:id
  *
- * - GET  /public/available-slots?professionalId&date&duration=30
+ * - GET  /public/available-slots?professionalId&date&duration=30  (retorna ["HH:mm"] ou [{formatted:"HH:mm"}] ou {time:"HH:mm"})
  * - GET  /waitlist
  */
 
 const DEFAULT_SLOT_MINUTES = 30;
 
 const Schedule = () => {
-  // ----- Estados principais -----
   const [events, setEvents] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -46,14 +45,12 @@ const Schedule = () => {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ----- Bloqueios / filtros -----
   const [blocks, setBlocks] = useState([]);
-  const [view, setView] = useState("day"); // 'day' | 'week' | 'month'
+  const [view, setView] = useState("day");
   const [date, setDate] = useState(() => new Date());
   const [selectedPro, setSelectedPro] = useState(null);
   const [blockEnabled, setBlockEnabled] = useState(false);
 
-  // ----- Modais -----
   const [openSlots, setOpenSlots] = useState(false);
   const [openApptList, setOpenApptList] = useState(false);
   const [openWaitlist, setOpenWaitlist] = useState(false);
@@ -61,15 +58,13 @@ const Schedule = () => {
   const [openProducts, setOpenProducts] = useState(true);
   const [openLegend, setOpenLegend] = useState(true);
 
-  // ----- Estados auxiliares -----
   const [slotsLoading, setSlotsLoading] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState([]); // ["07:00","07:30",...]
+  const [availableSlots, setAvailableSlots] = useState([]); // ["07:00",...]
   const [waitlist, setWaitlist] = useState([]);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
 
   // ====== APIs ======
 
-  // Agendamentos (com cache-busting e filtro de status cancelado/deletado)
   const fetchAppointments = useCallback(async () => {
     try {
       const params = {};
@@ -85,7 +80,6 @@ const Schedule = () => {
         params.date_to = toYMD(endOfMonth(date));
       }
 
-      // quebra cache de proxies/CDNs
       const response = await api.get("/appointments", { params: { ...params, _: Date.now() } });
 
       const rows = (response.data || []).filter((apt) => {
@@ -107,7 +101,6 @@ const Schedule = () => {
     }
   }, [date, view, selectedPro]);
 
-  // Bloqueios
   const fetchBlocks = useCallback(async () => {
     try {
       const params = {};
@@ -131,33 +124,33 @@ const Schedule = () => {
     }
   }, [date, view, selectedPro]);
 
-  // Horários disponíveis
+  // >>> HORÁRIOS DISPONÍVEIS (robusto p/ formatted|time e com fallback serviceId)
   const fetchAvailableSlots = useCallback(
     async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES) => {
       try {
         setSlotsLoading(true);
 
-        const baseParams = { date: toYMD(targetDate) };
+        const baseParams = { date: toYMD(targetDate), _: Date.now() };
         if (proId) baseParams.professionalId = proId;
 
-        // 1ª tentativa: com duration
+        // 1ª tentativa: usando duration
         let res = await api.get("/public/available-slots", {
-          params: { ...baseParams, duration: minutes, _: Date.now() },
+          params: { ...baseParams, duration: minutes },
           headers: { "X-Public": "1" },
         });
 
         const items = (res.data || [])
-          .map((s) => (typeof s === "string" ? s : s?.time))
+          .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time))
           .filter(Boolean);
 
-        // 2ª tentativa se vier vazio: com serviceId
+        // 2ª tentativa: usar serviceId caso tenha vindo vazio
         if ((!items || items.length === 0) && services?.[0]?.id) {
           res = await api.get("/public/available-slots", {
-            params: { ...baseParams, serviceId: services[0].id, _: Date.now() },
+            params: { ...baseParams, serviceId: services[0].id },
             headers: { "X-Public": "1" },
           });
           const items2 = (res.data || [])
-            .map((s) => (typeof s === "string" ? s : s?.time))
+            .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time))
             .filter(Boolean);
           setAvailableSlots(items2);
         } else {
@@ -173,7 +166,6 @@ const Schedule = () => {
     [date, selectedPro, services]
   );
 
-  // Waitlist
   const fetchWaitlist = useCallback(async () => {
     try {
       setWaitlistLoading(true);
@@ -187,7 +179,6 @@ const Schedule = () => {
     }
   }, []);
 
-  // Load inicial
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -208,24 +199,19 @@ const Schedule = () => {
     load();
   }, [fetchAppointments, fetchBlocks]);
 
-  // Profissional padrão quando staff carregar
   useEffect(() => {
     if (!selectedPro && staff?.length) setSelectedPro(staff[0]?.id);
   }, [staff, selectedPro]);
 
-  // Recarregar quando filtros mudam
   useEffect(() => {
     fetchBlocks();
     fetchAppointments();
   }, [fetchBlocks, fetchAppointments]);
 
-  // ====== Handlers ======
-
   const handleSelectSlot = useCallback(
     (slotInfo) => {
       const { start, end } = slotInfo;
 
-      // Impede agendar dentro de bloqueio
       const conflito = (blocks || []).some((b) => {
         const base = new Date(b.date);
         const [sh, sm] = (b.startTime || "00:00").split(":").map(Number);
@@ -252,7 +238,6 @@ const Schedule = () => {
     (event) => {
       const data = event.resource;
 
-      // Clique em bloqueio => excluir
       if (data?.type === "BLOCK") {
         if (window.confirm("Deseja remover este bloqueio?")) {
           api
@@ -266,7 +251,6 @@ const Schedule = () => {
         return;
       }
 
-      // Evento normal (agendamento)
       setSelectedSlot(null);
       setSelectedEvent(data);
       setIsModalOpen(true);
@@ -295,18 +279,17 @@ const Schedule = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir este agendamento?")) return;
 
-    // Remoção otimista na UI
+    // Remoção otimista
     setEvents((prev) => prev.filter((ev) => ev.id !== id));
 
     toast.promise(api.delete(`/appointments/${id}`), {
       loading: "Excluindo agendamento...",
       success: () => {
-        fetchAppointments(); // reforça atualização
+        fetchAppointments();
         setIsModalOpen(false);
         return "Agendamento excluído com sucesso!";
       },
       error: (e) => {
-        // rollback simples
         fetchAppointments();
         return e?.response?.data?.message || "Erro ao excluir agendamento.";
       },
@@ -319,7 +302,6 @@ const Schedule = () => {
     setIsModalOpen(true);
   };
 
-  // Navegação de datas
   const goToday = () => setDate(new Date());
   const goPrev = () => {
     const d = new Date(date);
@@ -349,7 +331,6 @@ const Schedule = () => {
     return formatter.format(date);
   }, [date, view]);
 
-  // Converter bloqueios em eventos do calendário
   const blockEvents = useMemo(() => {
     return (blocks || []).map((b) => {
       const base = new Date(b.date);
@@ -377,7 +358,6 @@ const Schedule = () => {
 
   const combinedEvents = useMemo(() => [...events, ...blockEvents], [events, blockEvents]);
 
-  // Ações auxiliares (abrir modal a partir de listas)
   const handlePickAvailableSlot = useCallback(
     (hhmm) => {
       const [h, m] = String(hhmm).split(":").map(Number);
@@ -408,10 +388,9 @@ const Schedule = () => {
     fetchAvailableSlots(date, selectedPro);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  // ====== Render ======
   return (
     <div className="relative animate-fade-in-up p-4 max-w-7xl mx-auto">
-      {/* Toolbar */}
+      {/* toolbar */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
         <div className="flex items-center gap-2">
           <ProfessionalsSelect
@@ -455,15 +434,14 @@ const Schedule = () => {
         </div>
       </div>
 
-      {/* Cabeçalho de data */}
+      {/* header data */}
       <div className="w-full bg-white border rounded px-4 py-2 text-sm md:text-base flex items-center justify-between mb-4">
         <span className="font-medium capitalize">{pageTitle}</span>
         <span className="text-gray-500">{staff?.find((p) => p.id === selectedPro)?.name ?? ""}</span>
       </div>
 
-      {/* Grid principal */}
+      {/* grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[70vh]">
-        {/* Calendário */}
         <div className="lg:col-span-8 xl:col-span-9 bg-white border rounded overflow-hidden">
           {loading ? (
             <p className="text-sm text-gray-500 p-4">Carregando dados da agenda...</p>
@@ -480,10 +458,8 @@ const Schedule = () => {
           )}
         </div>
 
-        {/* Painel lateral */}
         <aside className="lg:col-span-4 xl:col-span-3">
           <div className="bg-white border rounded p-3 md:p-4 space-y-4">
-            {/* Bloquear horário */}
             <div className="flex items-start justify-between">
               <label className="flex items-center gap-2 select-none">
                 <input
@@ -504,7 +480,6 @@ const Schedule = () => {
               </button>
             </div>
 
-            {/* Mini calendário + ações */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <input
@@ -541,7 +516,6 @@ const Schedule = () => {
                   Lista de Agendamentos
                 </button>
 
-                {/* ✅ Lista de Espera ATIVA */}
                 <button
                   onClick={() => {
                     setOpenWaitlist(true);
@@ -555,7 +529,6 @@ const Schedule = () => {
               </div>
             </div>
 
-            {/* Produtos / Serviços */}
             <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
               <div className="space-y-2">
                 <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
@@ -570,7 +543,6 @@ const Schedule = () => {
               </div>
             </Accordion>
 
-            {/* Legenda */}
             <Accordion title="Legenda" open={openLegend} onToggle={() => setOpenLegend((v) => !v)}>
               <Legend />
             </Accordion>
@@ -578,7 +550,6 @@ const Schedule = () => {
         </aside>
       </div>
 
-      {/* Botão flutuante */}
       <button
         onClick={openEmptyModal}
         className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition btn-animated"
@@ -587,7 +558,6 @@ const Schedule = () => {
         <PlusCircle size={28} />
       </button>
 
-      {/* Modal de Agendamento */}
       {isModalOpen && (
         <AppointmentModal
           isOpen={isModalOpen}
@@ -597,13 +567,12 @@ const Schedule = () => {
           clients={clients}
           services={services}
           staff={staff}
-          fetchAppointments={fetchAppointments}
           onSave={handleSave}
           onDelete={handleDelete}
+          fetchAppointments={fetchAppointments}
         />
       )}
 
-      {/* Modais/Drawers */}
       {openSlots && (
         <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
           <SlotsModalContent
@@ -623,15 +592,9 @@ const Schedule = () => {
         </SideDrawer>
       )}
 
-      {/* ✅ Drawer da Waitlist */}
       {openWaitlist && (
         <SideDrawer title="Lista de Espera" onClose={() => setOpenWaitlist(false)}>
-          <WaitlistContent
-            items={waitlist}
-            loading={waitlistLoading}
-            onRefresh={fetchWaitlist}
-            onAgendar={handleWaitlistAgendar}
-          />
+          <WaitlistContent items={waitlist} loading={waitlistLoading} onRefresh={fetchWaitlist} onAgendar={handleWaitlistAgendar} />
         </SideDrawer>
       )}
 
@@ -645,9 +608,9 @@ const Schedule = () => {
               try {
                 await api.post("/agenda/blocks", {
                   professionalId: payload.professionalId || null,
-                  date: payload.date,       // "YYYY-MM-DD"
-                  startTime: payload.start, // backend espera startTime
-                  endTime: payload.end,     // backend espera endTime
+                  date: payload.date,
+                  startTime: payload.start,
+                  endTime: payload.end,
                   reason: payload.reason || "",
                 });
                 toast.success("Bloqueio criado com sucesso!");
@@ -667,23 +630,54 @@ const Schedule = () => {
 
 export default Schedule;
 
-/* ======================= Componentes auxiliares ======================= */
+/* ===== Auxiliares ===== */
+function formatDateInput(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function startOfWeek(d) {
+  const copy = new Date(d);
+  const day = copy.getDay();
+  const diff = (day + 6) % 7;
+  copy.setDate(copy.getDate() - diff);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+function endOfWeek(d) {
+  const s = startOfWeek(d);
+  const e = new Date(s);
+  e.setDate(s.getDate() + 6);
+  e.setHours(23, 59, 59, 999);
+  return e;
+}
+function startOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
+function endOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+function toYMD(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
+/* ====== UI auxiliares (Accordion, etc.) ===== */
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
     <div className="flex items-center gap-2">
       <span className="hidden md:block text-sm text-gray-600">Profissionais:</span>
       <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
         {(options || []).map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
+          <option key={p.id} value={p.id}>{p.name}</option>
         ))}
       </select>
     </div>
   );
 }
-
 function ViewToggle({ value, onChange }) {
   const opts = [
     { id: "day", label: "Dia" },
@@ -704,7 +698,6 @@ function ViewToggle({ value, onChange }) {
     </div>
   );
 }
-
 function Accordion({ title, open, onToggle, children }) {
   return (
     <div className="border rounded">
@@ -721,13 +714,12 @@ function ChevronRightIcon({ open }) {
     <svg className={`w-4 h-4 transition-transform ${open ? "rotate-90" : ""}`} viewBox="0 0 20 20" fill="currentColor">
       <path
         fillRule="evenodd"
-        d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+        d="M7.293 14.707a1 1 0 0 1 0-1.414L10.586 10 7.293 6.707a1 1 0 0 1 1.414-1.414l4 4a1 1 0 0 1 0 1.414l-4 4a1 1 0 0 1-1.414 0z"
         clipRule="evenodd"
       />
     </svg>
   );
 }
-
 function Legend() {
   const items = [
     { color: "bg-emerald-500", label: "Confirmado" },
@@ -746,7 +738,6 @@ function Legend() {
     </div>
   );
 }
-
 function BaseModal({ title, children, onClose }) {
   return (
     <div className="fixed inset-0 z-50">
@@ -765,7 +756,6 @@ function BaseModal({ title, children, onClose }) {
     </div>
   );
 }
-
 function SideDrawer({ title, children, onClose }) {
   return (
     <div className="fixed inset-0 z-50">
@@ -782,9 +772,6 @@ function SideDrawer({ title, children, onClose }) {
     </div>
   );
 }
-
-/* --------- Conteúdos ligados às APIs -------- */
-
 function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick }) {
   return (
     <div className="space-y-3">
@@ -796,7 +783,6 @@ function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick 
           Recarregar
         </button>
       </div>
-
       {loading ? (
         <div className="text-sm text-gray-500">Carregando horários...</div>
       ) : slots.length === 0 ? (
@@ -810,23 +796,17 @@ function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick 
           ))}
         </div>
       )}
-
-      <div className="text-xs text-gray-500">
-        Profissional: <span className="font-medium">{proId || "—"}</span>
-      </div>
+      <div className="text-xs text-gray-500">Profissional: <span className="font-medium">{proId || "—"}</span></div>
     </div>
   );
 }
-
 function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
   const [q, setQ] = useState("");
-
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
     if (!t) return events;
     return events.filter((ev) => (ev.title || "").toLowerCase().includes(t));
   }, [events, q]);
-
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -843,11 +823,7 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
       <div className="divide-y border rounded">
         {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
         {filtered.map((ev) => (
-          <button
-            key={ev.id}
-            onClick={() => onOpen?.(ev.id)}
-            className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50"
-          >
+          <button key={ev.id} onClick={() => onOpen?.(ev.id)} className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50">
             <div className="text-sm">
               <div className="font-medium">{ev.title}</div>
               <div className="text-gray-500">
@@ -862,7 +838,6 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
     </div>
   );
 }
-
 function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
   return (
     <div className="space-y-3">
@@ -872,7 +847,6 @@ function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
           Recarregar
         </button>
       </div>
-
       {loading ? (
         <div className="text-sm text-gray-500">Carregando...</div>
       ) : items.length === 0 ? (
@@ -897,12 +871,10 @@ function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
     </div>
   );
 }
-
 function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
   const [reason, setReason] = useState("");
-
   return (
     <form
       className="space-y-3"
@@ -935,19 +907,10 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
       </div>
       <div>
         <label className="text-xs text-gray-600">Motivo (opcional)</label>
-        <input
-          type="text"
-          className="border rounded px-2 py-1.5 text-sm w-full"
-          placeholder="Ex.: Reunião, almoço..."
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
+        <input type="text" className="border rounded px-2 py-1.5 text-sm w-full" placeholder="Ex.: Reunião, almoço..." value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
-
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">
-          Cancelar
-        </button>
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">Cancelar</button>
         <button type="submit" className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           Confirmar bloqueio
@@ -955,39 +918,4 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
       </div>
     </form>
   );
-}
-
-/* ------------------------------ Helpers ------------------------------ */
-function formatDateInput(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-function startOfWeek(d) {
-  const copy = new Date(d);
-  const day = copy.getDay(); // 0=Dom, 1=Seg...
-  const diff = (day + 6) % 7; // início segunda
-  copy.setDate(copy.getDate() - diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-function endOfWeek(d) {
-  const s = startOfWeek(d);
-  const e = new Date(s);
-  e.setDate(s.getDate() + 6);
-  e.setHours(23, 59, 59, 999);
-  return e;
-}
-function startOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
-}
-function endOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-function toYMD(dateObj) {
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const day = String(dateObj.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }

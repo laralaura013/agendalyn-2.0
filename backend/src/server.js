@@ -1,4 +1,3 @@
-// server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -24,22 +23,20 @@ import brandRoutes from './routes/brandRoutes.js';
 import commissionRoutes from './routes/commissionRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 import clientPortalRoutes from './routes/clientPortalRoutes.js';
-import waitlistRoutes from './routes/waitlistRoutes.js'; // ✅ NOVO
-
-// 🆕 Rotas de bloqueio de horários
+import waitlistRoutes from './routes/waitlistRoutes.js';
 import blockRoutes from './routes/blockRoutes.js';
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ Log da origem para debug
+// log origem (debug)
 app.use((req, res, next) => {
   console.log('🌐 Origem da requisição:', req.headers.origin);
   next();
 });
 
-// ✅ Middleware manual para resolver preflight (CORS) no Railway
+// preflight cors railway
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -51,20 +48,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ CORS padrão com credentials
-app.use(cors({
-  origin: true,
-  credentials: true,
-}));
-
+// CORS
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// ✅ Webhooks primeiro
+// webhooks primeiro
 app.use('/api/webhooks', webhookRoutes);
 
-// ✅ Rotas principais
+// rotas
 app.use('/api/portal', clientPortalRoutes);
-app.use('/api/public', publicRoutes);
+app.use('/api/public', publicRoutes);          // sem protect
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/company', companyRoutes);
@@ -83,20 +76,12 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/commissions', commissionRoutes);
-
-// 🆕 Bloqueios de horário
 app.use('/api/agenda/blocks', blockRoutes);
-// 🆕 Lista de espera
-app.use('/api/waitlist', waitlistRoutes); // ✅ NOVO
+app.use('/api/waitlist', waitlistRoutes);
 
-// ✅ Health check
-app.get('/api', (req, res) => {
-  res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' });
-});
-
-app.get('/', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' });
-});
+// health
+app.get('/api', (_req, res) => res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' }));
+app.get('/', (_req, res) => res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' }));
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);

@@ -1,7 +1,7 @@
 import prisma from '../prismaClient.js';
 import bcrypt from 'bcryptjs';
 
-// Listar Colaboradores
+// LISTAR
 export const listStaff = async (req, res) => {
   try {
     const staff = await prisma.user.findMany({
@@ -15,7 +15,7 @@ export const listStaff = async (req, res) => {
   }
 };
 
-// Criar Colaborador
+// CRIAR
 export const createStaff = async (req, res) => {
   try {
     const { name, email, password, role, showInBooking, workSchedule, commission } = req.body;
@@ -33,47 +33,50 @@ export const createStaff = async (req, res) => {
         role: role || 'STAFF',
         showInBooking: typeof showInBooking === 'boolean' ? showInBooking : true,
         workSchedule: workSchedule || {},
-        commission: commission ? parseFloat(commission) : null,
-        companyId: companyId,
+        commission: commission != null ? String(commission) : null,
+        companyId,
       },
     });
     const { password: _, ...staffWithoutPassword } = newStaff;
     res.status(201).json(staffWithoutPassword);
   } catch (error) {
     if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
-        return res.status(409).json({ message: 'Este email já está em uso.' });
+      return res.status(409).json({ message: 'Este email já está em uso.' });
     }
     console.error("--- ERRO AO CRIAR COLABORADOR ---", error);
     res.status(500).json({ message: 'Erro ao criar colaborador.' });
   }
 };
 
-// ATUALIZAR Colaborador (LÓGICA CORRIGIDA)
+// ATUALIZAR
 export const updateStaff = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, role, password, showInBooking, workSchedule, commission } = req.body;
     const companyId = req.company.id;
-    
-    // CORREÇÃO: Construímos o objeto de atualização de forma segura,
-    // apenas com os campos que realmente recebemos.
-    const updateData = {};
-    if (name) updateData.name = name;
-    if (email) updateData.email = email;
-    if (role) updateData.role = role;
-    if (typeof showInBooking === 'boolean') updateData.showInBooking = showInBooking;
-    if (workSchedule) updateData.workSchedule = workSchedule;
-    if (commission !== undefined) updateData.commission = commission ? parseFloat(commission) : null;
+
+    const exists = await prisma.user.findFirst({ where: { id, companyId } });
+    if (!exists) return res.status(404).json({ message: 'Colaborador não encontrado.' });
+
+    const { name, email, role, password, showInBooking, workSchedule, commission } = req.body;
+
+    const data = {};
+    if (name !== undefined) data.name = name;
+    if (email !== undefined) data.email = email;
+    if (role !== undefined) data.role = role;
+    if (typeof showInBooking === 'boolean') data.showInBooking = showInBooking;
+    if (workSchedule !== undefined) data.workSchedule = workSchedule;
+    if (commission !== undefined) data.commission = commission != null ? String(commission) : null;
+
     if (password) {
       const salt = await bcrypt.genSalt(10);
-      updateData.password = await bcrypt.hash(password, salt);
+      data.password = await bcrypt.hash(password, salt);
     }
 
-    const updatedStaff = await prisma.user.update({
-      where: { id: id, companyId: companyId },
-      data: updateData,
+    const updated = await prisma.user.update({
+      where: { id },
+      data,
     });
-    const { password: _, ...staffWithoutPassword } = updatedStaff;
+    const { password: _, ...staffWithoutPassword } = updated;
     res.status(200).json(staffWithoutPassword);
   } catch (error) {
     console.error("--- ERRO AO ATUALIZAR COLABORADOR ---", error);
@@ -81,13 +84,16 @@ export const updateStaff = async (req, res) => {
   }
 };
 
-// Deletar Colaborador
+// DELETAR
 export const deleteStaff = async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.user.delete({
-      where: { id: id, companyId: req.company.id },
-    });
+    const companyId = req.company.id;
+
+    const exists = await prisma.user.findFirst({ where: { id, companyId } });
+    if (!exists) return res.status(404).json({ message: 'Colaborador não encontrado.' });
+
+    await prisma.user.delete({ where: { id } });
     res.status(204).send();
   } catch (error) {
     console.error("--- ERRO AO DELETAR COLABORADOR ---", error);

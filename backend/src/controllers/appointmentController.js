@@ -2,13 +2,12 @@ import prisma from '../prismaClient.js';
 
 /**
  * GET /api/appointments
- * Lista os agendamentos da empresa com filtros
  * Query:
- *  - professionalId? | userId?   (ambos aceitos; usa userId internamente)
- *  - date? (YYYY-MM-DD, único dia)
- *  - date_from?, date_to? (YYYY-MM-DD, intervalo)
- *  - statuses? ex: "SCHEDULED,CONFIRMED"
- *  - includeCanceled? (true/false) => por padrão NÃO retorna CANCELED
+ *  - professionalId? | userId?
+ *  - date? (YYYY-MM-DD)
+ *  - date_from?, date_to? (YYYY-MM-DD)
+ *  - statuses? "SCHEDULED,CONFIRMED"
+ *  - includeCanceled? (true/false)
  */
 export const listAppointments = async (req, res) => {
   try {
@@ -25,11 +24,9 @@ export const listAppointments = async (req, res) => {
 
     const where = { companyId };
 
-    // Profissional (aceita professionalId ou userId)
     const resolvedUserId = userId || professionalId;
     if (resolvedUserId) where.userId = resolvedUserId;
 
-    // Datas (aceita date único OU intervalo)
     if (date) {
       const start = new Date(`${date}T00:00:00.000`);
       const end = new Date(`${date}T23:59:59.999`);
@@ -40,26 +37,20 @@ export const listAppointments = async (req, res) => {
       if (date_to) where.start.lte = new Date(`${date_to}T23:59:59.999`);
     }
 
-    // Statuses
-    const normalizedIncludeCanceled = String(includeCanceled || '').toLowerCase() === 'true';
+    const showCanceled = String(includeCanceled || '').toLowerCase() === 'true';
     if (statuses) {
       const arr = String(statuses)
         .split(',')
         .map(s => s.trim().toUpperCase())
         .filter(Boolean);
-      if (arr.length > 0) where.status = { in: arr };
-    } else if (!normalizedIncludeCanceled) {
-      // Por padrão, não retornar cancelados
+      if (arr.length) where.status = { in: arr };
+    } else if (!showCanceled) {
       where.status = { not: 'CANCELED' };
     }
 
     const appointments = await prisma.appointment.findMany({
       where,
-      include: {
-        client: true,
-        service: true,
-        user: true,
-      },
+      include: { client: true, service: true, user: true },
       orderBy: { start: 'asc' },
     });
 
@@ -72,15 +63,7 @@ export const listAppointments = async (req, res) => {
 
 /**
  * POST /api/appointments
- * Cria um novo agendamento
- * Body:
- *  - clientId (req)
- *  - serviceId (req)
- *  - userId (req) | professionalId (fallback)
- *  - start (ISO) (req)
- *  - end (ISO)   (req)
- *  - notes?
- *  - status? (default SCHEDULED)
+ * Body: clientId, serviceId, userId|professionalId, start, end, notes?, status?
  */
 export const createAppointment = async (req, res) => {
   try {
@@ -89,7 +72,7 @@ export const createAppointment = async (req, res) => {
       clientId,
       serviceId,
       userId,
-      professionalId, // compatibilidade com versões antigas do front
+      professionalId,
       start,
       end,
       notes,
@@ -108,54 +91,42 @@ export const createAppointment = async (req, res) => {
 
     const dStart = new Date(start);
     const dEnd = new Date(end);
-    if (isNaN(dStart.getTime())) missing.push('start inválido (formato ISO)');
-    if (isNaN(dEnd.getTime())) missing.push('end inválido (formato ISO)');
+    if (isNaN(dStart.getTime())) missing.push('start inválido (ISO)');
+    if (isNaN(dEnd.getTime())) missing.push('end inválido (ISO)');
 
     if (missing.length) {
-      return res.status(400).json({
-        message: 'Dados inválidos para agendamento.',
-        missing,
-      });
+      return res.status(400).json({ message: 'Dados inválidos para agendamento.', missing });
     }
 
-    // Data-only para checar bloqueios (00:00)
+    // data-only
     const dateOnly = new Date(dStart.toISOString().split('T')[0]);
 
-    // Verifica conflito com bloqueios (geral ou do profissional)
+    // bloqueios (geral ou profissional)
     const conflict = await prisma.scheduleBlock.findFirst({
       where: {
         companyId,
-        OR: [
-          { professionalId: chosenUserId },
-          { professionalId: null }, // bloqueio geral
-        ],
+        OR: [{ professionalId: chosenUserId }, { professionalId: null }],
         date: dateOnly,
         startTime: { lt: dEnd.toTimeString().slice(0, 5) },
         endTime: { gt: dStart.toTimeString().slice(0, 5) },
       },
     });
-
     if (conflict) {
-      return res.status(400).json({
-        message: 'Horário indisponível. Existe um bloqueio neste período.',
-      });
+      return res.status(400).json({ message: 'Horário indisponível. Existe um bloqueio neste período.' });
     }
 
-    // (Opcional) checar sobreposição com outros agendamentos do mesmo profissional
+    // sobreposição com outros agendamentos do mesmo profissional (não cancelados)
     const overlap = await prisma.appointment.findFirst({
       where: {
         companyId,
         userId: chosenUserId,
-        // overlap: start < existing.end && end > existing.start
         start: { lt: dEnd },
         end: { gt: dStart },
         status: { not: 'CANCELED' },
       },
     });
     if (overlap) {
-      return res.status(400).json({
-        message: 'Horário já ocupado para este profissional.',
-      });
+      return res.status(400).json({ message: 'Horário já ocupado para este profissional.' });
     }
 
     const created = await prisma.appointment.create({
@@ -169,23 +140,18 @@ export const createAppointment = async (req, res) => {
         notes: notes || '',
         status: status || 'SCHEDULED',
       },
-      include: {
-        client: true,
-        service: true,
-        user: true,
-      },
+      include: { client: true, service: true, user: true },
     });
 
-    return res.status(201).json(created);
+    res.status(201).json(created);
   } catch (e) {
     console.error('Erro ao criar agendamento:', e);
-    return res.status(500).json({ message: e.message || 'Erro interno ao criar agendamento.' });
+    res.status(500).json({ message: e.message || 'Erro interno ao criar agendamento.' });
   }
 };
 
 /**
  * PUT /api/appointments/:id
- * Atualiza um agendamento existente
  */
 export const updateAppointment = async (req, res) => {
   try {
@@ -193,12 +159,8 @@ export const updateAppointment = async (req, res) => {
     const { id } = req.params;
     const { clientId, serviceId, userId, professionalId, start, end, notes, status } = req.body;
 
-    const appointment = await prisma.appointment.findFirst({
-      where: { id, companyId },
-    });
-    if (!appointment) {
-      return res.status(404).json({ message: 'Agendamento não encontrado.' });
-    }
+    const appointment = await prisma.appointment.findFirst({ where: { id, companyId } });
+    if (!appointment) return res.status(404).json({ message: 'Agendamento não encontrado.' });
 
     const chosenUserId = userId || professionalId || appointment.userId;
 
@@ -213,11 +175,7 @@ export const updateAppointment = async (req, res) => {
         notes: typeof notes === 'string' ? notes : appointment.notes,
         status: status || appointment.status,
       },
-      include: {
-        client: true,
-        service: true,
-        user: true,
-      },
+      include: { client: true, service: true, user: true },
     });
 
     res.json(updated);
@@ -229,23 +187,16 @@ export const updateAppointment = async (req, res) => {
 
 /**
  * DELETE /api/appointments/:id
- * Exclui um agendamento existente (delete físico)
  */
 export const deleteAppointment = async (req, res) => {
   try {
     const companyId = req.company.id;
     const { id } = req.params;
 
-    const appointment = await prisma.appointment.findFirst({
-      where: { id, companyId },
-    });
-    if (!appointment) {
-      return res.status(404).json({ message: 'Agendamento não encontrado.' });
-    }
+    const appointment = await prisma.appointment.findFirst({ where: { id, companyId } });
+    if (!appointment) return res.status(404).json({ message: 'Agendamento não encontrado.' });
 
     await prisma.appointment.delete({ where: { id } });
-
-    // 204 = sem conteúdo
     res.status(204).send();
   } catch (err) {
     console.error('Erro ao excluir agendamento:', err);
