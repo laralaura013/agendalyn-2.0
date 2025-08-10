@@ -10,7 +10,9 @@ import {
 } from 'date-fns';
 import { sendAppointmentConfirmationEmail } from '../services/emailService.js';
 
-/* ------------------------ Helpers de data (UTC-safe) ------------------------ */
+/* -------------------------------------------------------------------------- */
+/*                               Helpers de data                              */
+/* -------------------------------------------------------------------------- */
 
 // Converte "YYYY-MM-DD" para Date (meia-noite UTC)
 function parseDateOnlyUTC(dateStr) {
@@ -31,9 +33,10 @@ function hhmmUTC(d) {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
-/* ------------------------------ Booking públicos ------------------------------ */
+/* -------------------------------------------------------------------------- */
+/*                          Dados públicos (Booking)                          */
+/* -------------------------------------------------------------------------- */
 
-// Dados públicos da empresa (booking page)
 export const getBookingPageData = async (req, res) => {
   try {
     const { companyId } = req.params;
@@ -63,6 +66,9 @@ export const getBookingPageData = async (req, res) => {
   }
 };
 
+/* -------------------------------------------------------------------------- */
+/*                     Horários disponíveis (compatível front)               */
+/* -------------------------------------------------------------------------- */
 /**
  * GET /api/public/available-slots
  * Aceita:
@@ -70,82 +76,117 @@ export const getBookingPageData = async (req, res) => {
  *  - professionalId | userId | staffId (opcional) -> filtra por profissional
  *  - duration (min) | serviceId (opcional) -> define duração do slot
  * Responde: ["HH:mm", ...]
+ *
+ * Observações:
+ * - Trata tudo em UTC para evitar desvios de fuso/hosting.
+ * - Considera workSchedule do profissional (se existir).
+ * - Respeita bloqueios (company e/ou por profissional).
+ * - Ignora agendamentos com status CANCELED.
+ * - Em falhas previsíveis retorna [] para não quebrar o front.
  */
 export const getAvailableSlots = async (req, res) => {
+  const t0 = Date.now();
   try {
-    const { date, duration, serviceId } = req.query;
-    const resolvedUserId = req.query.userId || req.query.professionalId || req.query.staffId || null;
+    const { date, duration, serviceId, debug } = req.query;
+    const resolvedUserId =
+      req.query.userId || req.query.professionalId || req.query.staffId || null;
 
     if (!date) {
+      console.warn('[available-slots] missing date');
       return res.status(400).json({ message: 'Parâmetro "date" é obrigatório (YYYY-MM-DD).' });
     }
 
-    // Duração do slot (minutos)
+    // Duração do slot (min)
     let slotMinutes = Number(duration) || 0;
     if (!slotMinutes && serviceId) {
-      const svc = await prisma.service.findFirst({ where: { id: serviceId } });
-      slotMinutes = Number(svc?.duration) || 30;
+      try {
+        const svc = await prisma.service.findFirst({ where: { id: serviceId } });
+        slotMinutes = Number(svc?.duration) || 30;
+      } catch (e) {
+        console.warn('[available-slots] erro ao obter service.duration:', e?.message);
+        slotMinutes = 30;
+      }
     }
     if (!slotMinutes) slotMinutes = 30;
 
-    // Janela do dia (UTC, consistente com ScheduleBlock.date gravado como Date-only)
+    // Janela do dia (UTC)
     const { start: dayStartUTC, end: dayEndUTC } = dayBoundsUTC(date);
 
-    // Janela de trabalho padrão (09:00–18:00) + workSchedule do profissional (se existir)
+    // Work schedule (default 09:00–18:00)
     let open = '09:00';
     let close = '18:00';
+    const wsDayKey = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][dayStartUTC.getUTCDay()];
+
     if (resolvedUserId) {
-      const user = await prisma.user.findFirst({
-        where: { id: resolvedUserId },
-        select: { workSchedule: true },
-      });
-      const ws = user?.workSchedule || null;
-      if (ws) {
-        const map = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-        const dayKey = map[dayStartUTC.getUTCDay()]; // usa dia em UTC
-        const cfg = ws[dayKey];
+      try {
+        const user = await prisma.user.findFirst({
+          where: { id: resolvedUserId },
+          select: { workSchedule: true, name: true },
+        });
+        const ws = user?.workSchedule || null;
+        const cfg = ws ? ws[wsDayKey] : null;
         const disabled = cfg && (cfg.active === false || cfg.enabled === false);
-        if (disabled) return res.json([]);
+        if (disabled) {
+          if (debug) return res.json({ slots: [], meta: { reason: 'workSchedule disabled', day: wsDayKey } });
+          return res.json([]);
+        }
         if (cfg) {
           if (cfg.start) open = cfg.start;
           if (cfg.end)   close = cfg.end;
         }
+      } catch (e) {
+        console.warn('[available-slots] erro ao carregar workSchedule:', e?.message);
       }
     }
 
-    // Constrói a janela de trabalho do dia em UTC
+    // Janela de trabalho (UTC)
     const [oh, om] = open.split(':').map(Number);
     const [ch, cm] = close.split(':').map(Number);
     const windowStartUTC = new Date(dayStartUTC);
     windowStartUTC.setUTCHours(oh, om, 0, 0);
     const windowEndUTC = new Date(dayStartUTC);
     windowEndUTC.setUTCHours(ch, cm, 0, 0);
-    if (!isBefore(windowStartUTC, windowEndUTC)) return res.json([]);
+    if (!isBefore(windowStartUTC, windowEndUTC)) {
+      if (debug) return res.json({ slots: [], meta: { reason: 'invalid window', open, close, day: wsDayKey } });
+      return res.json([]);
+    }
 
-    // Bloqueios do dia (geral e/ou do profissional)
-    const blocks = await prisma.scheduleBlock.findMany({
-      where: {
-        date: parseDateOnlyUTC(date), // match exato na meia-noite UTC
-        OR: [
-          resolvedUserId ? { professionalId: resolvedUserId } : undefined,
-          { professionalId: null },
-        ].filter(Boolean),
-      },
-      select: { startTime: true, endTime: true },
-      orderBy: [{ startTime: 'asc' }],
-    });
+    // Bloqueios do dia (company e/ou profissional)
+    let blocks = [];
+    try {
+      blocks = await prisma.scheduleBlock.findMany({
+        where: {
+          date: parseDateOnlyUTC(date), // igualdade exata na meia-noite UTC
+          OR: [
+            resolvedUserId ? { professionalId: resolvedUserId } : undefined,
+            { professionalId: null },
+          ].filter(Boolean),
+        },
+        select: { startTime: true, endTime: true },
+        orderBy: [{ startTime: 'asc' }],
+      });
+    } catch (e) {
+      console.warn('[available-slots] erro ao consultar scheduleBlock:', e?.message);
+      blocks = [];
+    }
 
     // Agendamentos do dia (não cancelados)
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        start: { gte: dayStartUTC, lte: dayEndUTC },
-        ...(resolvedUserId ? { userId: resolvedUserId } : {}),
-        status: { not: 'CANCELED' },
-      },
-      select: { start: true, end: true },
-    });
+    let appointments = [];
+    try {
+      appointments = await prisma.appointment.findMany({
+        where: {
+          start: { gte: dayStartUTC, lte: dayEndUTC },
+          ...(resolvedUserId ? { userId: resolvedUserId } : {}),
+          status: { not: 'CANCELED' },
+        },
+        select: { start: true, end: true },
+      });
+    } catch (e) {
+      console.warn('[available-slots] erro ao consultar appointments:', e?.message);
+      appointments = [];
+    }
 
-    // Geração de slots a cada "slotMinutes"
+    // Geração de slots
     const slots = [];
     for (
       let s = new Date(windowStartUTC);
@@ -165,17 +206,49 @@ export const getAvailableSlots = async (req, res) => {
       const overlap = appointments.some((a) => s < a.end && e > a.start);
       if (overlap) continue;
 
-      // Retorna como "HH:mm" (UTC coerente com o dia)
-      slots.push(hhmmUTC(s));
+      slots.push(hhmmUTC(s)); // retorna "HH:mm"
+    }
+
+    // Log resumido (ajuda no Railway)
+    console.log('[available-slots]', {
+      date,
+      user: resolvedUserId,
+      open,
+      close,
+      slotMinutes,
+      blocks: blocks.length,
+      appts: appointments.length,
+      slots: slots.length,
+      ms: Date.now() - t0,
+    });
+
+    if (debug) {
+      return res.json({
+        slots,
+        meta: {
+          date,
+          userId: resolvedUserId,
+          open,
+          close,
+          slotMinutes,
+          blocks: blocks.length,
+          appointments: appointments.length,
+          ms: Date.now() - t0,
+        },
+      });
     }
 
     return res.json(slots);
   } catch (err) {
-    console.error('getAvailableSlots error:', err);
-    return res.status(500).json({ message: 'Erro ao calcular horários disponíveis.' });
+    console.error('[available-slots] fatal error:', err);
+    // Nunca quebra o front:
+    return res.json([]);
   }
 };
 
+/* -------------------------------------------------------------------------- */
+/*                       Criação de agendamento público                       */
+/* -------------------------------------------------------------------------- */
 /**
  * POST /api/public/create-appointment
  * Body:
