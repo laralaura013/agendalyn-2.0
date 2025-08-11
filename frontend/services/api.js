@@ -1,6 +1,7 @@
 // src/services/api.js
 import axios from 'axios';
 
+// Usa VITE_API_URL se existir (Vite/Netlify) senão cai no Railway
 const API_URL =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
   'https://agendalyn-20-production.up.railway.app/api';
@@ -10,13 +11,13 @@ const api = axios.create({
   timeout: 15000,
 });
 
-// helper: garante objeto headers
+// garante objeto headers
 function ensureHeaders(config) {
   if (!config.headers) config.headers = {};
   return config.headers;
 }
 
-// Interceptor para aplicar token dinamicamente com base na rota
+// Interceptor: aplica token certo e evita headers indevidos em /public
 api.interceptors.request.use(
   (config) => {
     const headers = ensureHeaders(config);
@@ -25,15 +26,11 @@ api.interceptors.request.use(
     headers['Cache-Control'] = 'no-cache';
     headers['Pragma'] = 'no-cache';
 
-    // normaliza pathname da URL
+    // normaliza o path (pra diferenciar /public e /portal)
     const urlPath = (() => {
       if (!config.url) return '';
       if (config.url.startsWith('http')) {
-        try {
-          return new URL(config.url).pathname || '';
-        } catch {
-          return config.url;
-        }
+        try { return new URL(config.url).pathname || ''; } catch { return config.url; }
       }
       return config.url;
     })();
@@ -47,10 +44,10 @@ api.interceptors.request.use(
 
     // tokens
     const clientToken = localStorage.getItem('clientToken');
-    const adminToken = localStorage.getItem('token');
+    const adminToken  = localStorage.getItem('token');
 
     if (isPublic) {
-      // endpoints públicos não devem levar Authorization
+      // rotas públicas não devem levar Authorization
       delete headers.Authorization;
     } else if (isPortal && clientToken) {
       headers.Authorization = `Bearer ${clientToken}`;
@@ -65,11 +62,10 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// (Opcional) Interceptor de resposta para 401/403
+// Opcional: tratar 401/403
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    // exemplo:
     // if (err?.response?.status === 401) {
     //   localStorage.removeItem('token');
     //   localStorage.removeItem('clientToken');
