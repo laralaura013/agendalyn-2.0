@@ -1,7 +1,9 @@
 // src/controllers/publicController.js
 import prisma from "../prismaClient.js";
 import { addMinutes, format, isAfter, isBefore, parseISO } from "date-fns";
-import { zonedTimeToUtc } from "date-fns-tz";
+// ✅ Import compatível com ESM/CommonJS no Railway
+import * as tz from "date-fns-tz";
+const { zonedTimeToUtc } = tz;
 import { sendAppointmentConfirmationEmail } from "../services/emailService.js";
 
 /* -------------------------------------------------------------------------- */
