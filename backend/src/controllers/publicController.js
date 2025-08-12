@@ -1,19 +1,17 @@
 // src/controllers/publicController.js
 import prisma from "../prismaClient.js";
-import {
-  addMinutes,
-  format,
-  isAfter,
-  isBefore,
-  parseISO,
-} from "date-fns";
+import { addMinutes, format, isAfter, isBefore, parseISO } from "date-fns";
+import { zonedTimeToUtc } from "date-fns-tz";
 import { sendAppointmentConfirmationEmail } from "../services/emailService.js";
 
 /* -------------------------------------------------------------------------- */
-/*                               Helpers de data                              */
+/* Helpers de data                                                            */
 /* -------------------------------------------------------------------------- */
 
-// Converte "YYYY-MM-DD" para Date (meia-noite UTC)
+// Ideal: ler da Company no DB (company.timezone)
+const COMPANY_TZ = "America/Sao_Paulo";
+
+// Converte "YYYY-MM-DD" -> Date na meia-noite UTC
 function parseDateOnlyUTC(dateStr) {
   const [y, m, d] = String(dateStr).split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
@@ -27,7 +25,7 @@ function dayBoundsUTC(dateStr) {
   return { start, end };
 }
 
-// HH:mm a partir de um Date em UTC
+// "HH:mm" (UTC) a partir de um Date
 function hhmmUTC(d) {
   return `${String(d.getUTCHours()).padStart(2, "0")}:${String(
     d.getUTCMinutes()
@@ -35,7 +33,7 @@ function hhmmUTC(d) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                          Dados públicos (Booking)                          */
+/* Dados públicos (Booking)                                                   */
 /* -------------------------------------------------------------------------- */
 
 export const getBookingPageData = async (req, res) => {
@@ -72,22 +70,15 @@ export const getBookingPageData = async (req, res) => {
 };
 
 /* -------------------------------------------------------------------------- */
-/*                     Horários disponíveis (compatível front)                */
+/* Horários disponíveis (compatível front)                                    */
 /* -------------------------------------------------------------------------- */
 /**
  * GET /api/public/available-slots
  * Aceita:
  *  - date (YYYY-MM-DD) obrigatório
- *  - professionalId | userId | staffId (opcional) -> filtra por profissional
- *  - duration (min) | serviceId (opcional) -> define duração do slot
- * Responde: ["HH:mm", ...]
- *
- * Observações:
- * - Trata tudo em UTC para evitar desvios de fuso/hosting.
- * - Considera workSchedule do profissional (se existir).
- * - Respeita bloqueios (company e/ou por profissional).
- * - Ignora agendamentos com status CANCELED.
- * - Em falhas previsíveis retorna [] para não quebrar o front.
+ *  - professionalId | userId | staffId (opcional)
+ *  - duration (min) | serviceId (opcional)
+ * Responde: ["HH:mm", ...] (UTC)
  */
 export const getAvailableSlots = async (req, res) => {
   const t0 = Date.now();
@@ -110,10 +101,7 @@ export const getAvailableSlots = async (req, res) => {
         const svc = await prisma.service.findFirst({ where: { id: serviceId } });
         slotMinutes = Number(svc?.duration) || 30;
       } catch (e) {
-        console.warn(
-          "[available-slots] erro ao obter service.duration:",
-          e?.message
-        );
+        console.warn("[available-slots] erro ao obter service.duration:", e?.message);
         slotMinutes = 30;
       }
     }
@@ -146,10 +134,7 @@ export const getAvailableSlots = async (req, res) => {
         const disabled = cfg && (cfg.active === false || cfg.enabled === false);
         if (disabled) {
           if (debug)
-            return res.json({
-              slots: [],
-              meta: { reason: "workSchedule disabled", day: wsDayKey },
-            });
+            return res.json({ slots: [], meta: { reason: "workSchedule disabled", day: wsDayKey } });
           return res.json([]);
         }
         if (cfg) {
@@ -157,10 +142,7 @@ export const getAvailableSlots = async (req, res) => {
           if (cfg.end) close = cfg.end;
         }
       } catch (e) {
-        console.warn(
-          "[available-slots] erro ao carregar workSchedule:",
-          e?.message
-        );
+        console.warn("[available-slots] erro ao carregar workSchedule:", e?.message);
       }
     }
 
@@ -173,10 +155,7 @@ export const getAvailableSlots = async (req, res) => {
     windowEndUTC.setUTCHours(ch, cm, 0, 0);
     if (!isBefore(windowStartUTC, windowEndUTC)) {
       if (debug)
-        return res.json({
-          slots: [],
-          meta: { reason: "invalid window", open, close, day: wsDayKey },
-        });
+        return res.json({ slots: [], meta: { reason: "invalid window", open, close, day: wsDayKey } });
       return res.json([]);
     }
 
@@ -185,7 +164,7 @@ export const getAvailableSlots = async (req, res) => {
     try {
       blocks = await prisma.scheduleBlock.findMany({
         where: {
-          date: parseDateOnlyUTC(date), // igualdade exata na meia-noite UTC
+          date: parseDateOnlyUTC(date),
           OR: [
             resolvedUserId ? { professionalId: resolvedUserId } : undefined,
             { professionalId: null },
@@ -195,10 +174,7 @@ export const getAvailableSlots = async (req, res) => {
         orderBy: [{ startTime: "asc" }],
       });
     } catch (e) {
-      console.warn(
-        "[available-slots] erro ao consultar scheduleBlock:",
-        e?.message
-      );
+      console.warn("[available-slots] erro ao consultar scheduleBlock:", e?.message);
       blocks = [];
     }
 
@@ -214,10 +190,7 @@ export const getAvailableSlots = async (req, res) => {
         select: { start: true, end: true },
       });
     } catch (e) {
-      console.warn(
-        "[available-slots] erro ao consultar appointments:",
-        e?.message
-      );
+      console.warn("[available-slots] erro ao consultar appointments:", e?.message);
       appointments = [];
     }
 
@@ -231,17 +204,17 @@ export const getAvailableSlots = async (req, res) => {
       const e = new Date(s.getTime() + slotMinutes * 60000);
       if (isAfter(e, windowEndUTC)) break;
 
-      // Conflito com bloqueios (compara HH:mm)
+      // Conflito com bloqueios (HH:mm)
       const sHH = hhmmUTC(s);
       const eHH = hhmmUTC(e);
       const blocked = blocks.some((b) => b.startTime < eHH && b.endTime > sHH);
       if (blocked) continue;
 
-      // Conflito com agendamentos (intervalo real)
+      // Conflito com agendamentos (intervalo)
       const overlap = appointments.some((a) => s < a.end && e > a.start);
       if (overlap) continue;
 
-      slots.push(hhmmUTC(s)); // retorna "HH:mm"
+      slots.push(hhmmUTC(s));
     }
 
     console.log("[available-slots]", {
@@ -281,19 +254,16 @@ export const getAvailableSlots = async (req, res) => {
 };
 
 /* -------------------------------------------------------------------------- */
-/*                       Criação de agendamento público                       */
+/* Criação de agendamento público                                             */
 /* -------------------------------------------------------------------------- */
 /**
  * POST /api/public/create-appointment
- * Body (novo padrão):
+ * Body:
  *  - companyId, serviceId (obrigatórios)
  *  - staffId | professionalId | userId (obrigatório)
- *  - date: "YYYY-MM-DD" (obrigatório)
- *  - slotTime: "HH:mm" (obrigatório)
+ *  - date: "YYYY-MM-DD" (obrigatório no novo padrão)
+ *  - slotTime: "HH:mm" (novo) OU ISO (legado)
  *  - clientName, clientPhone?, clientEmail?, clientId?
- *
- * Retrocompatível:
- *  - slotTime como ISO (antigo) => será aceito também.
  */
 export const createPublicAppointment = async (req, res) => {
   try {
@@ -304,7 +274,7 @@ export const createPublicAppointment = async (req, res) => {
       professionalId,
       userId,
       date,           // "YYYY-MM-DD" (novo)
-      slotTime,       // "HH:mm" (novo) ou ISO (antigo)
+      slotTime,       // "HH:mm" (novo) ou ISO (legado)
       clientName,
       clientPhone,
       clientEmail,
@@ -329,16 +299,16 @@ export const createPublicAppointment = async (req, res) => {
     const staff = await prisma.user.findUnique({ where: { id: chosenUserId } });
     if (!staff) return res.status(404).json({ message: "Profissional não encontrado." });
 
-    // Monta start/end (UTC) aceitando novo ou antigo formato
+    // Monta start/end (salva em UTC) aceitando novo ou antigo formato
     let startDate;
     if (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date)) && /^\d{2}:\d{2}$/.test(String(slotTime))) {
-      const [hh, mm] = String(slotTime).split(":").map(Number);
-      startDate = parseDateOnlyUTC(date); // meia-noite UTC do dia
-      startDate.setUTCHours(hh, mm, 0, 0);
+      // interpreta "date + slotTime" no fuso horário do estabelecimento e converte para UTC
+      const localDateTime = `${date} ${slotTime}`; // ex: "2025-08-12 17:00"
+      startDate = zonedTimeToUtc(localDateTime, COMPANY_TZ);
     } else {
       // retrocompat: slotTime ISO
       const parsed = parseISO(String(slotTime));
-      if (isNaN(parsed)) {
+      if (isNaN(parsed.getTime())) {
         return res.status(400).json({ message: "Data/horário inválidos." });
       }
       startDate = parsed;
@@ -373,7 +343,9 @@ export const createPublicAppointment = async (req, res) => {
     }
 
     // Checa bloqueio (usa data só-dia em UTC + HH:mm)
-    const dateOnlyUTC = parseDateOnlyUTC(format(startDate, "yyyy-MM-dd"));
+    const dateOnlyUTC = date
+      ? parseDateOnlyUTC(date)
+      : parseDateOnlyUTC(format(startDate, "yyyy-MM-dd"));
     const sHHmm = hhmmUTC(startDate);
     const eHHmm = hhmmUTC(endDate);
 
@@ -416,11 +388,7 @@ export const createPublicAppointment = async (req, res) => {
         userId: chosenUserId,
         status: "SCHEDULED",
       },
-      include: {
-        client: true,
-        user: true,
-        service: true,
-      },
+      include: { client: true, user: true, service: true },
     });
 
     // Email de confirmação (best-effort)
