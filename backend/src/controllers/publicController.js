@@ -1,17 +1,14 @@
 // src/controllers/publicController.js
 import prisma from "../prismaClient.js";
 import { addMinutes, format, isAfter, isBefore, parseISO } from "date-fns";
-// ✅ Import compatível com ESM/CommonJS no Railway
-import * as tz from "date-fns-tz";
-const { zonedTimeToUtc } = tz;
 import { sendAppointmentConfirmationEmail } from "../services/emailService.js";
 
 /* -------------------------------------------------------------------------- */
 /* Helpers de data                                                            */
 /* -------------------------------------------------------------------------- */
 
-// Ideal: ler da Company no DB (company.timezone)
-const COMPANY_TZ = "America/Sao_Paulo";
+// ⚙️ TZ fixa do estabelecimento (sem DST no BR desde 2019)
+const COMPANY_TZ_OFFSET = "-03:00"; // America/Sao_Paulo
 
 // Converte "YYYY-MM-DD" -> Date na meia-noite UTC
 function parseDateOnlyUTC(dateStr) {
@@ -32,6 +29,12 @@ function hhmmUTC(d) {
   return `${String(d.getUTCHours()).padStart(2, "0")}:${String(
     d.getUTCMinutes()
   ).padStart(2, "0")}`;
+}
+
+// Converte "YYYY-MM-DD" + "HH:mm" (hora local) -> Date em UTC usando offset fixo
+function localDateTimeToUTC(dateStr, hhmm, offset = COMPANY_TZ_OFFSET) {
+  // Monta ISO com offset, ex.: "2025-08-12T17:00:00-03:00"
+  return new Date(`${dateStr}T${hhmm}:00${offset}`);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -250,7 +253,6 @@ export const getAvailableSlots = async (req, res) => {
     return res.json(slots);
   } catch (err) {
     console.error("[available-slots] fatal error:", err);
-    // Nunca quebra o front:
     return res.json([]);
   }
 };
@@ -263,7 +265,7 @@ export const getAvailableSlots = async (req, res) => {
  * Body:
  *  - companyId, serviceId (obrigatórios)
  *  - staffId | professionalId | userId (obrigatório)
- *  - date: "YYYY-MM-DD" (obrigatório no novo padrão)
+ *  - date: "YYYY-MM-DD" (novo)
  *  - slotTime: "HH:mm" (novo) OU ISO (legado)
  *  - clientName, clientPhone?, clientEmail?, clientId?
  */
@@ -275,8 +277,8 @@ export const createPublicAppointment = async (req, res) => {
       staffId,
       professionalId,
       userId,
-      date,           // "YYYY-MM-DD" (novo)
-      slotTime,       // "HH:mm" (novo) ou ISO (legado)
+      date,
+      slotTime,
       clientName,
       clientPhone,
       clientEmail,
@@ -285,7 +287,6 @@ export const createPublicAppointment = async (req, res) => {
 
     const chosenUserId = userId || professionalId || staffId;
 
-    // validações mínimas
     if (!companyId || !serviceId || !chosenUserId || !clientName) {
       return res.status(400).json({ message: "Dados insuficientes." });
     }
@@ -293,49 +294,37 @@ export const createPublicAppointment = async (req, res) => {
       return res.status(400).json({ message: "Horário (slotTime) é obrigatório." });
     }
 
-    // Serviço
+    // Serviço / Profissional
     const service = await prisma.service.findUnique({ where: { id: serviceId } });
     if (!service) return res.status(404).json({ message: "Serviço não encontrado." });
 
-    // Profissional
     const staff = await prisma.user.findUnique({ where: { id: chosenUserId } });
     if (!staff) return res.status(404).json({ message: "Profissional não encontrado." });
 
-    // Monta start/end (salva em UTC) aceitando novo ou antigo formato
+    // Monta start em UTC usando offset (ou legado ISO)
     let startDate;
-    if (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date)) && /^\d{2}:\d{2}$/.test(String(slotTime))) {
-      // interpreta "date + slotTime" no fuso horário do estabelecimento e converte para UTC
-      const localDateTime = `${date} ${slotTime}`; // ex: "2025-08-12 17:00"
-      startDate = zonedTimeToUtc(localDateTime, COMPANY_TZ);
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}$/.test(slotTime)) {
+      startDate = localDateTimeToUTC(date, slotTime, COMPANY_TZ_OFFSET);
     } else {
-      // retrocompat: slotTime ISO
       const parsed = parseISO(String(slotTime));
-      if (isNaN(parsed.getTime())) {
-        return res.status(400).json({ message: "Data/horário inválidos." });
-      }
+      if (isNaN(parsed)) return res.status(400).json({ message: "Data/horário inválidos." });
       startDate = parsed;
     }
-
     const endDate = addMinutes(startDate, Number(service.duration) || 30);
 
-    // Cliente (reaproveita por email se existir ou usa clientId)
+    // Cliente (reaproveita por email ou clientId)
     let clientId = clientIdRaw || null;
     if (!clientId) {
       let client = null;
       if (clientEmail) {
         client = await prisma.client.findFirst({
           where: { email: { equals: clientEmail, mode: "insensitive" }, companyId },
-          select: { id: true, name: true },
+          select: { id: true },
         });
       }
       if (!client) {
         const created = await prisma.client.create({
-          data: {
-            name: clientName,
-            phone: clientPhone || "",
-            email: clientEmail || null,
-            companyId,
-          },
+          data: { name: clientName, phone: clientPhone || "", email: clientEmail || null, companyId },
           select: { id: true },
         });
         clientId = created.id;
@@ -344,10 +333,8 @@ export const createPublicAppointment = async (req, res) => {
       }
     }
 
-    // Checa bloqueio (usa data só-dia em UTC + HH:mm)
-    const dateOnlyUTC = date
-      ? parseDateOnlyUTC(date)
-      : parseDateOnlyUTC(format(startDate, "yyyy-MM-dd"));
+    // Checa bloqueio
+    const dateOnlyUTC = parseDateOnlyUTC(format(startDate, "yyyy-MM-dd"));
     const sHHmm = hhmmUTC(startDate);
     const eHHmm = hhmmUTC(endDate);
 
@@ -364,7 +351,7 @@ export const createPublicAppointment = async (req, res) => {
       return res.status(400).json({ message: "Horário indisponível (bloqueio)." });
     }
 
-    // Checa overlap com outros agendamentos (não cancelados)
+    // Checa overlap
     const overlap = await prisma.appointment.findFirst({
       where: {
         companyId,
@@ -378,7 +365,7 @@ export const createPublicAppointment = async (req, res) => {
       return res.status(400).json({ message: "Horário já ocupado." });
     }
 
-    // Cria agendamento
+    // Cria
     const newAppointment = await prisma.appointment.create({
       data: {
         clientId,
@@ -393,12 +380,12 @@ export const createPublicAppointment = async (req, res) => {
       include: { client: true, user: true, service: true },
     });
 
-    // Email de confirmação (best-effort)
+    // E-mail best-effort
     if (clientEmail) {
       try {
         await sendAppointmentConfirmationEmail({
           toEmail: clientEmail,
-          clientName: clientName,
+          clientName,
           serviceName: newAppointment.service?.name,
           staffName: newAppointment.user?.name,
           appointmentDate: startDate,
