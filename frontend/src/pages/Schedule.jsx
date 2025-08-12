@@ -1,5 +1,5 @@
-// ✅ ARQUIVO: src/pages/Schedule.jsx
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+// ✅ ARQUIVO: src/pages/Schedule.jsx (corrigido)
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
 import api from "../services/api";
@@ -29,28 +29,34 @@ import {
  * - POST /agenda/blocks  { professionalId, date:'YYYY-MM-DD', startTime:'HH:mm', endTime:'HH:mm', reason }
  * - DELETE /agenda/blocks/:id
  *
- * - GET  /public/available-slots?professionalId&date&duration=30  (retorna ["HH:mm"] ou [{formatted:"HH:mm"}] ou {time:"HH:mm"})
+ * - GET  /public/available-slots?date&serviceId&staffId  (retorna ["HH:mm"] | [{formatted:"HH:mm"}] | {time:"HH:mm"})
  * - GET  /waitlist
  */
 
 const DEFAULT_SLOT_MINUTES = 30;
 
 const Schedule = () => {
+  // estado principal
   const [events, setEvents] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
+
+  // catálogos compartilhados
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
   const [staff, setStaff] = useState([]);
-  const [loading, setLoading] = useState(true);
 
+  const [loading, setLoading] = useState(true);
   const [blocks, setBlocks] = useState([]);
+
+  // visão e filtros
   const [view, setView] = useState("day");
   const [date, setDate] = useState(() => new Date());
   const [selectedPro, setSelectedPro] = useState(null);
-  const [blockEnabled, setBlockEnabled] = useState(false);
 
+  // UI auxiliares
+  const [blockEnabled, setBlockEnabled] = useState(false);
   const [openSlots, setOpenSlots] = useState(false);
   const [openApptList, setOpenApptList] = useState(false);
   const [openWaitlist, setOpenWaitlist] = useState(false);
@@ -58,105 +64,125 @@ const Schedule = () => {
   const [openProducts, setOpenProducts] = useState(true);
   const [openLegend, setOpenLegend] = useState(true);
 
+  // slots & waitlist
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]); // ["07:00",...]
   const [waitlist, setWaitlist] = useState([]);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
 
-  // ====== APIs ======
+  // evita duplo disparo em StrictMode para o carregamento inicial
+  const loadedOnceRef = useRef(false);
 
-  const fetchAppointments = useCallback(async () => {
-    try {
+  /** ------- HELPERS DE PARAMS (mês/semana/dia) ------- */
+  const buildRangeParams = useCallback(
+    (baseDate) => {
       const params = {};
-      if (selectedPro) params.professionalId = selectedPro;
-
       if (view === "day") {
-        params.date = toYMD(date);
+        params.date = toYMD(baseDate);
       } else if (view === "week") {
-        params.date_from = toYMD(startOfWeek(date));
-        params.date_to = toYMD(endOfWeek(date));
+        params.date_from = toYMD(startOfWeek(baseDate));
+        params.date_to = toYMD(endOfWeek(baseDate));
       } else {
-        params.date_from = toYMD(startOfMonth(date));
-        params.date_to = toYMD(endOfMonth(date));
+        params.date_from = toYMD(startOfMonth(baseDate));
+        params.date_to = toYMD(endOfMonth(baseDate));
       }
-
-      const response = await api.get("/appointments", { params: { ...params, _: Date.now() } });
-
-      const rows = (response.data || []).filter((apt) => {
-        const st = String(apt.status || "").toUpperCase();
-        return !["CANCELED", "DELETED", "REMOVED"].includes(st);
-      });
-
-      const formatted = rows.map((apt) => ({
-        id: apt.id,
-        title: `${apt.client?.name ?? "Cliente"} - ${apt.service?.name ?? "Serviço"}`,
-        start: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
-        end: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
-        resource: apt,
-      }));
-      setEvents(formatted);
-    } catch (error) {
-      console.error("Erro ao buscar agendamentos:", error);
-      toast.error("Erro ao carregar os agendamentos.");
-    }
-  }, [date, view, selectedPro]);
-
-  const fetchBlocks = useCallback(async () => {
-    try {
-      const params = {};
       if (selectedPro) params.professionalId = selectedPro;
+      return params;
+    },
+    [view, selectedPro]
+  );
 
-      if (view === "day") {
-        params.date = toYMD(date);
-      } else if (view === "week") {
-        params.date_from = toYMD(startOfWeek(date));
-        params.date_to = toYMD(endOfWeek(date));
-      } else {
-        params.date_from = toYMD(startOfMonth(date));
-        params.date_to = toYMD(endOfMonth(date));
+  /** ------- LOADERS ------- */
+
+  // carrega catálogos compartilhados UMA ÚNICA VEZ
+  const loadShared = useCallback(async (signal) => {
+    const [c, s, st] = await Promise.all([
+      api.get("/clients", { signal }),
+      api.get("/services", { signal }),
+      api.get("/staff", { signal }),
+    ]);
+    setClients(c.data || []);
+    setServices(s.data || []);
+    setStaff(st.data || []);
+  }, []);
+
+  const fetchAppointments = useCallback(
+    async (signal) => {
+      try {
+        const params = buildRangeParams(date);
+        const response = await api.get("/appointments", { params, signal });
+
+        const rows = (response.data || []).filter((apt) => {
+          const st = String(apt.status || "").toUpperCase();
+          return !["CANCELED", "DELETED", "REMOVED"].includes(st);
+        });
+
+        const formatted = rows.map((apt) => ({
+          id: apt.id,
+          title: `${apt.client?.name ?? "Cliente"} - ${apt.service?.name ?? "Serviço"}`,
+          start: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
+          end: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
+          resource: apt,
+        }));
+        setEvents(formatted);
+      } catch (error) {
+        if (isAbort(error)) return;
+        console.error("Erro ao buscar agendamentos:", error);
+        toast.error("Erro ao carregar os agendamentos.");
       }
+    },
+    [date, buildRangeParams]
+  );
 
-      const res = await api.get("/agenda/blocks", { params: { ...params, _: Date.now() } });
-      setBlocks(res.data || []);
-    } catch (e) {
-      console.error("Erro ao carregar bloqueios:", e);
-      toast.error("Erro ao carregar bloqueios.");
-    }
-  }, [date, view, selectedPro]);
+  const fetchBlocks = useCallback(
+    async (signal) => {
+      try {
+        const params = buildRangeParams(date);
+        const res = await api.get("/agenda/blocks", { params, signal });
+        setBlocks(res.data || []);
+      } catch (e) {
+        if (isAbort(e)) return;
+        console.error("Erro ao carregar bloqueios:", e);
+        toast.error("Erro ao carregar bloqueios.");
+      }
+    },
+    [date, buildRangeParams]
+  );
 
-  // >>> HORÁRIOS DISPONÍVEIS (robusto p/ formatted|time e com fallback serviceId)
+  // HORÁRIOS DISPONÍVEIS (usa staffId no endpoint público; fallback para serviceId)
   const fetchAvailableSlots = useCallback(
-    async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES) => {
+    async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES, signal) => {
       try {
         setSlotsLoading(true);
 
-        const baseParams = { date: toYMD(targetDate), _: Date.now() };
-        if (proId) baseParams.professionalId = proId;
+        const baseParams = { date: toYMD(targetDate) };
+        // público espera staffId (conforme seus logs)
+        if (proId) baseParams.staffId = proId;
 
-        // 1ª tentativa: usando duration
+        // 1ª tentativa: duration
         let res = await api.get("/public/available-slots", {
           params: { ...baseParams, duration: minutes },
-          
+          signal,
         });
 
-        const items = (res.data || [])
+        let items = (res.data || [])
           .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time))
           .filter(Boolean);
 
-        // 2ª tentativa: usar serviceId caso tenha vindo vazio
+        // 2ª tentativa: usar serviceId (ex.: quando o serviço define duração custom)
         if ((!items || items.length === 0) && services?.[0]?.id) {
           res = await api.get("/public/available-slots", {
             params: { ...baseParams, serviceId: services[0].id },
-            
+            signal,
           });
-          const items2 = (res.data || [])
+          items = (res.data || [])
             .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time))
             .filter(Boolean);
-          setAvailableSlots(items2);
-        } else {
-          setAvailableSlots(items);
         }
+
+        setAvailableSlots(items);
       } catch (e) {
+        if (isAbort(e)) return;
         console.error("Erro ao carregar horários disponíveis:", e);
         toast.error("Erro ao carregar horários disponíveis.");
       } finally {
@@ -166,12 +192,13 @@ const Schedule = () => {
     [date, selectedPro, services]
   );
 
-  const fetchWaitlist = useCallback(async () => {
+  const fetchWaitlist = useCallback(async (signal) => {
     try {
       setWaitlistLoading(true);
-      const res = await api.get("/waitlist", { params: { _: Date.now() } });
+      const res = await api.get("/waitlist", { signal });
       setWaitlist(res.data || []);
     } catch (e) {
+      if (isAbort(e)) return;
       console.error("Erro ao carregar lista de espera:", e);
       toast.error("Erro ao carregar a lista de espera.");
     } finally {
@@ -179,34 +206,53 @@ const Schedule = () => {
     }
   }, []);
 
+  /** ------- EFEITOS ------- */
+
+  // 1) carregamento inicial uma vez (catálogos) — guarda contra StrictMode
   useEffect(() => {
-    const load = async () => {
+    if (loadedOnceRef.current) return;
+    loadedOnceRef.current = true;
+
+    const ac = new AbortController();
+    (async () => {
       setLoading(true);
       try {
-        await Promise.all([
-          fetchAppointments(),
-          fetchBlocks(),
-          api.get("/clients", { params: { _: Date.now() } }).then((r) => setClients(r.data || [])),
-          api.get("/services", { params: { _: Date.now() } }).then((r) => setServices(r.data || [])),
-          api.get("/staff", { params: { _: Date.now() } }).then((r) => setStaff(r.data || [])),
-        ]);
-      } catch {
-        toast.error("Erro ao carregar dados da agenda.");
+        await loadShared(ac.signal);
+      } catch (e) {
+        if (!isAbort(e)) toast.error("Erro ao carregar dados iniciais.");
       } finally {
         setLoading(false);
       }
-    };
-    load();
-  }, [fetchAppointments, fetchBlocks]);
+    })();
 
+    return () => ac.abort();
+  }, [loadShared]);
+
+  // 2) quando staff carregar, define profissional padrão
   useEffect(() => {
     if (!selectedPro && staff?.length) setSelectedPro(staff[0]?.id);
   }, [staff, selectedPro]);
 
+  // 3) refetch de agenda/blocos ao mudar view/date/pro
   useEffect(() => {
-    fetchBlocks();
-    fetchAppointments();
-  }, [fetchBlocks, fetchAppointments]);
+    if (!loadedOnceRef.current) return; // evita correr antes do loadShared
+
+    const ac = new AbortController();
+    (async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchAppointments(ac.signal), fetchBlocks(ac.signal)]);
+      } catch (e) {
+        if (!isAbort(e)) toast.error("Erro ao carregar dados da agenda.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+
+    return () => ac.abort();
+  }, [view, date, selectedPro, fetchAppointments, fetchBlocks]);
+
+  /** ------- HANDLERS ------- */
 
   const handleSelectSlot = useCallback(
     (slotInfo) => {
@@ -244,7 +290,9 @@ const Schedule = () => {
             .delete(`/agenda/blocks/${data.id}`)
             .then(() => {
               toast.success("Bloqueio removido.");
-              fetchBlocks();
+              // refetch apenas de blocks
+              const ac = new AbortController();
+              fetchBlocks(ac.signal);
             })
             .catch(() => toast.error("Erro ao remover bloqueio."));
         }
@@ -268,7 +316,9 @@ const Schedule = () => {
     toast.promise(p, {
       loading: "Salvando agendamento...",
       success: () => {
-        fetchAppointments();
+        // refetch apenas de appointments
+        const ac = new AbortController();
+        fetchAppointments(ac.signal);
         setIsModalOpen(false);
         return `Agendamento ${isEditing ? "atualizado" : "criado"} com sucesso!`;
       },
@@ -285,12 +335,14 @@ const Schedule = () => {
     toast.promise(api.delete(`/appointments/${id}`), {
       loading: "Excluindo agendamento...",
       success: () => {
-        fetchAppointments();
+        const ac = new AbortController();
+        fetchAppointments(ac.signal);
         setIsModalOpen(false);
         return "Agendamento excluído com sucesso!";
       },
       error: (e) => {
-        fetchAppointments();
+        const ac = new AbortController();
+        fetchAppointments(ac.signal);
         return e?.response?.data?.message || "Erro ao excluir agendamento.";
       },
     });
@@ -385,9 +437,11 @@ const Schedule = () => {
 
   const handleWaitlistAgendar = useCallback(() => {
     setOpenSlots(true);
-    fetchAvailableSlots(date, selectedPro);
+    const ac = new AbortController();
+    fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
+  /** ------- RENDER ------- */
   return (
     <div className="relative animate-fade-in-up p-4 max-w-7xl mx-auto">
       {/* toolbar */}
@@ -416,7 +470,8 @@ const Schedule = () => {
           <button
             onClick={() => {
               setOpenSlots(true);
-              fetchAvailableSlots(date, selectedPro);
+              const ac = new AbortController();
+              fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
             }}
             className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center gap-2"
             title="Horários disponíveis"
@@ -500,7 +555,8 @@ const Schedule = () => {
                 <button
                   onClick={() => {
                     setOpenSlots(true);
-                    fetchAvailableSlots(date, selectedPro);
+                    const ac = new AbortController();
+                    fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
                   }}
                   className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
                 >
@@ -519,7 +575,8 @@ const Schedule = () => {
                 <button
                   onClick={() => {
                     setOpenWaitlist(true);
-                    fetchWaitlist();
+                    const ac = new AbortController();
+                    fetchWaitlist(ac.signal);
                   }}
                   className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
                 >
@@ -569,7 +626,10 @@ const Schedule = () => {
           staff={staff}
           onSave={handleSave}
           onDelete={handleDelete}
-          fetchAppointments={fetchAppointments}
+          fetchAppointments={(...args) => {
+            const ac = new AbortController();
+            fetchAppointments(ac.signal, ...args);
+          }}
         />
       )}
 
@@ -580,7 +640,10 @@ const Schedule = () => {
             proId={selectedPro}
             loading={slotsLoading}
             slots={availableSlots}
-            onReload={() => fetchAvailableSlots(date, selectedPro)}
+            onReload={() => {
+              const ac = new AbortController();
+              fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
+            }}
             onPick={handlePickAvailableSlot}
           />
         </BaseModal>
@@ -588,13 +651,28 @@ const Schedule = () => {
 
       {openApptList && (
         <SideDrawer title="Lista de Agendamentos" onClose={() => setOpenApptList(false)}>
-          <AppointmentsListContent events={events} onOpen={handleOpenEventFromList} onRefresh={fetchAppointments} />
+          <AppointmentsListContent
+            events={events}
+            onOpen={handleOpenEventFromList}
+            onRefresh={() => {
+              const ac = new AbortController();
+              fetchAppointments(ac.signal);
+            }}
+          />
         </SideDrawer>
       )}
 
       {openWaitlist && (
         <SideDrawer title="Lista de Espera" onClose={() => setOpenWaitlist(false)}>
-          <WaitlistContent items={waitlist} loading={waitlistLoading} onRefresh={fetchWaitlist} onAgendar={handleWaitlistAgendar} />
+          <WaitlistContent
+            items={waitlist}
+            loading={waitlistLoading}
+            onRefresh={() => {
+              const ac = new AbortController();
+              fetchWaitlist(ac.signal);
+            }}
+            onAgendar={handleWaitlistAgendar}
+          />
         </SideDrawer>
       )}
 
@@ -615,7 +693,8 @@ const Schedule = () => {
                 });
                 toast.success("Bloqueio criado com sucesso!");
                 setOpenBlockTime(false);
-                fetchBlocks();
+                const ac = new AbortController();
+                fetchBlocks(ac.signal);
               } catch (err) {
                 console.error(err);
                 toast.error("Erro ao criar bloqueio.");
@@ -631,6 +710,10 @@ const Schedule = () => {
 export default Schedule;
 
 /* ===== Auxiliares ===== */
+function isAbort(err) {
+  return err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled";
+}
+
 function formatDateInput(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -919,4 +1002,3 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
     </form>
   );
 }
-
