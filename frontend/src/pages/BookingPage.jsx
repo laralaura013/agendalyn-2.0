@@ -1,136 +1,167 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import {
-  ArrowLeft, Sparkles, Clock, Tag, User, Calendar, CheckCircle
-} from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import toast from 'react-hot-toast';
+// ✅ ARQUIVO: src/pages/BookingPage.jsx (corrigido)
+import React, { useState, useEffect, useMemo } from "react";
+import { useParams, Link } from "react-router-dom";
+import api from "../services/api";
+import { ArrowLeft, Sparkles, Clock, Tag, User, Calendar, CheckCircle } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import toast from "react-hot-toast";
+
+function toDateISO(dateStr /* YYYY-MM-DD */, hhmm /* HH:mm */) {
+  // monta um ISO local para exibir no passo 4
+  const [h = "00", m = "00"] = String(hhmm || "").split(":");
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setHours(Number(h), Number(m), 0, 0);
+  return d.toISOString();
+}
+
+function normalizeSlots(list) {
+  return (list || [])
+    .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time || s?.label || ""))
+    .filter(Boolean);
+}
 
 const BookingPage = () => {
   const { companyId } = useParams();
-  const navigate = useNavigate(); // Adicionado
+
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedStaff, setSelectedStaff] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]); // YYYY-MM-DD
+
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [selectedSlot, setSelectedSlot] = useState(null); // string "HH:mm"
+
   const [customerDetails, setCustomerDetails] = useState({ name: "", phone: "", email: "" });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [companyData, setCompanyData] = useState({ company: null, services: [], staff: [] });
-  const [client, setClient] = useState(null); // Estado do cliente logado
+  const [client, setClient] = useState(null);
 
+  // Carrega cliente logado (se houver) e preenche dados
   useEffect(() => {
     const storedClient = localStorage.getItem("clientData");
     if (storedClient) {
-      setClient(JSON.parse(storedClient));
+      const parsed = JSON.parse(storedClient);
+      setClient(parsed);
+      setCustomerDetails({
+        name: parsed.name || "",
+        phone: parsed.phone || "",
+        email: parsed.email || "",
+      });
     }
   }, []);
 
+  // Carrega dados da página pública
   useEffect(() => {
-    const clientToken = localStorage.getItem("clientToken");
-    const storedClientData = JSON.parse(localStorage.getItem("clientData"));
-    if (clientToken && storedClientData) {
-      setCustomerDetails({
-        name: storedClientData.name || "",
-        phone: storedClientData.phone || "",
-        email: storedClientData.email || "",
-      });
-    }
-
-    const fetchBookingData = async () => {
-      if (!companyId) return;
+    if (!companyId) return;
+    const ac = new AbortController();
+    (async () => {
       try {
         setLoading(true);
-        const response = await api.get(`/public/booking-page/${companyId}`);
-        setCompanyData(response.data);
+        const { data } = await api.get(`/public/booking-page/${companyId}`, { signal: ac.signal });
+        setCompanyData(data || { company: null, services: [], staff: [] });
       } catch (err) {
+        if (err?.code === "ERR_CANCELED") return;
         setError("Não foi possível carregar a página de agendamento. Verifique o link e tente novamente.");
       } finally {
         setLoading(false);
       }
-    };
-    fetchBookingData();
+    })();
+    return () => ac.abort();
   }, [companyId]);
 
+  // Busca horários quando entrar no passo 3 (com seleções válidas)
   useEffect(() => {
-    if (step === 3 && selectedDate && selectedService && selectedStaff) {
-      const fetchSlots = async () => {
-        setLoadingSlots(true);
-        setAvailableSlots([]);
-        try {
-          const params = {
-            date: selectedDate,
-            serviceId: selectedService.id,
-            staffId: selectedStaff.id
-          };
-          const response = await api.get("/public/available-slots", { params });
-          setAvailableSlots(response.data);
-        } catch (err) {
-          toast.error("Não foi possível buscar os horários.");
-        } finally {
-          setLoadingSlots(false);
-        }
-      };
-      fetchSlots();
-    }
+    if (step !== 3 || !selectedDate || !selectedService || !selectedStaff) return;
+
+    const ac = new AbortController();
+    (async () => {
+      setLoadingSlots(true);
+      setAvailableSlots([]);
+      try {
+        const params = {
+          date: selectedDate,
+          serviceId: selectedService.id, // permite duração custom
+          staffId: selectedStaff.id,     // conforme seus logs públicos
+        };
+        const res = await api.get("/public/available-slots", { params, signal: ac.signal });
+        setAvailableSlots(normalizeSlots(res.data));
+      } catch (err) {
+        if (err?.code !== "ERR_CANCELED") toast.error("Não foi possível buscar os horários.");
+      } finally {
+        setLoadingSlots(false);
+      }
+    })();
+
+    return () => ac.abort();
   }, [step, selectedDate, selectedService, selectedStaff]);
 
   const handleSelectService = (service) => {
     setSelectedService(service);
+    setSelectedStaff(null);
+    setSelectedSlot(null);
     setStep(2);
   };
 
   const handleSelectStaff = (staffMember) => {
     setSelectedStaff(staffMember);
+    setSelectedSlot(null);
     setStep(3);
   };
 
-  const handleSelectSlot = (slot) => {
-    setSelectedSlot(slot);
+  const handleSelectSlot = (slotHHmm /* string */) => {
+    setSelectedSlot(slotHHmm);
     setStep(4);
   };
 
-  const handleBack = () => {
-    setStep(prev => prev - 1);
-  };
+  const handleBack = () => setStep((prev) => Math.max(1, prev - 1));
 
   const handleCustomerDetailsChange = (e) => {
     const { name, value } = e.target;
-    setCustomerDetails(prev => ({ ...prev, [name]: value }));
+    setCustomerDetails((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleConfirmBooking = async (e) => {
     e.preventDefault();
-    const bookingPromise = api.post("/public/create-appointment", {
+
+    if (!companyId || !selectedService || !selectedStaff || !selectedDate || !selectedSlot) {
+      toast.error("Preencha todas as etapas antes de confirmar.");
+      return;
+    }
+
+    const payload = {
       companyId,
       serviceId: selectedService.id,
       staffId: selectedStaff.id,
-      slotTime: selectedSlot.time,
+      date: selectedDate,          // opcional — se o backend usa junto com slotTime
+      slotTime: selectedSlot,      // "HH:mm" (como seu fluxo público)
       clientName: customerDetails.name,
       clientPhone: customerDetails.phone,
       clientEmail: customerDetails.email,
-      clientId: client?.id, // ✅ Inclui o ID do cliente
-    });
+      clientId: client?.id ?? null,
+    };
+
+    const bookingPromise = api.post("/public/create-appointment", payload);
 
     toast.promise(bookingPromise, {
-      loading: "A confirmar o seu agendamento...",
+      loading: "Confirmando o seu agendamento...",
       success: () => {
         setStep(5);
         return "Agendamento confirmado com sucesso!";
       },
-      error: "Não foi possível confirmar o seu agendamento.",
+      error: (err) => err?.response?.data?.message || "Não foi possível confirmar o seu agendamento.",
     });
   };
+
+  const normalizedSlots = useMemo(() => normalizeSlots(availableSlots), [availableSlots]);
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p>A carregar...</p>
+        <p>Carregando...</p>
       </div>
     );
   }
@@ -145,17 +176,18 @@ const BookingPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 to-white pb-10">
-      <div className="fixed top-0 w-full bg-white shadow z-40 p-4 text-center font-bold text-purple-700 text-lg">
-        <div className="flex justify-between items-center">
+      <div className="fixed top-0 w-full bg-white shadow z-40 p-4">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">Agendar Novo Horário</h1>
           {client ? (
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-700">Olá, {client.name}</span>
+              <span className="text-sm text-gray-700">Oi, {client.name}</span>
               <button
                 onClick={() => {
                   localStorage.removeItem("clientToken");
                   localStorage.removeItem("clientData");
                   setClient(null);
+                  toast.success("Sessão encerrada.");
                 }}
                 className="text-sm text-purple-600 hover:underline"
               >
@@ -164,16 +196,10 @@ const BookingPage = () => {
             </div>
           ) : (
             <div className="flex gap-4">
-              <Link
-                to={`/portal/login/${companyId}`}
-                className="text-sm text-purple-600 hover:underline"
-              >
+              <Link to={`/portal/login/${companyId}`} className="text-sm text-purple-600 hover:underline">
                 Entrar
               </Link>
-              <Link
-                to={`/portal/register/${companyId}`}
-                className="text-sm text-purple-600 hover:underline"
-              >
+              <Link to={`/portal/register/${companyId}`} className="text-sm text-purple-600 hover:underline">
                 Criar Conta
               </Link>
             </div>
@@ -183,6 +209,7 @@ const BookingPage = () => {
 
       <div className="w-full max-w-lg mx-auto px-4 pt-[80px]">
         <main className="bg-white p-6 rounded-2xl shadow-lg">
+          {/* ETAPA 1 - Serviço */}
           {step === 1 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -192,9 +219,12 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Serviço</h2>
               </div>
               <ul className="space-y-3">
-                {companyData.services.map(service => (
+                {companyData.services.map((service) => (
                   <li key={service.id}>
-                    <button onClick={() => handleSelectService(service)} className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition">
+                    <button
+                      onClick={() => handleSelectService(service)}
+                      className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition"
+                    >
                       <div>
                         <p className="font-semibold">{service.name}</p>
                         <p className="text-sm text-gray-500 flex items-center">
@@ -202,10 +232,12 @@ const BookingPage = () => {
                           {service.duration} min
                           <span className="mx-2">|</span>
                           <Tag size={14} className="inline mr-1" />
-                          R$ {Number(service.price).toFixed(2)}
+                          R$ {Number(service.price || 0).toFixed(2)}
                         </p>
                       </div>
-                      <span className="px-3 py-1 bg-purple-700 text-white text-xs font-semibold rounded-lg">Selecionar</span>
+                      <span className="px-3 py-1 bg-purple-700 text-white text-xs font-semibold rounded-lg">
+                        Selecionar
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -213,6 +245,7 @@ const BookingPage = () => {
             </div>
           )}
 
+          {/* ETAPA 2 - Profissional */}
           {step === 2 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -225,11 +258,16 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Profissional</h2>
               </div>
               <ul className="space-y-3">
-                {companyData.staff.map(staffMember => (
+                {companyData.staff.map((staffMember) => (
                   <li key={staffMember.id}>
-                    <button onClick={() => handleSelectStaff(staffMember)} className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition">
+                    <button
+                      onClick={() => handleSelectStaff(staffMember)}
+                      className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition"
+                    >
                       <p className="font-semibold">{staffMember.name}</p>
-                      <span className="px-3 py-1 bg-purple-700 text-white text-xs font-semibold rounded-lg">Selecionar</span>
+                      <span className="px-3 py-1 bg-purple-700 text-white text-xs font-semibold rounded-lg">
+                        Selecionar
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -237,6 +275,7 @@ const BookingPage = () => {
             </div>
           )}
 
+          {/* ETAPA 3 - Data e Hora */}
           {step === 3 && (
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -268,20 +307,20 @@ const BookingPage = () => {
 
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                 {loadingSlots ? (
-                  <p className="col-span-full text-center py-4">A procurar horários...</p>
-                ) : availableSlots.length > 0 ? (
-                  availableSlots.map((slot) => (
+                  <p className="col-span-full text-center py-4">Carregando horários...</p>
+                ) : normalizedSlots.length > 0 ? (
+                  normalizedSlots.map((hhmm) => (
                     <button
-                      key={slot.time}
-                      onClick={() => handleSelectSlot(slot)}
-                      className={`p-2 rounded-full border font-medium text-sm transition-all
-                        ${
-                          selectedSlot?.time === slot.time
-                            ? 'bg-purple-700 text-white border-purple-700'
-                            : 'bg-white text-purple-700 border-purple-300 hover:bg-purple-100'
-                        }`}
+                      key={hhmm}
+                      onClick={() => handleSelectSlot(hhmm)}
+                      className={`p-2 rounded-full border font-medium text-sm transition-all ${
+                        selectedSlot === hhmm
+                          ? "bg-purple-700 text-white border-purple-700"
+                          : "bg-white text-purple-700 border-purple-300 hover:bg-purple-100"
+                      }`}
+                      title={hhmm}
                     >
-                      {slot.formatted}
+                      {hhmm}
                     </button>
                   ))
                 ) : (
@@ -293,6 +332,7 @@ const BookingPage = () => {
             </div>
           )}
 
+          {/* ETAPA 4 - Confirmação */}
           {step === 4 && (
             <div>
               <button onClick={handleBack} className="text-sm text-gray-600 hover:text-black mb-4 flex items-center">
@@ -300,31 +340,65 @@ const BookingPage = () => {
               </button>
               <h2 className="text-2xl font-semibold mb-4">Confirme seu Agendamento</h2>
               <div className="p-4 bg-gray-50 rounded-md space-y-2 text-gray-700">
-                <p><strong>Serviço:</strong> {selectedService?.name}</p>
-                <p><strong>Profissional:</strong> {selectedStaff?.name}</p>
-                <p><strong>Horário:</strong> {selectedSlot ? format(parseISO(selectedSlot.time), "EEEE, dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : ''}</p>
+                <p>
+                  <strong>Serviço:</strong> {selectedService?.name}
+                </p>
+                <p>
+                  <strong>Profissional:</strong> {selectedStaff?.name}
+                </p>
+                <p>
+                  <strong>Horário:</strong>{" "}
+                  {selectedSlot
+                    ? format(parseISO(toDateISO(selectedDate, selectedSlot)), "EEEE, dd/MM/yyyy 'às' HH:mm", {
+                        locale: ptBR,
+                      })
+                    : ""}
+                </p>
               </div>
               <form onSubmit={handleConfirmBooking} className="space-y-4 mt-6">
                 <h3 className="font-semibold">Seus Dados</h3>
                 <div>
                   <label className="block text-sm">Nome Completo</label>
-                  <input type="text" name="name" value={customerDetails.name} onChange={handleCustomerDetailsChange} className="w-full p-2 border rounded-md" required />
+                  <input
+                    type="text"
+                    name="name"
+                    value={customerDetails.name}
+                    onChange={handleCustomerDetailsChange}
+                    className="w-full p-2 border rounded-md"
+                    required
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm">Telemóvel (WhatsApp)</label>
-                  <input type="tel" name="phone" value={customerDetails.phone} onChange={handleCustomerDetailsChange} className="w-full p-2 border rounded-md" />
+                  <label className="block text-sm">Telefone (WhatsApp)</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={customerDetails.phone}
+                    onChange={handleCustomerDetailsChange}
+                    className="w-full p-2 border rounded-md"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm">Email</label>
-                  <input type="email" name="email" value={customerDetails.email} onChange={handleCustomerDetailsChange} className="w-full p-2 border rounded-md" />
+                  <input
+                    type="email"
+                    name="email"
+                    value={customerDetails.email}
+                    onChange={handleCustomerDetailsChange}
+                    className="w-full p-2 border rounded-md"
+                  />
                 </div>
-                <button type="submit" className="w-full py-3 bg-purple-700 text-white font-semibold rounded-xl text-lg hover:bg-purple-800 mt-4">
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-purple-700 text-white font-semibold rounded-xl text-lg hover:bg-purple-800 mt-4"
+                >
                   Confirmar Agendamento
                 </button>
               </form>
             </div>
           )}
 
+          {/* ETAPA 5 - Sucesso */}
           {step === 5 && (
             <div className="text-center py-10">
               <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
