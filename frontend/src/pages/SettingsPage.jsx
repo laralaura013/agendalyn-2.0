@@ -4,6 +4,18 @@ import api from '../services/api';
 import { Link, Copy } from 'lucide-react';
 import GoogleConnectButton from '../components/integrations/GoogleConnectButton';
 
+// Parse seguro do localStorage para evitar crash/tela branca
+function getSafeUser() {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    localStorage.removeItem('user');
+    return null;
+  }
+}
+
 const SettingsPage = () => {
   const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
   const [companyId, setCompanyId] = useState('');
@@ -17,14 +29,14 @@ const SettingsPage = () => {
   const fetchCompanyProfile = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/company/profile');
+      const { data } = await api.get('/company/profile');
       setFormData({
-        name: response.data.name || '',
-        phone: response.data.phone || '',
-        address: response.data.address || '',
+        name: data.name || '',
+        phone: data.phone || '',
+        address: data.address || '',
       });
-      setCompanyId(response.data.id || '');
-    } catch (error) {
+      setCompanyId(data.id || '');
+    } catch {
       toast.error('Failed to load company data.');
     } finally {
       setLoading(false);
@@ -34,10 +46,10 @@ const SettingsPage = () => {
   // Busca status do Google Calendar
   const fetchGoogleStatus = useCallback(async () => {
     try {
-      const userData = JSON.parse(localStorage.getItem('user'));
+      const userData = getSafeUser();
       if (!userData?.id) return;
       const { data } = await api.get(`/integrations/google/status/${userData.id}`);
-      setGoogleConnected(data.connected);
+      setGoogleConnected(!!data.connected);
       setGoogleEmail(data.email || '');
     } catch (err) {
       console.warn('Erro ao buscar status Google:', err);
@@ -47,15 +59,18 @@ const SettingsPage = () => {
   // Detecta retorno do Google OAuth na URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('google') === 'connected') {
+    const result = params.get('google');
+
+    if (result === 'connected') {
       toast.success('Google Calendar conectado com sucesso!');
       fetchGoogleStatus();
-      params.delete('google');
-      window.history.replaceState({}, '', `${window.location.pathname}`);
-    } else if (params.get('google') === 'error') {
+    } else if (result === 'error') {
       toast.error('Erro ao conectar ao Google Calendar.');
-      params.delete('google');
-      window.history.replaceState({}, '', `${window.location.pathname}`);
+    }
+
+    if (result) {
+      // Limpa o query param para evitar loops/estados esquisitos
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [fetchGoogleStatus]);
 
@@ -66,7 +81,7 @@ const SettingsPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -92,7 +107,7 @@ const SettingsPage = () => {
     );
   }
 
-  const userData = JSON.parse(localStorage.getItem('user'));
+  const userData = getSafeUser();
   const staffId = userData?.id || '';
 
   return (

@@ -14,7 +14,7 @@ import ClientLoginPage from './pages/ClientLoginPage'
 import ClientRegisterPage from './pages/ClientRegisterPage'
 import ClientProtectedRoute from './components/auth/ClientProtectedRoute'
 import ClientLayout from './components/layouts/ClientLayout'
-import ClientDashboardPage from './pages/ClientDashboardPage' // será usado como agenda
+import ClientDashboardPage from './pages/ClientDashboardPage'
 import ClientProfilePage from './pages/ClientProfilePage'
 import ClientPackagesPage from './pages/ClientPackagesPage'
 import ClientHistoryPage from './pages/ClientHistoryPage'
@@ -41,9 +41,6 @@ import CategoriesPage from './pages/CategoriesPage'
 import BrandsPage from './pages/BrandsPage'
 import SettingsPage from './pages/SettingsPage'
 import CommissionsPage from './pages/CommissionsPage'
-
-// ✅ NOVO: página dedicada para a Lista de Espera (opcional)
-// Se ainda não existir o arquivo, crie src/pages/WaitlistPage.jsx
 import WaitlistPage from './pages/WaitlistPage'
 
 function App() {
@@ -83,7 +80,7 @@ function App() {
         <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
         <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
 
-        {/* Painel Admin */}
+        {/* Painel Admin (prefixo /dashboard) */}
         <Route
           path="/dashboard"
           element={
@@ -97,7 +94,6 @@ function App() {
           <Route path="clients/new" element={<ClientForm />} />
           <Route path="clients/:id/edit" element={<ClientForm />} />
           <Route path="schedule" element={<Schedule />} />
-          {/* ✅ NOVO: rota para a Lista de Espera */}
           <Route path="waitlist" element={<WaitlistPage />} />
           <Route path="staff" element={<Staff />} />
           <Route path="services" element={<Services />} />
@@ -113,6 +109,18 @@ function App() {
           <Route path="brands" element={<BrandsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="commissions" element={<CommissionsPage />} />
+        </Route>
+
+        {/* ✅ Rota direta para /settings (evita tela branca no retorno do Google) */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<SettingsPage />} />
         </Route>
       </Routes>
     </>
