@@ -27,24 +27,20 @@ import clientPortalRoutes from './routes/clientPortalRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
 import blockRoutes from './routes/blockRoutes.js';
 
+// 📌 Nova importação: rotas do Google Calendar
+import googleRoutes from './routes/googleRoutes.js';
+
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 /* ------------------------------- Logs úteis ------------------------------- */
 app.use((req, _res, next) => {
-  // Origem ajuda a debugar CORS em produção
   console.log('🌐 Origin:', req.headers.origin || '—', '| URL:', req.method, req.originalUrl);
   next();
 });
 
 /* -------------------------- Preflight CORS robusto ------------------------- */
-/**
- * Importante:
- * - Colocar ANTES do cors()
- * - Repetir os métodos e headers que o navegador solicitar
- * - Não usar "*" quando credentials: true
- */
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     const reqOrigin  = req.headers.origin || 'https://frontlyn.netlify.app';
@@ -63,7 +59,7 @@ app.use((req, res, next) => {
 
 /* ---------------------------------- CORS ---------------------------------- */
 app.use(cors({
-  origin: true,                  // reflete o Origin recebido
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
@@ -74,7 +70,7 @@ app.use('/api/webhooks', webhookRoutes);
 
 /* ---------------------------------- Rotas --------------------------------- */
 app.use('/api/portal', clientPortalRoutes);
-app.use('/api/public', publicRoutes); // público (sem protect)
+app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/company', companyRoutes);
@@ -95,6 +91,9 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/commissions', commissionRoutes);
 app.use('/api/agenda/blocks', blockRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+
+// 📌 Nova rota: Google Calendar
+app.use('/api/integrations/google', googleRoutes);
 
 /* --------------------------------- Health --------------------------------- */
 app.get('/api', (_req, res) => res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' }));

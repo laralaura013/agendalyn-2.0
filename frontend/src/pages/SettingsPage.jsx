@@ -2,15 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { Link, Copy } from 'lucide-react';
-// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
+import GoogleConnectButton from '../components/integrations/GoogleConnectButton';
 
-const CompanySettingsPage = () => {
+const SettingsPage = () => {
   const [formData, setFormData] = useState({ name: '', phone: '', address: '' });
   const [companyId, setCompanyId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState('');
 
   const bookingUrl = `${window.location.origin}/agendar/${companyId}`;
 
+  // Busca dados da empresa
   const fetchCompanyProfile = useCallback(async () => {
     setLoading(true);
     try {
@@ -22,15 +25,44 @@ const CompanySettingsPage = () => {
       });
       setCompanyId(response.data.id || '');
     } catch (error) {
-      toast.error("Failed to load company data.");
+      toast.error('Failed to load company data.');
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Busca status do Google Calendar
+  const fetchGoogleStatus = useCallback(async () => {
+    try {
+      const userData = JSON.parse(localStorage.getItem('userData'));
+      if (!userData?.id) return;
+      const { data } = await api.get(`/integrations/google/status/${userData.id}`);
+      setGoogleConnected(data.connected);
+      setGoogleEmail(data.email || '');
+    } catch (err) {
+      console.warn('Erro ao buscar status Google:', err);
+    }
+  }, []);
+
+  // Detecta retorno do Google OAuth na URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('google') === 'connected') {
+      toast.success('Google Calendar conectado com sucesso!');
+      fetchGoogleStatus();
+      params.delete('google');
+      window.history.replaceState({}, '', `${window.location.pathname}`);
+    } else if (params.get('google') === 'error') {
+      toast.error('Erro ao conectar ao Google Calendar.');
+      params.delete('google');
+      window.history.replaceState({}, '', `${window.location.pathname}`);
+    }
+  }, [fetchGoogleStatus]);
+
   useEffect(() => {
     fetchCompanyProfile();
-  }, [fetchCompanyProfile]);
+    fetchGoogleStatus();
+  }, [fetchCompanyProfile, fetchGoogleStatus]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -60,6 +92,9 @@ const CompanySettingsPage = () => {
     );
   }
 
+  const userData = JSON.parse(localStorage.getItem('userData'));
+  const staffId = userData?.id || '';
+
   return (
     <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
       <h1 className="text-2xl md:text-3xl font-bold mb-6">Company Settings</h1>
@@ -84,6 +119,33 @@ const CompanySettingsPage = () => {
             <Copy size={18} />
           </button>
         </div>
+      </div>
+
+      {/* Google Calendar Integration */}
+      <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8">
+        <h2 className="text-xl font-semibold mb-4">Google Calendar</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Connect your Google Calendar to sync appointments automatically.
+        </p>
+        {staffId ? (
+          <div className="flex flex-col gap-2">
+            <GoogleConnectButton
+              staffId={staffId}
+              isConnected={googleConnected}
+              onStatusChange={(connected, email) => {
+                setGoogleConnected(connected);
+                setGoogleEmail(email || '');
+              }}
+            />
+            {googleConnected && googleEmail && (
+              <p className="text-sm text-green-600">
+                ✅ Connected as <strong>{googleEmail}</strong>
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-red-500">Unable to detect your staff ID.</p>
+        )}
       </div>
 
       {/* Company Form */}
@@ -135,4 +197,4 @@ const CompanySettingsPage = () => {
   );
 };
 
-export default CompanySettingsPage;
+export default SettingsPage;

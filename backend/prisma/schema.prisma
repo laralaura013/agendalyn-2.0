@@ -8,109 +8,127 @@ datasource db {
 }
 
 model Company {
-  id               String           @id @default(cuid())
+  id               String   @id @default(cuid())
   name             String
   phone            String?
   address          String?
-  stripeCustomerId String?          @unique
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  isActive         Boolean          @default(true)
-  anamnesisForms   AnamnesisForm[]
-  appointments     Appointment[]
-  brands           Brand[]
-  cashierSessions  CashierSession[]
-  categories       Category[]
-  clients          Client[]
-  goals            Goal[]
-  orders           Order[]
-  packages         Package[]
-  products         Product[]
-  services         Service[]
-  subscription     Subscription?
-  users            User[]
-  scheduleBlocks   ScheduleBlock[]   // <-- adicionado
-  waitlists        Waitlist[]
+  stripeCustomerId String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  isActive         Boolean  @default(true)
+
+  anamnesisForms  AnamnesisForm[]
+  appointments    Appointment[]
+  brands          Brand[]
+  cashierSessions CashierSession[]
+  categories      Category[]
+  clients         Client[]
+  goals           Goal[]
+  orders          Order[]
+  packages        Package[]
+  products        Product[]
+  services        Service[]
+  subscription    Subscription?
+  users           User[]
+  scheduleBlocks  ScheduleBlock[] // bloqueios de agenda
+  waitlists       Waitlist[]
 }
 
 model User {
-  id                   String                @id @default(cuid())
-  email                String                @unique
-  name                 String
-  password             String
-  role                 Role                  @default(STAFF)
-  commission           Decimal?              @db.Decimal(5, 2)
-  workSchedule         Json?
-  companyId            String
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  showInBooking        Boolean               @default(true)
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  password      String
+  role          Role     @default(STAFF)
+  commission    Decimal? @db.Decimal(5, 2)
+  workSchedule  Json?
+  companyId     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  showInBooking Boolean  @default(true)
+
+  company              Company               @relation(fields: [companyId], references: [id])
   appointments         Appointment[]
   goals                Goal[]
   orders               Order[]
   packageSessionUsages PackageSessionUsage[]
-  company              Company               @relation(fields: [companyId], references: [id])
-  services             Service[]             @relation("ServiceToUser")
-  scheduleBlocks       ScheduleBlock[]       // <-- adicionado (bloqueios por profissional)
+  services             Service[]             @relation("ServiceToUser") // M2M implícito
+  scheduleBlocks       ScheduleBlock[] // bloqueios por profissional
   waitlists            Waitlist[]
+  googleIntegration    GoogleIntegration?
+
+  @@index([companyId])
 }
 
 model Service {
-  id           String        @id @default(cuid())
-  name         String
-  price        Decimal       @db.Decimal(10, 2)
-  duration     Int
-  companyId    String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  price     Decimal  @db.Decimal(10, 2)
+  duration  Int
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company      Company       @relation(fields: [companyId], references: [id])
   appointments Appointment[]
   goals        Goal[]
   orderItems   OrderItem[]
-  company      Company       @relation(fields: [companyId], references: [id])
   packages     Package[]     @relation("PackageServices")
-  availableTo  User[]        @relation("ServiceToUser")
+  availableTo  User[]        @relation("ServiceToUser") // M2M implícito
   waitlists    Waitlist[]
+
+  @@index([companyId])
 }
 
 model Client {
-  id               String            @id @default(cuid())
-  name             String
-  phone            String
-  birthDate        DateTime?
-  notes            String?
-  companyId        String
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  email            String?
-  password         String?
+  id        String    @id @default(cuid())
+  name      String
+  phone     String
+  birthDate DateTime?
+  notes     String?
+  companyId String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  email     String?
+  password  String?
+
+  company          Company           @relation(fields: [companyId], references: [id])
   anamnesisAnswers AnamnesisAnswer[]
   appointments     Appointment[]
-  company          Company           @relation(fields: [companyId], references: [id])
   packages         ClientPackage[]
   orders           Order[]
   waitlists        Waitlist[]
 
   @@unique([companyId, email])
+  @@index([companyId])
 }
 
 model Appointment {
-  id                  String                @id @default(cuid())
-  start               DateTime
-  end                 DateTime
-  notes               String?
-  status              AppointmentStatus     @default(SCHEDULED)
-  companyId           String
-  serviceId           String
-  userId              String
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  clientId            String
-  anamnesisAnswers    AnamnesisAnswer[]
-  client              Client                @relation(fields: [clientId], references: [id])
+  id        String            @id @default(cuid())
+  start     DateTime
+  end       DateTime
+  notes     String?
+  status    AppointmentStatus @default(SCHEDULED)
+  companyId String
+  serviceId String
+  userId    String
+  clientId  String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  // Integração Google: ID do evento associado (quando sincronizado)
+  googleEventId String?
+
   company             Company               @relation(fields: [companyId], references: [id])
   service             Service               @relation(fields: [serviceId], references: [id])
   user                User                  @relation(fields: [userId], references: [id])
+  client              Client                @relation(fields: [clientId], references: [id])
+  anamnesisAnswers    AnamnesisAnswer[]
   packageSessionUsage PackageSessionUsage[]
+
+  @@index([companyId, start])
+  @@index([userId, start])
+  @@index([clientId, start])
 }
 
 model Order {
@@ -122,22 +140,32 @@ model Order {
   userId    String
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
-  client    Client      @relation(fields: [clientId], references: [id])
-  company   Company     @relation(fields: [companyId], references: [id])
-  user      User        @relation(fields: [userId], references: [id])
-  items     OrderItem[]
+
+  client  Client      @relation(fields: [clientId], references: [id])
+  company Company     @relation(fields: [companyId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+  items   OrderItem[]
+
+  @@index([companyId])
+  @@index([clientId])
+  @@index([userId])
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
   serviceId String?
   quantity  Int
-  price     Decimal  @db.Decimal(10, 2)
+  price     Decimal @db.Decimal(10, 2)
   productId String?
-  order     Order    @relation(fields: [orderId], references: [id])
-  product   Product? @relation(fields: [productId], references: [id])
-  service   Service? @relation(fields: [serviceId], references: [id])
+
+  order   Order    @relation(fields: [orderId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id])
+
+  @@index([orderId])
+  @@index([serviceId])
+  @@index([productId])
 }
 
 model CashierSession {
@@ -148,8 +176,11 @@ model CashierSession {
   closedAt       DateTime?
   status         CashierStatus @default(OPEN)
   companyId      String
-  company        Company       @relation(fields: [companyId], references: [id])
-  transactions   Transaction[]
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  transactions Transaction[]
+
+  @@index([companyId])
 }
 
 model Transaction {
@@ -159,15 +190,19 @@ model Transaction {
   description      String
   cashierSessionId String
   createdAt        DateTime        @default(now())
-  cashierSession   CashierSession  @relation(fields: [cashierSessionId], references: [id])
+
+  cashierSession CashierSession @relation(fields: [cashierSessionId], references: [id])
+
+  @@index([cashierSessionId])
 }
 
 model Plan {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  price         Decimal        @db.Decimal(10, 2)
+  id            String  @id @default(cuid())
+  name          String  @unique
+  price         Decimal @db.Decimal(10, 2)
   features      Json
-  stripePriceId String         @unique
+  stripePriceId String  @unique
+
   subscriptions Subscription[]
 }
 
@@ -180,8 +215,9 @@ model Subscription {
   stripeSubscriptionId String?            @unique
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
-  company              Company            @relation(fields: [companyId], references: [id])
-  plan                 Plan               @relation(fields: [planId], references: [id])
+
+  company Company @relation(fields: [companyId], references: [id])
+  plan    Plan    @relation(fields: [planId], references: [id])
 }
 
 model Goal {
@@ -195,130 +231,178 @@ model Goal {
   serviceId   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  company     Company  @relation(fields: [companyId], references: [id])
-  service     Service? @relation(fields: [serviceId], references: [id])
-  user        User?    @relation(fields: [userId], references: [id])
+
+  company Company  @relation(fields: [companyId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
 
   @@unique([month, year, companyId, userId, serviceId])
+  @@index([companyId])
+  @@index([userId])
+  @@index([serviceId])
 }
 
 model AnamnesisForm {
-  id        String            @id @default(cuid())
+  id        String   @id @default(cuid())
   title     String
   questions Json
   companyId String
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  answers   AnamnesisAnswer[]
-  company   Company           @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company           @relation(fields: [companyId], references: [id])
+  answers AnamnesisAnswer[]
+
+  @@index([companyId])
 }
 
 model AnamnesisAnswer {
-  id            String        @id @default(cuid())
+  id            String   @id @default(cuid())
   formId        String
   clientId      String
   answers       Json
   appointmentId String?
-  createdAt     DateTime      @default(now())
-  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
-  client        Client        @relation(fields: [clientId], references: [id])
-  form          AnamnesisForm @relation(fields: [formId], references: [id])
+  createdAt     DateTime @default(now())
+
+  form        AnamnesisForm @relation(fields: [formId], references: [id])
+  client      Client        @relation(fields: [clientId], references: [id])
+  appointment Appointment?  @relation(fields: [appointmentId], references: [id])
+
+  @@index([formId])
+  @@index([clientId])
+  @@index([appointmentId])
 }
 
 model Package {
-  id             String          @id @default(cuid())
-  name           String
-  price          Decimal         @db.Decimal(10, 2)
-  sessions       Int
-  validityDays   Int
-  companyId      String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  clientPackages ClientPackage[]
+  id           String   @id @default(cuid())
+  name         String
+  price        Decimal  @db.Decimal(10, 2)
+  sessions     Int
+  validityDays Int
+  companyId    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   company        Company         @relation(fields: [companyId], references: [id])
+  clientPackages ClientPackage[]
   services       Service[]       @relation("PackageServices")
+
+  @@index([companyId])
 }
 
 model ClientPackage {
-  id                String                @id @default(cuid())
+  id                String   @id @default(cuid())
   clientId          String
   packageId         String
   sessionsRemaining Int
   expiresAt         DateTime
-  createdAt         DateTime              @default(now())
-  client            Client                @relation(fields: [clientId], references: [id])
-  package           Package               @relation(fields: [packageId], references: [id])
-  sessionUsages     PackageSessionUsage[]
+  createdAt         DateTime @default(now())
+
+  client        Client                @relation(fields: [clientId], references: [id])
+  package       Package               @relation(fields: [packageId], references: [id])
+  sessionUsages PackageSessionUsage[]
+
+  @@index([clientId])
+  @@index([packageId])
 }
 
 model PackageSessionUsage {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
   clientPackageId String
-  usedAt          DateTime      @default(now())
+  usedAt          DateTime @default(now())
   appointmentId   String?
   userId          String
-  appointment     Appointment?  @relation(fields: [appointmentId], references: [id])
-  clientPackage   ClientPackage @relation(fields: [clientPackageId], references: [id])
-  user            User          @relation(fields: [userId], references: [id])
+
+  clientPackage ClientPackage @relation(fields: [clientPackageId], references: [id])
+  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@index([clientPackageId])
+  @@index([appointmentId])
+  @@index([userId])
 }
 
 model Category {
-  id        String    @id @default(cuid())
+  id        String @id @default(cuid())
   name      String
   companyId String
-  company   Company   @relation(fields: [companyId], references: [id])
-  products  Product[]
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  products Product[]
 
   @@unique([name, companyId])
+  @@index([companyId])
 }
 
 model Brand {
-  id        String    @id @default(cuid())
+  id        String @id @default(cuid())
   name      String
   companyId String
-  company   Company   @relation(fields: [companyId], references: [id])
-  products  Product[]
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  products Product[]
 
   @@unique([name, companyId])
+  @@index([companyId])
 }
 
 model Product {
-  id          String      @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  price       Decimal     @db.Decimal(10, 2)
-  cost        Decimal?    @db.Decimal(10, 2)
-  stock       Int         @default(0)
+  price       Decimal  @db.Decimal(10, 2)
+  cost        Decimal? @db.Decimal(10, 2)
+  stock       Int      @default(0)
   companyId   String
   categoryId  String?
   brandId     String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  orderItems  OrderItem[]
-  brand       Brand?      @relation(fields: [brandId], references: [id])
-  category    Category?   @relation(fields: [categoryId], references: [id])
-  company     Company     @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id])
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  brand      Brand?      @relation(fields: [brandId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([brandId])
 }
 
 //
-// ---- NOVO MODELO PARA BLOQUEIO DE HORÁRIOS ----
-//
+// ---- BLOQUEIO DE HORÁRIOS ----
 model ScheduleBlock {
   id             String   @id @default(cuid())
   companyId      String
-  professionalId String?   // opcional: bloqueio geral da empresa ou por profissional
-  date           DateTime  // data (00:00); horas em startTime/endTime
-  startTime      String    // "HH:mm"
-  endTime        String    // "HH:mm"
+  professionalId String? // opcional: bloqueio geral da empresa ou por profissional
+  date           DateTime // data (00:00); horas em startTime/endTime
+  startTime      String // "HH:mm"
+  endTime        String // "HH:mm"
   reason         String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  company        Company   @relation(fields: [companyId], references: [id])
-  professional   User?     @relation(fields: [professionalId], references: [id])
+  company      Company @relation(fields: [companyId], references: [id])
+  professional User?   @relation(fields: [professionalId], references: [id])
 
   @@index([companyId, date])
   @@index([professionalId, date])
+}
+
+//
+// ---- INTEGRAÇÃO GOOGLE CALENDAR ----
+model GoogleIntegration {
+  id           String @id @default(cuid())
+  staffId      String @unique // = userId (profissional)
+  staff        User   @relation(fields: [staffId], references: [id])
+  googleEmail  String
+  calendarId   String @default("primary")
+  accessToken  String
+  refreshToken String
+  expiryDate   BigInt // ms (Date.getTime()) do token
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Role {
@@ -362,7 +446,7 @@ enum GoalType {
   BY_SERVICE
 }
 
-// --- ENUMS ---
+// Espera
 enum WaitlistStatus {
   WAITING
   NOTIFIED
@@ -370,34 +454,35 @@ enum WaitlistStatus {
   CANCELLED
 }
 
-// --- MODELS ---
 model Waitlist {
-  id              String          @id @default(cuid())
-  companyId       String
-  company         Company         @relation(fields: [companyId], references: [id])
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  // Relacionar com cliente já existente (opcional)
-  clientId        String?
-  client          Client?         @relation(fields: [clientId], references: [id])
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
 
-  // Caso não tenha client no sistema
-  clientName      String?
-  phone           String?
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id])
 
-  // Preferências
-  serviceId       String?
-  service         Service?        @relation(fields: [serviceId], references: [id])
+  professionalId String?
+  professional   User?   @relation(fields: [professionalId], references: [id])
 
-  professionalId  String?
-  professional    User?           @relation(fields: [professionalId], references: [id])
+  clientName String?
+  phone      String?
 
-  preferredDate   DateTime?
-  preferredTime   String?         // "HH:mm"
-  pref            String?         // texto livre: manhã/tarde/noite, sábado, etc.
+  preferredDate DateTime?
+  preferredTime String? // "HH:mm"
+  pref          String? // livre: manhã/tarde/noite etc.
 
-  notes           String?
-  status          WaitlistStatus  @default(WAITING)
+  notes  String?
+  status WaitlistStatus @default(WAITING)
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([clientId])
+  @@index([serviceId])
+  @@index([professionalId])
 }

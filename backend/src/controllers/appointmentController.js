@@ -1,13 +1,13 @@
 import prisma from '../prismaClient.js';
+import {
+  isTimeFreeOnGoogle,
+  createGoogleEventForAppointment,
+  updateGoogleEventForAppointment,
+  deleteGoogleEventForAppointment,
+} from '../services/googleCalendarService.js';
 
 /**
  * GET /api/appointments
- * Query:
- *  - professionalId? | userId?
- *  - date? (YYYY-MM-DD)
- *  - date_from?, date_to? (YYYY-MM-DD)
- *  - statuses? "SCHEDULED,CONFIRMED"
- *  - includeCanceled? (true/false)
  */
 export const listAppointments = async (req, res) => {
   try {
@@ -23,7 +23,6 @@ export const listAppointments = async (req, res) => {
     } = req.query;
 
     const where = { companyId };
-
     const resolvedUserId = userId || professionalId;
     if (resolvedUserId) where.userId = resolvedUserId;
 
@@ -63,7 +62,6 @@ export const listAppointments = async (req, res) => {
 
 /**
  * POST /api/appointments
- * Body: clientId, serviceId, userId|professionalId, start, end, notes?, status?
  */
 export const createAppointment = async (req, res) => {
   try {
@@ -98,10 +96,8 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({ message: 'Dados inválidos para agendamento.', missing });
     }
 
-    // data-only
+    // Verifica bloqueios internos
     const dateOnly = new Date(dStart.toISOString().split('T')[0]);
-
-    // bloqueios (geral ou profissional)
     const conflict = await prisma.scheduleBlock.findFirst({
       where: {
         companyId,
@@ -115,7 +111,7 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({ message: 'Horário indisponível. Existe um bloqueio neste período.' });
     }
 
-    // sobreposição com outros agendamentos do mesmo profissional (não cancelados)
+    // Verifica sobreposição com outros agendamentos internos
     const overlap = await prisma.appointment.findFirst({
       where: {
         companyId,
@@ -129,6 +125,17 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({ message: 'Horário já ocupado para este profissional.' });
     }
 
+    // 🔹 Verifica disponibilidade no Google Calendar (se conectado)
+    const isFree = await isTimeFreeOnGoogle({
+      staffId: chosenUserId,
+      startISO: dStart.toISOString(),
+      endISO: dEnd.toISOString(),
+    });
+    if (!isFree) {
+      return res.status(409).json({ message: 'Profissional indisponível no Google Calendar para este horário.' });
+    }
+
+    // Cria agendamento no banco
     const created = await prisma.appointment.create({
       data: {
         company: { connect: { id: companyId } },
@@ -142,6 +149,23 @@ export const createAppointment = async (req, res) => {
       },
       include: { client: true, service: true, user: true },
     });
+
+    // 🔹 Cria evento no Google Calendar
+    try {
+      const googleEvent = await createGoogleEventForAppointment({
+        staffId: chosenUserId,
+        appointment: created,
+        clientEmail: created.client?.email || null,
+      });
+      if (googleEvent?.id) {
+        await prisma.appointment.update({
+          where: { id: created.id },
+          data: { googleEventId: googleEvent.id },
+        });
+      }
+    } catch (e) {
+      console.warn('Falha ao criar evento no Google:', e.message);
+    }
 
     res.status(201).json(created);
   } catch (e) {
@@ -178,6 +202,18 @@ export const updateAppointment = async (req, res) => {
       include: { client: true, service: true, user: true },
     });
 
+    // 🔹 Atualiza evento no Google Calendar
+    try {
+      await updateGoogleEventForAppointment({
+        staffId: chosenUserId,
+        googleEventId: appointment.googleEventId,
+        appointment: updated,
+        clientEmail: updated.client?.email || null,
+      });
+    } catch (e) {
+      console.warn('Falha ao atualizar evento no Google:', e.message);
+    }
+
     res.json(updated);
   } catch (err) {
     console.error('Erro ao atualizar agendamento:', err);
@@ -195,6 +231,18 @@ export const deleteAppointment = async (req, res) => {
 
     const appointment = await prisma.appointment.findFirst({ where: { id, companyId } });
     if (!appointment) return res.status(404).json({ message: 'Agendamento não encontrado.' });
+
+    // 🔹 Remove evento do Google Calendar
+    try {
+      if (appointment.googleEventId) {
+        await deleteGoogleEventForAppointment({
+          staffId: appointment.userId,
+          googleEventId: appointment.googleEventId,
+        });
+      }
+    } catch (e) {
+      console.warn('Falha ao excluir evento no Google:', e.message);
+    }
 
     await prisma.appointment.delete({ where: { id } });
     res.status(204).send();
