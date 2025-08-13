@@ -34,7 +34,7 @@ const SettingsPage = () => {
   // Busca status do Google Calendar
   const fetchGoogleStatus = useCallback(async () => {
     try {
-      const userData = JSON.parse(localStorage.getItem('userData'));
+      const userData = JSON.parse(localStorage.getItem('user'));
       if (!userData?.id) return;
       const { data } = await api.get(`/integrations/google/status/${userData.id}`);
       setGoogleConnected(data.connected);
@@ -92,7 +92,7 @@ const SettingsPage = () => {
     );
   }
 
-  const userData = JSON.parse(localStorage.getItem('userData'));
+  const userData = JSON.parse(localStorage.getItem('user'));
   const staffId = userData?.id || '';
 
   return (
