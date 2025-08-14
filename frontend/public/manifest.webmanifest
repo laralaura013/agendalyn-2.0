@@ -1,39 +1,39 @@
 {
-  "name": "Agendalyn 2.0",
+  "name": "Agendalyn",
   "short_name": "Agendalyn",
-  "description": "Sistema de agendamento para barbearias, salões de beleza e clínicas de estética.",
+  "description": "Sistema de agendamento para barbearias, salões de beleza e clínicas.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#6B21A8",
+  "theme_color": "#9333ea",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
       "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ],
   "screenshots": [
     {
       "src": "/screenshots/screenshot-desktop.png",
-      "sizes": "1907x955",
+      "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Painel de Controle"
+      "label": "Dashboard no desktop"
     },
     {
       "src": "/screenshots/screenshot-mobile.png",
-      "sizes": "1200x720",
+      "sizes": "430x932",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Visualização da Agenda"
+      "label": "Painel no celular"
     }
   ]
 }
