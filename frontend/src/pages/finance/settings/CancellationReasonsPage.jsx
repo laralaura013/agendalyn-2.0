@@ -1,50 +1,68 @@
-import React, { useEffect, useState } from 'react';
-import api from '../../services/api';
-import toast from 'react-hot-toast';
+import React, { useState } from "react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 
 export default function CancellationReasonsPage() {
-  const [items, setItems] = useState([]);
-  const [name, setName] = useState('');
+  const [reasons, setReasons] = useState([]);
+  const [input, setInput] = useState("");
 
-  const fetchData = async () => {
-    try {
-      const { data } = await api.get('/settings/cancellation-reasons');
-      setItems(data);
-    } catch {
-      toast.error('Erro ao carregar motivos.');
-    }
+  const addReason = () => {
+    if (!input.trim()) return;
+    setReasons((prev) => [...prev, { id: crypto.randomUUID(), name: input.trim() }]);
+    setInput("");
   };
 
-  useEffect(()=>{ fetchData(); },[]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/settings/cancellation-reasons', { name, active: true });
-      toast.success('Motivo criado!');
-      setName('');
-      fetchData();
-    } catch {
-      toast.error('Erro ao criar motivo.');
-    }
+  const removeReason = (id) => {
+    setReasons((prev) => prev.filter((r) => r.id !== id));
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-4 rounded-md shadow">
-        <h2 className="text-lg font-semibold mb-3">Novo Motivo</h2>
-        <form onSubmit={submit} className="flex gap-3">
-          <input className="border rounded px-3 py-2" placeholder="Nome do motivo" value={name} onChange={e=>setName(e.target.value)} required/>
-          <button className="px-4 py-2 bg-gray-900 text-white rounded">Salvar</button>
-        </form>
+    <div className="p-4 sm:p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Motivos de Cancelamento</h1>
       </div>
-      <div className="bg-white p-4 rounded-md shadow">
-        <h2 className="text-lg font-semibold mb-3">Motivos</h2>
-        <ul className="list-disc pl-5">
-          {items.map(it => <li key={it.id}>{it.name} {it.active ? '' : '(inativo)'}</li>)}
-          {!items.length && <p className="text-gray-500">Nenhum registro</p>}
-        </ul>
+
+      <p className="text-sm text-gray-600 mt-2">
+        Stub temporário para destravar o deploy. Integração com a API pode ser ligada depois.
+      </p>
+
+      <div className="mt-6 grid gap-3 sm:flex">
+        <input
+          type="text"
+          placeholder="Ex.: Cliente não compareceu"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          className="w-full sm:max-w-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+        />
+        <button
+          onClick={addReason}
+          className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 bg-violet-600 text-white hover:bg-violet-700 transition"
+        >
+          <Plus size={18} /> Adicionar
+        </button>
       </div>
+
+      <ul className="mt-6 divide-y rounded-lg border">
+        {reasons.length === 0 && (
+          <li className="p-4 text-sm text-gray-500">Nenhum motivo cadastrado.</li>
+        )}
+        {reasons.map((r) => (
+          <li key={r.id} className="flex items-center justify-between p-4">
+            <span>{r.name}</span>
+            <div className="flex items-center gap-2">
+              <button className="p-2 rounded hover:bg-gray-100" title="Editar (stub)">
+                <Pencil size={18} />
+              </button>
+              <button
+                onClick={() => removeReason(r.id)}
+                className="p-2 rounded hover:bg-gray-100 text-red-600"
+                title="Excluir"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
