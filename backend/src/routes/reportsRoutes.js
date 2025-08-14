@@ -1,11 +1,14 @@
 import express from 'express';
-import { protect, checkRole } from '../middlewares/authMiddleware.js'; // Importa o checkRole
-import { getRevenueReport } from '../controllers/reportsController.js';
+import { protect, checkRole } from '../middlewares/authMiddleware.js';
+import { getRevenueReport, getBirthdaysReport } from '../controllers/reportsController.js';
 
 const router = express.Router();
 router.use(protect);
 
-// Aplica a regra: apenas usuários com a função 'OWNER' podem acessar esta rota
+// Apenas OWNER
 router.get('/revenue', checkRole(['OWNER']), getRevenueReport);
+
+// Aniversariantes (OWNER)
+router.get('/birthdays', checkRole(['OWNER']), getBirthdaysReport);
 
 export default router;

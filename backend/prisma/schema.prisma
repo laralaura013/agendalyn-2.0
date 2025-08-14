@@ -30,8 +30,17 @@ model Company {
   services        Service[]
   subscription    Subscription?
   users           User[]
-  scheduleBlocks  ScheduleBlock[] // bloqueios de agenda
+  scheduleBlocks  ScheduleBlock[]
   waitlists       Waitlist[]
+
+  // SPRINT 1
+  suppliers           Supplier[]
+  paymentMethods      PaymentMethod[]
+  financeCategories   FinanceCategory[]
+  payables            Payable[]
+  receivables         Receivable[]
+  cancellationReasons CancellationReason[]
+  clientOrigins       ClientOrigin[]
 }
 
 model User {
@@ -52,8 +61,8 @@ model User {
   goals                Goal[]
   orders               Order[]
   packageSessionUsages PackageSessionUsage[]
-  services             Service[]             @relation("ServiceToUser") // M2M implícito
-  scheduleBlocks       ScheduleBlock[] // bloqueios por profissional
+  services             Service[]             @relation("ServiceToUser")
+  scheduleBlocks       ScheduleBlock[]
   waitlists            Waitlist[]
   googleIntegration    GoogleIntegration?
 
@@ -74,7 +83,7 @@ model Service {
   goals        Goal[]
   orderItems   OrderItem[]
   packages     Package[]     @relation("PackageServices")
-  availableTo  User[]        @relation("ServiceToUser") // M2M implícito
+  availableTo  User[]        @relation("ServiceToUser")
   waitlists    Waitlist[]
 
   @@index([companyId])
@@ -92,15 +101,21 @@ model Client {
   email     String?
   password  String?
 
+  // SPRINT 1: origem do cliente (opcional)
+  originId String?
+  origin   ClientOrigin? @relation(fields: [originId], references: [id])
+
   company          Company           @relation(fields: [companyId], references: [id])
   anamnesisAnswers AnamnesisAnswer[]
   appointments     Appointment[]
   packages         ClientPackage[]
   orders           Order[]
   waitlists        Waitlist[]
+  Receivable       Receivable[]
 
   @@unique([companyId, email])
   @@index([companyId])
+  @@index([originId])
 }
 
 model Appointment {
@@ -116,8 +131,12 @@ model Appointment {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  // Integração Google: ID do evento associado (quando sincronizado)
+  // Integração Google
   googleEventId String?
+
+  // SPRINT 1: motivo de cancelamento
+  cancelReasonId String?
+  cancelReason   CancellationReason? @relation(fields: [cancelReasonId], references: [id])
 
   company             Company               @relation(fields: [companyId], references: [id])
   service             Service               @relation(fields: [serviceId], references: [id])
@@ -145,6 +164,9 @@ model Order {
   company Company     @relation(fields: [companyId], references: [id])
   user    User        @relation(fields: [userId], references: [id])
   items   OrderItem[]
+
+  // SPRINT 1: receivable opcional linkado
+  receivables Receivable[]
 
   @@index([companyId])
   @@index([clientId])
@@ -369,15 +391,13 @@ model Product {
   @@index([brandId])
 }
 
-//
-// ---- BLOQUEIO DE HORÁRIOS ----
 model ScheduleBlock {
   id             String   @id @default(cuid())
   companyId      String
-  professionalId String? // opcional: bloqueio geral da empresa ou por profissional
-  date           DateTime // data (00:00); horas em startTime/endTime
-  startTime      String // "HH:mm"
-  endTime        String // "HH:mm"
+  professionalId String?
+  date           DateTime
+  startTime      String
+  endTime        String
   reason         String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -389,17 +409,15 @@ model ScheduleBlock {
   @@index([professionalId, date])
 }
 
-//
-// ---- INTEGRAÇÃO GOOGLE CALENDAR ----
 model GoogleIntegration {
   id           String @id @default(cuid())
-  staffId      String @unique // = userId (profissional)
+  staffId      String @unique
   staff        User   @relation(fields: [staffId], references: [id])
   googleEmail  String
   calendarId   String @default("primary")
   accessToken  String
   refreshToken String
-  expiryDate   BigInt // ms (Date.getTime()) do token
+  expiryDate   BigInt
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -446,13 +464,147 @@ enum GoalType {
   BY_SERVICE
 }
 
-// Espera
 enum WaitlistStatus {
   WAITING
   NOTIFIED
   SCHEDULED
   CANCELLED
 }
+
+// -------------------- SPRINT 1: Financeiro / Configurações --------------------
+
+enum FinanceCategoryType {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum PayableStatus {
+  OPEN
+  PAID
+  CANCELED
+}
+
+enum ReceivableStatus {
+  OPEN
+  RECEIVED
+  CANCELED
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  taxId     String?
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+
+  company Company   @relation(fields: [companyId], references: [id])
+  bills   Payable[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model PaymentMethod {
+  id        String  @id @default(cuid())
+  companyId String
+  name      String
+  active    Boolean @default(true)
+
+  company     Company      @relation(fields: [companyId], references: [id])
+  payables    Payable[]
+  receivables Receivable[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model FinanceCategory {
+  id        String              @id @default(cuid())
+  companyId String
+  name      String
+  type      FinanceCategoryType
+
+  company     Company      @relation(fields: [companyId], references: [id])
+  payables    Payable[]
+  receivables Receivable[]
+
+  @@unique([companyId, name, type])
+  @@index([companyId])
+}
+
+model Payable {
+  id              String        @id @default(cuid())
+  companyId       String
+  supplierId      String?
+  categoryId      String
+  paymentMethodId String?
+  dueDate         DateTime
+  amount          Decimal       @db.Decimal(10, 2)
+  status          PayableStatus @default(OPEN)
+  paidAt          DateTime?
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  company       Company         @relation(fields: [companyId], references: [id])
+  supplier      Supplier?       @relation(fields: [supplierId], references: [id])
+  category      FinanceCategory @relation(fields: [categoryId], references: [id])
+  paymentMethod PaymentMethod?  @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([companyId, dueDate])
+}
+
+model Receivable {
+  id              String           @id @default(cuid())
+  companyId       String
+  clientId        String?
+  orderId         String?
+  categoryId      String?
+  paymentMethodId String?
+  dueDate         DateTime
+  amount          Decimal          @db.Decimal(10, 2)
+  status          ReceivableStatus @default(OPEN)
+  receivedAt      DateTime?
+  notes           String?
+  createdAt       DateTime         @default(now())
+
+  company       Company          @relation(fields: [companyId], references: [id])
+  client        Client?          @relation(fields: [clientId], references: [id])
+  order         Order?           @relation(fields: [orderId], references: [id])
+  category      FinanceCategory? @relation(fields: [categoryId], references: [id])
+  paymentMethod PaymentMethod?   @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([companyId, dueDate])
+}
+
+model CancellationReason {
+  id        String  @id @default(cuid())
+  companyId String
+  name      String
+  active    Boolean @default(true)
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  appointments Appointment[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model ClientOrigin {
+  id        String  @id @default(cuid())
+  companyId String
+  name      String
+  active    Boolean @default(true)
+
+  company Company  @relation(fields: [companyId], references: [id])
+  clients Client[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+// -------------------- LISTA DE ESPERA --------------------
 
 model Waitlist {
   id        String  @id @default(cuid())
@@ -472,8 +624,8 @@ model Waitlist {
   phone      String?
 
   preferredDate DateTime?
-  preferredTime String? // "HH:mm"
-  pref          String? // livre: manhã/tarde/noite etc.
+  preferredTime String?
+  pref          String?
 
   notes  String?
   status WaitlistStatus @default(WAITING)

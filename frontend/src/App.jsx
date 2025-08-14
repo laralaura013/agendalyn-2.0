@@ -43,6 +43,16 @@ import SettingsPage from './pages/SettingsPage'
 import CommissionsPage from './pages/CommissionsPage'
 import WaitlistPage from './pages/WaitlistPage'
 
+// 🆕 Sprint 1 (Financeiro/Configurações/Relatório)
+import PayablesPage from './pages/finance/PayablesPage'
+import ReceivablesPage from './pages/finance/ReceivablesPage'
+import FinanceCategoriesPage from './pages/finance/FinanceCategoriesPage'
+import SuppliersPage from './pages/finance/SuppliersPage'
+import PaymentMethodsPage from './pages/finance/PaymentMethodsPage'
+import CancellationReasonsPage from './pages/settings/CancellationReasonsPage'
+import ClientOriginsPage from './pages/settings/ClientOriginsPage'
+import BirthdaysReportPage from './pages/reports/BirthdaysReportPage'
+
 function App() {
   return (
     <>
@@ -101,6 +111,7 @@ function App() {
           <Route path="cashier" element={<Cashier />} />
           <Route path="subscription" element={<SubscriptionPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="reports/birthdays" element={<BirthdaysReportPage />} />
           <Route path="goals" element={<GoalsPage />} />
           <Route path="anamnesis" element={<AnamnesisPage />} />
           <Route path="packages" element={<PackagesPage />} />
@@ -109,6 +120,17 @@ function App() {
           <Route path="brands" element={<BrandsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="commissions" element={<CommissionsPage />} />
+
+          {/* 🆕 Financeiro */}
+          <Route path="payables" element={<PayablesPage />} />
+          <Route path="receivables" element={<ReceivablesPage />} />
+          <Route path="finance-categories" element={<FinanceCategoriesPage />} />
+          <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="payment-methods" element={<PaymentMethodsPage />} />
+
+          {/* 🆕 Configurações */}
+          <Route path="cancellation-reasons" element={<CancellationReasonsPage />} />
+          <Route path="client-origins" element={<ClientOriginsPage />} />
         </Route>
 
         {/* ✅ Rota direta para /settings (evita tela branca no retorno do Google) */}

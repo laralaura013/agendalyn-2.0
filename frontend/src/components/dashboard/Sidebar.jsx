@@ -1,4 +1,3 @@
-// frontend/src/components/dashboard/Sidebar.jsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +15,7 @@ const menuGroups = [
       { name: 'Agenda', icon: <CalendarDays size={18} />, path: '/dashboard/schedule' },
       { name: 'Comandas', icon: <ClipboardList size={18} />, path: '/dashboard/orders' },
       { name: 'Pacotes', icon: <Package size={18} />, path: '/dashboard/packages' },
+      // { name: 'Lista de Espera', icon: <CalendarDays size={18} />, path: '/dashboard/waitlist' }, // opcional
     ],
   },
   {
@@ -27,12 +27,20 @@ const menuGroups = [
       { name: 'Produtos', icon: <Box size={18} />, path: '/dashboard/products' },
       { name: 'Categorias', icon: <Folder size={18} />, path: '/dashboard/categories' },
       { name: 'Marcas', icon: <Bookmark size={18} />, path: '/dashboard/brands' },
-      { name: 'Fornecedores', icon: <Truck size={18} />, path: '/dashboard/suppliers' },
+
+      // 🆕 Sprint 1
+      { name: 'Fornecedores', icon: <Truck size={18} />, path: '/dashboard/suppliers', allowedRoles: ['OWNER'] },
+      { name: 'Formas de Pagamento', icon: <CreditCard size={18} />, path: '/dashboard/payment-methods', allowedRoles: ['OWNER'] },
+      { name: 'Categorias Financeiras', icon: <BarChart3 size={18} />, path: '/dashboard/finance-categories', allowedRoles: ['OWNER'] },
     ],
   },
   {
     title: 'FINANCEIRO',
     items: [
+      // 🆕 Sprint 1
+      { name: 'Pagar', icon: <Wallet size={18} />, path: '/dashboard/payables', allowedRoles: ['OWNER'] },
+      { name: 'Receber', icon: <Wallet size={18} />, path: '/dashboard/receivables', allowedRoles: ['OWNER'] },
+
       { name: 'Relatórios', icon: <BarChart3 size={18} />, path: '/dashboard/reports', allowedRoles: ['OWNER'] },
       { name: 'Comissões', icon: <ArrowRightLeft size={18} />, path: '/dashboard/commissions', allowedRoles: ['OWNER'] },
       { name: 'Caixa', icon: <Wallet size={18} />, path: '/dashboard/cashier' },
@@ -43,7 +51,7 @@ const menuGroups = [
     items: [
       { name: 'Metas', icon: <Target size={18} />, path: '/dashboard/goals', allowedRoles: ['OWNER'] },
       { name: 'Anamneses', icon: <FileText size={18} />, path: '/dashboard/anamnesis' },
-      { name: 'Compras', icon: <ShoppingCart size={18} />, path: '/dashboard/purchases' },
+      { name: 'Compras', icon: <ShoppingCart size={18} />, path: '/dashboard/purchases' }, // se não houver rota, remova
     ],
   },
   {
@@ -55,6 +63,10 @@ const menuGroups = [
   {
     title: 'CONFIGURAÇÕES',
     items: [
+      // 🆕 Sprint 1
+      { name: 'Motivos de Cancelamento', icon: <Settings size={18} />, path: '/dashboard/cancellation-reasons', allowedRoles: ['OWNER'] },
+      { name: 'Origens de Cliente', icon: <Settings size={18} />, path: '/dashboard/client-origins', allowedRoles: ['OWNER'] },
+
       { name: 'Empresa', icon: <Settings size={18} />, path: '/dashboard/settings', allowedRoles: ['OWNER'] },
     ]
   }
@@ -82,12 +94,10 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
 
   return (
     <aside
-      // Mantemos FIXED em todas as larguras, e controlamos a visibilidade no mobile com translate.
       className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-gray-800 text-white transform transition-transform duration-300 ease-in-out
       ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
       aria-label="Menu lateral"
     >
-      {/* Header da sidebar */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700 shrink-0">
         <span className="text-xl font-bold">Agendalyn</span>
         <button
@@ -99,7 +109,6 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
         </button>
       </div>
 
-      {/* Menu scrollável */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         {menuGroups.map((group) => (
           <div key={group.title} className="mb-6">

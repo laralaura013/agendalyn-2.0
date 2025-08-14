@@ -1,4 +1,3 @@
-// server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -26,21 +25,22 @@ import publicRoutes from './routes/publicRoutes.js';
 import clientPortalRoutes from './routes/clientPortalRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
 import blockRoutes from './routes/blockRoutes.js';
-
-// 📌 Nova importação: rotas do Google Calendar
 import googleRoutes from './routes/googleRoutes.js';
+
+// ✅ NOVO
+import financeRoutes from './routes/financeRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
+import exportRoutes from './routes/exportRoutes.js';
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-/* ------------------------------- Logs úteis ------------------------------- */
 app.use((req, _res, next) => {
   console.log('🌐 Origin:', req.headers.origin || '—', '| URL:', req.method, req.originalUrl);
   next();
 });
 
-/* -------------------------- Preflight CORS robusto ------------------------- */
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     const reqOrigin  = req.headers.origin || 'https://frontlyn.netlify.app';
@@ -57,7 +57,6 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ---------------------------------- CORS ---------------------------------- */
 app.use(cors({
   origin: true,
   credentials: true,
@@ -65,10 +64,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
-/* ----------------------------- Webhooks primeiro ---------------------------- */
+// Webhooks
 app.use('/api/webhooks', webhookRoutes);
 
-/* ---------------------------------- Rotas --------------------------------- */
+// Rotas públicas e gerais
 app.use('/api/portal', clientPortalRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
@@ -91,15 +90,16 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/commissions', commissionRoutes);
 app.use('/api/agenda/blocks', blockRoutes);
 app.use('/api/waitlist', waitlistRoutes);
-
-// 📌 Nova rota: Google Calendar
 app.use('/api/integrations/google', googleRoutes);
 
-/* --------------------------------- Health --------------------------------- */
+// ✅ NOVO
+app.use('/api/finance', financeRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/exports', exportRoutes);
+
 app.get('/api', (_req, res) => res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' }));
 app.get('/', (_req, res) => res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' }));
 
-/* --------------------------------- Server --------------------------------- */
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
