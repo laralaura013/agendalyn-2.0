@@ -1,3 +1,4 @@
+// frontend/src/components/dashboard/Sidebar.jsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -62,6 +63,7 @@ const menuGroups = [
 const NavItem = ({ item }) => (
   <NavLink
     to={item.path}
+    end={item.path === '/dashboard'}
     className={({ isActive }) =>
       `flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors duration-200 ${
         isActive
@@ -80,21 +82,24 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
 
   return (
     <aside
+      // Mantemos FIXED em todas as larguras, e controlamos a visibilidade no mobile com translate.
       className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-gray-800 text-white transform transition-transform duration-300 ease-in-out
-      ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static`}
+      ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+      aria-label="Menu lateral"
     >
       {/* Header da sidebar */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700 shrink-0">
         <span className="text-xl font-bold">Agendalyn</span>
         <button
           onClick={() => setIsMobileMenuOpen(false)}
           className="md:hidden text-gray-400 hover:text-white"
+          aria-label="Fechar menu"
         >
           <X size={20} />
         </button>
       </div>
 
-      {/* Menu */}
+      {/* Menu scrollável */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         {menuGroups.map((group) => (
           <div key={group.title} className="mb-6">
