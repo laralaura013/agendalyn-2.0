@@ -6,8 +6,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate', // 🔁 força atualização automática
+      registerType: 'autoUpdate',
       injectRegister: 'auto',
+      strategies: 'generateSW', // garante que o modo seja explícito
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globIgnores: ['**/node_modules/**/*', 'sw.js', 'workbox-*.js'],
+      },
       manifest: {
         name: 'Agendalyn',
         short_name: 'Agendalyn',
