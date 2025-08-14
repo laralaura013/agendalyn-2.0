@@ -1,39 +1,48 @@
 {
+  "id": "/",
   "name": "Agendalyn",
   "short_name": "Agendalyn",
   "description": "Sistema de agendamento para barbearias, salões de beleza e clínicas.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "browser"],
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#9333ea",
-  "orientation": "portrait",
+
+  "categories": ["productivity", "business"],
+
   "icons": [
-    {
-      "src": "/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
+
   "screenshots": [
     {
       "src": "/screenshots/screenshot-desktop.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Dashboard no desktop"
+      "label": "Dashboard (desktop)"
     },
     {
       "src": "/screenshots/screenshot-mobile.png",
-      "sizes": "430x932",
+      "sizes": "540x1200",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Painel no celular"
+      "label": "Painel (mobile)"
     }
-  ]
+  ],
+
+  "shortcuts": [
+    { "name": "Agenda", "url": "/dashboard/schedule" },
+    { "name": "Comandas", "url": "/dashboard/orders" },
+    { "name": "Clientes", "url": "/dashboard/clients" }
+  ],
+
+  "prefer_related_applications": false
 }
