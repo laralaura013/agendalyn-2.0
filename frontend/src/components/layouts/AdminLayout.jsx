@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, LogOut } from 'lucide-react';
 import Sidebar from '../dashboard/Sidebar';
@@ -9,6 +9,7 @@ function usePageTitle() {
 
   const title = useMemo(() => {
     const table = [
+      // Core
       { re: /^\/dashboard$/, label: 'Dashboard' },
       { re: /^\/dashboard\/schedule/, label: 'Agenda' },
       { re: /^\/dashboard\/orders/, label: 'Comandas' },
@@ -18,14 +19,15 @@ function usePageTitle() {
       { re: /^\/dashboard\/products/, label: 'Produtos' },
       { re: /^\/dashboard\/categories/, label: 'Categorias' },
       { re: /^\/dashboard\/brands/, label: 'Marcas' },
-      { re: /^\/dashboard\/reports\/birthdays/, label: 'Aniversariantes' },
-      { re: /^\/dashboard\/reports/, label: 'Relatórios' },
-      { re: /^\/dashboard\/commissions/, label: 'Comissões' },
       { re: /^\/dashboard\/cashier/, label: 'Caixa' },
       { re: /^\/dashboard\/goals/, label: 'Metas' },
       { re: /^\/dashboard\/anamnesis/, label: 'Anamneses' },
       { re: /^\/dashboard\/packages/, label: 'Pacotes' },
       { re: /^\/dashboard\/waitlist/, label: 'Lista de Espera' },
+
+      // Relatórios (ordem específica antes do genérico)
+      { re: /^\/dashboard\/reports\/birthdays/, label: 'Aniversariantes' },
+      { re: /^\/dashboard\/reports/, label: 'Relatórios' },
 
       // 🆕 Financeiro/Configurações Sprint 1
       { re: /^\/dashboard\/payables/, label: 'Contas a Pagar' },
@@ -36,8 +38,13 @@ function usePageTitle() {
       { re: /^\/dashboard\/cancellation-reasons/, label: 'Motivos de Cancelamento' },
       { re: /^\/dashboard\/client-origins/, label: 'Origens de Cliente' },
 
+      // Configurações
       { re: /^\/dashboard\/settings/, label: 'Configurações' },
+
+      // ✅ rota direta fora do /dashboard (usada no retorno do Google)
+      { re: /^\/settings$/, label: 'Configurações' },
     ];
+
     const found = table.find((t) => t.re.test(pathname));
     return found ? found.label : 'Dashboard';
   }, [pathname]);
@@ -54,13 +61,18 @@ const AdminLayout = () => {
     document.title = `${title} · Agendalyn`;
   }, [title]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = useCallback(() => {
+    try {
+      localStorage.removeItem('token');       // admin
+      localStorage.removeItem('clientToken'); // por segurança
+    } catch (_) {}
+    // Se seu fluxo de admin usa /login, mude aqui.
     navigate('/portal/login/cmdep95530000pspaolfy7dod');
-  };
+  }, [navigate]);
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Overlay para fechar a sidebar no mobile */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-20 md:hidden"
@@ -68,12 +80,15 @@ const AdminLayout = () => {
         />
       )}
 
+      {/* Sidebar */}
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
+      {/* Conteúdo principal */}
       <div className="flex-1 flex flex-col ml-0 md:ml-64">
+        {/* Header */}
         <header className="flex items-center justify-between bg-white border-b border-gray-200 h-16 px-4 sm:px-6">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -95,6 +110,7 @@ const AdminLayout = () => {
           </button>
         </header>
 
+        {/* Área das rotas */}
         <main className="flex-1 overflow-y-auto py-6">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6">
             <Outlet />

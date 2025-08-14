@@ -1,101 +1,293 @@
+// src/controllers/finance/receivablesController.js
 import prisma from '../../prismaClient.js';
 
+// Helpers
+const normalizeId = (v) =>
+  v && typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
+
+const parseDayBoundary = (isoOrDateOnly, end = false) => {
+  if (!isoOrDateOnly) return undefined;
+  // aceita 'YYYY-MM-DD' ou ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDateOnly)) {
+    return new Date(`${isoOrDateOnly}T${end ? '23:59:59.999' : '00:00:00.000'}`);
+  }
+  const d = new Date(isoOrDateOnly);
+  return isNaN(d.getTime()) ? undefined : d;
+};
+
+// -----------------------------------------------------------------------------
+// LIST
+// GET /api/finance/receivables
+// Query: status, date_from, date_to, categoryId, clientId, orderId
+// -----------------------------------------------------------------------------
 export const list = async (req, res) => {
   try {
     const { status, date_from, date_to, categoryId, clientId, orderId } = req.query;
+
     const where = { companyId: req.company.id };
 
-    if (status) where.status = status;
+    // status: aceita único ou múltiplos separados por vírgula
+    if (status) {
+      const arr = String(status)
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
+      if (arr.length === 1) where.status = arr[0];
+      else if (arr.length > 1) where.status = { in: arr };
+    }
+
     if (categoryId) where.categoryId = categoryId;
     if (clientId) where.clientId = clientId;
     if (orderId) where.orderId = orderId;
 
-    if (date_from || date_to) {
+    const gte = parseDayBoundary(date_from, false);
+    const lte = parseDayBoundary(date_to, true);
+    if (gte || lte) {
       where.dueDate = {};
-      if (date_from) where.dueDate.gte = new Date(`${date_from}T00:00:00.000`);
-      if (date_to) where.dueDate.lte = new Date(`${date_to}T23:59:59.999`);
+      if (gte) where.dueDate.gte = gte;
+      if (lte) where.dueDate.lte = lte;
     }
 
     const data = await prisma.receivable.findMany({
       where,
       include: {
-        client: { select: { name: true } },
+        client: { select: { id: true, name: true } },
         order: { select: { id: true, total: true, status: true } },
-        category: true,
-        paymentMethod: true,
+        category: { select: { id: true, name: true, type: true } },
+        paymentMethod: { select: { id: true, name: true } },
       },
-      orderBy: { dueDate: 'asc' },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
     });
-    res.json(data);
+
+    return res.json(data);
   } catch (e) {
     console.error('Erro list receivables:', e);
-    res.status(500).json({ message: 'Erro ao listar contas a receber.' });
+    return res.status(500).json({ message: 'Erro ao listar contas a receber.' });
   }
 };
 
+// -----------------------------------------------------------------------------
+// CREATE
+// POST /api/finance/receivables
+// Body: { clientId?, orderId?, categoryId?, paymentMethodId?, dueDate*, amount*, notes? }
+// -----------------------------------------------------------------------------
 export const create = async (req, res) => {
   try {
-    const { clientId, orderId, categoryId, paymentMethodId, dueDate, amount, notes } = req.body;
-    if (!dueDate || !amount) {
-      return res.status(400).json({ message: 'dueDate e amount são obrigatórios.' });
+    const companyId = req.company.id;
+    const { dueDate, amount, notes } = req.body;
+
+    let { clientId, orderId, categoryId, paymentMethodId } = req.body;
+    clientId = normalizeId(clientId);
+    orderId = normalizeId(orderId);
+    categoryId = normalizeId(categoryId);
+    paymentMethodId = normalizeId(paymentMethodId);
+
+    if (!dueDate || amount === undefined || amount === null) {
+      return res.status(400).json({ message: 'Campos obrigatórios: dueDate e amount.' });
     }
-    const data = await prisma.receivable.create({
+    const amountNum = Number(amount);
+    if (!isFinite(amountNum) || amountNum <= 0) {
+      return res.status(400).json({ message: 'amount deve ser um número positivo.' });
+    }
+
+    // Valida FKs SOMENTE se enviados
+    const [client, order, category, pm] = await Promise.all([
+      clientId
+        ? prisma.client.findFirst({
+            where: { id: clientId, companyId },
+            select: { id: true },
+          })
+        : null,
+      orderId
+        ? prisma.order.findFirst({
+            where: { id: orderId, companyId },
+            select: { id: true },
+          })
+        : null,
+      categoryId
+        ? prisma.financeCategory.findFirst({
+            where: { id: categoryId, companyId, type: 'RECEIVABLE' },
+            select: { id: true },
+          })
+        : null,
+      paymentMethodId
+        ? prisma.paymentMethod.findFirst({
+            where: { id: paymentMethodId, companyId },
+            select: { id: true },
+          })
+        : null,
+    ]);
+
+    if (clientId && !client)
+      return res.status(400).json({ message: 'Cliente inválido para esta empresa.' });
+    if (orderId && !order)
+      return res.status(400).json({ message: 'Comanda inválida para esta empresa.' });
+    if (categoryId && !category)
+      return res.status(400).json({ message: 'Categoria (Receber) inválida.' });
+    if (paymentMethodId && !pm)
+      return res.status(400).json({ message: 'Forma de pagamento inválida.' });
+
+    const created = await prisma.receivable.create({
       data: {
-        companyId: req.company.id,
-        clientId: clientId || null,
-        orderId: orderId || null,
-        categoryId: categoryId || null,
-        paymentMethodId: paymentMethodId || null,
+        companyId,
         dueDate: new Date(dueDate),
-        amount: Number(amount),
+        amount: amountNum,
         status: 'OPEN',
-        notes: notes || null,
+        notes: notes || '',
+        ...(clientId && { clientId }),
+        ...(orderId && { orderId }),
+        ...(categoryId && { categoryId }),
+        ...(paymentMethodId && { paymentMethodId }),
       },
     });
-    res.status(201).json(data);
+
+    return res.status(201).json(created);
   } catch (e) {
+    // FK genérica
+    if (e?.code === 'P2003') {
+      return res
+        .status(400)
+        .json({ message: 'Referência inválida (cliente/ordem/categoria/forma de pagamento).' });
+    }
     console.error('Erro create receivable:', e);
-    res.status(400).json({ message: 'Erro ao criar conta a receber.' });
+    return res.status(500).json({ message: 'Erro ao criar conta a receber.' });
   }
 };
 
+// -----------------------------------------------------------------------------
+// UPDATE
+// PUT /api/finance/receivables/:id
+// Body parcial; regras: se status='RECEIVED' e receivedAt ausente → define agora
+// -----------------------------------------------------------------------------
 export const update = async (req, res) => {
   try {
-    const { clientId, orderId, categoryId, paymentMethodId, dueDate, amount, status, receivedAt, notes } = req.body;
+    const companyId = req.company.id;
     const { id } = req.params;
-    const found = await prisma.receivable.findFirst({ where: { id, companyId: req.company.id } });
-    if (!found) return res.status(404).json({ message: 'Conta a receber não encontrada.' });
 
-    const data = await prisma.receivable.update({
-      where: { id },
-      data: {
-        clientId: clientId ?? found.clientId,
-        orderId: orderId ?? found.orderId,
-        categoryId: categoryId ?? found.categoryId,
-        paymentMethodId: paymentMethodId ?? found.paymentMethodId,
-        dueDate: dueDate ? new Date(dueDate) : found.dueDate,
-        amount: amount != null ? Number(amount) : found.amount,
-        status: status ?? found.status,
-        receivedAt: receivedAt ? new Date(receivedAt) : (status === 'RECEIVED' ? new Date() : found.receivedAt),
-        notes: typeof notes === 'string' ? notes : found.notes,
-      },
+    const current = await prisma.receivable.findFirst({
+      where: { id, companyId },
     });
-    res.json(data);
+    if (!current) {
+      return res.status(404).json({ message: 'Conta a receber não encontrada.' });
+    }
+
+    // Normaliza/valida IDs opcionais que vierem no body
+    let {
+      clientId,
+      orderId,
+      categoryId,
+      paymentMethodId,
+      dueDate,
+      amount,
+      status,
+      receivedAt,
+      notes,
+    } = req.body;
+
+    clientId = normalizeId(clientId);
+    orderId = normalizeId(orderId);
+    categoryId = normalizeId(categoryId);
+    paymentMethodId = normalizeId(paymentMethodId);
+
+    // Valida FKs apenas se enviados no update
+    if (clientId || orderId || categoryId || paymentMethodId) {
+      const [client, order, category, pm] = await Promise.all([
+        clientId
+          ? prisma.client.findFirst({ where: { id: clientId, companyId }, select: { id: true } })
+          : null,
+        orderId
+          ? prisma.order.findFirst({ where: { id: orderId, companyId }, select: { id: true } })
+          : null,
+        categoryId
+          ? prisma.financeCategory.findFirst({
+              where: { id: categoryId, companyId, type: 'RECEIVABLE' },
+              select: { id: true },
+            })
+          : null,
+        paymentMethodId
+          ? prisma.paymentMethod.findFirst({
+              where: { id: paymentMethodId, companyId },
+              select: { id: true },
+            })
+          : null,
+      ]);
+
+      if (clientId && !client)
+        return res.status(400).json({ message: 'Cliente inválido para esta empresa.' });
+      if (orderId && !order)
+        return res.status(400).json({ message: 'Comanda inválida para esta empresa.' });
+      if (categoryId && !category)
+        return res.status(400).json({ message: 'Categoria (Receber) inválida.' });
+      if (paymentMethodId && !pm)
+        return res.status(400).json({ message: 'Forma de pagamento inválida.' });
+    }
+
+    const data = {};
+    if (clientId !== undefined) data.clientId = clientId || null;
+    if (orderId !== undefined) data.orderId = orderId || null;
+    if (categoryId !== undefined) data.categoryId = categoryId || null;
+    if (paymentMethodId !== undefined) data.paymentMethodId = paymentMethodId || null;
+
+    if (dueDate) data.dueDate = new Date(dueDate);
+    if (amount !== undefined && amount !== null) {
+      const amountNum = Number(amount);
+      if (!isFinite(amountNum) || amountNum <= 0) {
+        return res.status(400).json({ message: 'amount deve ser um número positivo.' });
+      }
+      data.amount = amountNum;
+    }
+
+    if (typeof notes === 'string') data.notes = notes;
+
+    if (status) {
+      const upStatus = String(status).toUpperCase();
+      data.status = upStatus;
+      if (upStatus === 'RECEIVED') {
+        data.receivedAt = receivedAt ? new Date(receivedAt) : new Date();
+      } else if (receivedAt) {
+        data.receivedAt = new Date(receivedAt); // permite ajustar manualmente
+      }
+    } else if (receivedAt) {
+      data.receivedAt = new Date(receivedAt);
+    }
+
+    const updated = await prisma.receivable.update({
+      where: { id },
+      data,
+    });
+
+    return res.json(updated);
   } catch (e) {
+    if (e?.code === 'P2003') {
+      return res
+        .status(400)
+        .json({ message: 'Referência inválida (cliente/ordem/categoria/forma de pagamento).' });
+    }
     console.error('Erro update receivable:', e);
-    res.status(400).json({ message: 'Erro ao atualizar conta a receber.' });
+    return res.status(500).json({ message: 'Erro ao atualizar conta a receber.' });
   }
 };
 
+// -----------------------------------------------------------------------------
+// DELETE
+// DELETE /api/finance/receivables/:id
+// -----------------------------------------------------------------------------
 export const remove = async (req, res) => {
   try {
+    const companyId = req.company.id;
     const { id } = req.params;
-    const found = await prisma.receivable.findFirst({ where: { id, companyId: req.company.id } });
-    if (!found) return res.status(404).json({ message: 'Conta a receber não encontrada.' });
+
+    const found = await prisma.receivable.findFirst({
+      where: { id, companyId },
+    });
+    if (!found) {
+      return res.status(404).json({ message: 'Conta a receber não encontrada.' });
+    }
+
     await prisma.receivable.delete({ where: { id } });
-    res.status(204).send();
+    return res.status(204).send();
   } catch (e) {
     console.error('Erro delete receivable:', e);
-    res.status(400).json({ message: 'Erro ao excluir conta a receber.' });
+    return res.status(500).json({ message: 'Erro ao excluir conta a receber.' });
   }
 };
