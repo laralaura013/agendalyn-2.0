@@ -16,28 +16,25 @@ const parseDayBoundary = (isoOrDateOnly, end = false) => {
 };
 
 /* ============================================================
- * LIST
+ * LIST (Paginado)
  * GET /api/finance/payables
- * Query: status, date_from, date_to, categoryId, supplierId
+ * Query: status, date_from, date_to, categoryId, supplierId, page, pageSize
  * ==========================================================*/
 export const list = async (req, res) => {
   try {
-    const { status, date_from, date_to, categoryId, supplierId } = req.query;
+    const {
+      status, date_from, date_to, categoryId, supplierId,
+      page: pageQ, pageSize: pageSizeQ
+    } = req.query;
+
+    const page = Math.max(parseInt(pageQ || '1', 10), 1);
+    const pageSize = Math.min(Math.max(parseInt(pageSizeQ || '10', 10), 1), 100);
+    const skip = (page - 1) * pageSize;
 
     const where = { companyId: req.company.id };
-
-    // status único ou CSV
-    if (status) {
-      const arr = String(status)
-        .split(',')
-        .map((s) => s.trim().toUpperCase())
-        .filter(Boolean);
-      if (arr.length === 1) where.status = arr[0];
-      else if (arr.length > 1) where.status = { in: arr };
-    }
-
-    if (categoryId) where.categoryId = String(categoryId);
-    if (supplierId) where.supplierId = String(supplierId);
+    if (status) where.status = status;
+    if (categoryId) where.categoryId = categoryId;
+    if (supplierId) where.supplierId = supplierId;
 
     const gte = parseDayBoundary(date_from, false);
     const lte = parseDayBoundary(date_to, true);
@@ -47,20 +44,31 @@ export const list = async (req, res) => {
       if (lte) where.dueDate.lte = lte;
     }
 
-    const data = await prisma.payable.findMany({
-      where,
-      include: {
-        supplier: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, type: true } },
-        paymentMethod: { select: { id: true, name: true } },
-      },
-      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
-    });
+    const [items, total] = await Promise.all([
+      prisma.payable.findMany({
+        where,
+        include: {
+          supplier: true,
+          category: true,
+          paymentMethod: true,
+        },
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+        skip,
+        take: pageSize,
+      }),
+      prisma.payable.count({ where }),
+    ]);
 
-    return res.json(data);
+    res.json({
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
   } catch (e) {
     console.error('Erro list payables:', e);
-    return res.status(500).json({ message: 'Erro ao listar contas a pagar.' });
+    res.status(500).json({ message: 'Erro ao listar contas a pagar.' });
   }
 };
 

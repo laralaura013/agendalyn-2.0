@@ -16,13 +16,26 @@ const parseDayBoundary = (isoOrDateOnly, end = false) => {
 };
 
 /* ============================================================
- * LIST
+ * LIST (Paginado)
  * GET /api/finance/receivables
- * Query: status, date_from, date_to, categoryId, clientId, orderId
+ * Query:
+ *  - status (string CSV opcional)
+ *  - date_from (YYYY-MM-DD ou ISO)
+ *  - date_to   (YYYY-MM-DD ou ISO)
+ *  - categoryId, clientId, orderId
+ *  - page, pageSize
  * ==========================================================*/
 export const list = async (req, res) => {
   try {
-    const { status, date_from, date_to, categoryId, clientId, orderId } = req.query;
+    const {
+      status, date_from, date_to, categoryId, clientId, orderId,
+      page: pageQ, pageSize: pageSizeQ
+    } = req.query;
+
+    const page = Math.max(parseInt(pageQ || '1', 10), 1);
+    const pageSize = Math.min(Math.max(parseInt(pageSizeQ || '10', 10), 1), 100);
+    const skip = (page - 1) * pageSize;
+
     const where = { companyId: req.company.id };
 
     // status único ou CSV
@@ -47,18 +60,29 @@ export const list = async (req, res) => {
       if (lte) where.dueDate.lte = lte;
     }
 
-    const data = await prisma.receivable.findMany({
-      where,
-      include: {
-        client: { select: { id: true, name: true } },
-        order: { select: { id: true, total: true, status: true } },
-        category: { select: { id: true, name: true, type: true } },
-        paymentMethod: { select: { id: true, name: true } },
-      },
-      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
-    });
+    const [items, total] = await Promise.all([
+      prisma.receivable.findMany({
+        where,
+        include: {
+          client: { select: { id: true, name: true } },
+          order: { select: { id: true, total: true, status: true } },
+          category: { select: { id: true, name: true, type: true } },
+          paymentMethod: { select: { id: true, name: true } },
+        },
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+        skip,
+        take: pageSize,
+      }),
+      prisma.receivable.count({ where }),
+    ]);
 
-    return res.json(data);
+    return res.json({
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
   } catch (e) {
     console.error('Erro list receivables:', e);
     return res.status(500).json({ message: 'Erro ao listar contas a receber.' });

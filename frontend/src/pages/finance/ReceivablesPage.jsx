@@ -16,6 +16,11 @@ export default function ReceivablesPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // paginação
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+
   // filtros
   const [filters, setFilters] = useState({
     status: 'OPEN',
@@ -62,7 +67,7 @@ export default function ReceivablesPage() {
       console.warn(e);
     }
 
-    // clientes — tenta duas formas de resposta (lista direta ou {items:[]})
+    // clientes — aceita lista direta ou { items: [] }
     try {
       const r = await api.get('/clients', { params: { q: '', limit: 200 } });
       const list = Array.isArray(r.data) ? r.data : (r.data?.items || []);
@@ -76,8 +81,18 @@ export default function ReceivablesPage() {
   const fetchList = async () => {
     setLoading(true);
     try {
-      const r = await api.get('/finance/receivables', { params: filters });
-      setRows(r.data || []);
+      const r = await api.get('/finance/receivables', {
+        params: { ...filters, page, pageSize },
+      });
+
+      // aceita forma paginada { items, total } ou array simples
+      if (Array.isArray(r.data)) {
+        setRows(r.data);
+        setTotal(r.data.length);
+      } else {
+        setRows(r.data.items || []);
+        setTotal(r.data.total || 0);
+      }
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao listar Receber.');
     } finally {
@@ -87,9 +102,12 @@ export default function ReceivablesPage() {
 
   useEffect(() => {
     loadOptions();
+  }, []);
+
+  useEffect(() => {
     fetchList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [page, pageSize]);
 
   // ========= FILTERS =========
   const onChangeFilter = (e) => {
@@ -98,6 +116,7 @@ export default function ReceivablesPage() {
   };
   const applyFilters = async (e) => {
     e?.preventDefault();
+    setPage(1);
     await fetchList();
   };
   const resetFilters = async () => {
@@ -109,6 +128,7 @@ export default function ReceivablesPage() {
       categoryId: '',
       orderId: '',
     });
+    setPage(1);
     setTimeout(fetchList, 0);
   };
 
@@ -141,10 +161,15 @@ export default function ReceivablesPage() {
   };
   const submitForm = async (e) => {
     e.preventDefault();
+    const amountOk = Number(form.amount);
+    if (!form.dueDate || !isFinite(amountOk) || amountOk <= 0) {
+      toast.error('Preencha um vencimento válido e um valor positivo.');
+      return;
+    }
     try {
       const payload = {
         dueDate: toIsoNoon(form.dueDate),
-        amount: Number(form.amount),
+        amount: amountOk,
         notes: form.notes?.trim() || '',
       };
       if (form.clientId) payload.clientId = form.clientId;
@@ -212,13 +237,15 @@ export default function ReceivablesPage() {
     }
   };
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   return (
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Contas a Receber</h2>
         <div className="flex gap-2">
-          <button onClick={exportCsv} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-2">
+          <button onClick={exportCsv} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-2" disabled={loading}>
             <Download size={16} /> Exportar CSV
           </button>
           <button onClick={openCreate} className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-2">
@@ -293,18 +320,18 @@ export default function ReceivablesPage() {
                     <div className="flex justify-end gap-2">
                       {r.status === 'OPEN' && (
                         <>
-                          <button onClick={() => markReceived(r)} className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700" title="Marcar recebido">
+                          <button onClick={() => markReceived(r)} className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700" title="Marcar recebido" disabled={loading}>
                             <CheckCircle2 size={16} />
                           </button>
-                          <button onClick={() => cancelItem(r)} className="px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700" title="Cancelar">
+                          <button onClick={() => cancelItem(r)} className="px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700" title="Cancelar" disabled={loading}>
                             <XCircle size={16} />
                           </button>
                         </>
                       )}
-                      <button onClick={() => openEdit(r)} className="px-2 py-1 bg-gray-100 rounded hover:bg-gray-200" title="Editar">
+                      <button onClick={() => openEdit(r)} className="px-2 py-1 bg-gray-100 rounded hover:bg-gray-200" title="Editar" disabled={loading}>
                         <Edit3 size={16} />
                       </button>
-                      <button onClick={() => removeItem(r)} className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Excluir">
+                      <button onClick={() => removeItem(r)} className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Excluir" disabled={loading}>
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -318,6 +345,38 @@ export default function ReceivablesPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* paginação */}
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Página {page} de {totalPages} • {total} registro(s)
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              className="border rounded px-2 py-1 text-sm"
+              value={pageSize}
+              onChange={(e)=>{ setPage(1); setPageSize(parseInt(e.target.value, 10)); }}
+            >
+              {[10,20,50,100].map(n => <option key={n} value={n}>{n}/página</option>)}
+            </select>
+            <button
+              className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+              onClick={()=> setPage(p => Math.max(1, p-1))}
+              disabled={page <= 1 || loading}
+            >
+              Anterior
+            </button>
+            <button
+              className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+              onClick={()=>{
+                setPage(p => Math.min(totalPages, p+1));
+              }}
+              disabled={page >= totalPages || loading}
+            >
+              Próxima
+            </button>
+          </div>
         </div>
       </div>
 
