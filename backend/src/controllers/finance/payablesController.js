@@ -1,5 +1,6 @@
 // src/controllers/finance/payablesController.js
 import prisma from '../../prismaClient.js';
+import * as cashbox from '../../services/cashboxService.js';
 
 /* ========================= Helpers ========================= */
 const normalizeId = (v) =>
@@ -15,23 +16,30 @@ const parseDayBoundary = (isoOrDateOnly, end = false) => {
   return isNaN(d.getTime()) ? undefined : d;
 };
 
+const safeNumber = (v) => {
+  const n = Number(v);
+  return isFinite(n) ? n : NaN;
+};
+
 /* ============================================================
  * LIST (Paginado)
  * GET /api/finance/payables
  * Query:
- *  - status (string CSV opcional; ex: OPEN,PAID)
- *  - date_from, date_to
+ *  - status (CSV opcional; ex: OPEN,PAID,CANCELED)
+ *  - date_from, date_to (filtro em dueDate)
  *  - categoryId, supplierId
  *  - q (busca por descrição/observação)
  *  - sortBy (default 'dueDate'), sortOrder ('asc'|'desc', default 'asc')
  *  - page (1-based), pageSize
+ * Response:
+ *  { items, total, page, pageSize, totalsByStatus: { OPEN, PAID, CANCELED } }
  * ==========================================================*/
 export const list = async (req, res) => {
   try {
     const {
       status, date_from, date_to, categoryId, supplierId,
       q, sortBy = 'dueDate', sortOrder = 'asc',
-      page: pageQ, pageSize: pageSizeQ
+      page: pageQ, pageSize: pageSizeQ,
     } = req.query;
 
     const companyId = req.company?.id;
@@ -72,7 +80,7 @@ export const list = async (req, res) => {
       ];
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, totalsAgg] = await Promise.all([
       prisma.payable.findMany({
         where,
         include: {
@@ -88,13 +96,32 @@ export const list = async (req, res) => {
         take: pageSize,
       }),
       prisma.payable.count({ where }),
+      prisma.payable.groupBy({
+        by: ['status'],
+        where,
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
     ]);
+
+    const totalsByStatus = {
+      OPEN: { count: 0, amount: 0 },
+      PAID: { count: 0, amount: 0 },
+      CANCELED: { count: 0, amount: 0 },
+    };
+    for (const r of totalsAgg) {
+      const key = r.status?.toUpperCase?.() || 'OPEN';
+      if (!totalsByStatus[key]) totalsByStatus[key] = { count: 0, amount: 0 };
+      totalsByStatus[key].count = r._count?._all || 0;
+      totalsByStatus[key].amount = Number(r._sum?.amount || 0);
+    }
 
     return res.status(200).json({
       items,
       total,
       page,
       pageSize,
+      totalsByStatus,
     });
   } catch (e) {
     console.error('Erro list payables:', e);
@@ -127,7 +154,7 @@ export const create = async (req, res) => {
     const due = parseDayBoundary(dueDate);
     if (!due) return res.status(400).json({ message: 'dueDate inválido.' });
 
-    const amountNum = Number(amount);
+    const amountNum = safeNumber(amount);
     if (!isFinite(amountNum) || amountNum <= 0) {
       return res.status(400).json({ message: 'amount deve ser um número positivo.' });
     }
@@ -182,11 +209,12 @@ export const create = async (req, res) => {
 };
 
 /* ============================================================
- * UPDATE
+ * UPDATE (integra com Caixa)
  * PUT /api/finance/payables/:id
  * Regras de status:
- *  - Se status='PAID' e paidAt ausente → define agora.
- *  - Se status voltar para 'OPEN' ou 'CANCELED' → zera paidAt (salvo se vier explicitamente).
+ *  - Se status='PAID' e paidAt ausente → define agora e lança saída no caixa (idempotente).
+ *  - Se status voltar para 'OPEN' ou 'CANCELED' → zera paidAt e remove a saída do caixa.
+ *  - Se valor mudar e registro estiver PAID → reupsert da transação do caixa.
  * ==========================================================*/
 export const update = async (req, res) => {
   try {
@@ -252,19 +280,24 @@ export const update = async (req, res) => {
       data.dueDate = d;
     }
 
+    let amountChanged = false;
     if (amount !== undefined && amount !== null) {
-      const amountNum = Number(amount);
+      const amountNum = safeNumber(amount);
       if (!isFinite(amountNum) || amountNum <= 0) {
         return res.status(400).json({ message: 'amount deve ser um número positivo.' });
       }
       data.amount = amountNum;
+      amountChanged = amountNum !== Number(current.amount);
     }
 
     if (typeof notes === 'string') data.notes = notes;
 
+    // status + paidAt
+    let statusNow = current.status;
     if (status) {
       const upStatus = String(status).toUpperCase();
       data.status = upStatus;
+      statusNow = upStatus;
 
       if (upStatus === 'PAID') {
         data.paidAt = paidAt ? new Date(paidAt) : new Date();
@@ -275,12 +308,38 @@ export const update = async (req, res) => {
       data.paidAt = new Date(paidAt);
     }
 
-    const updated = await prisma.payable.update({
-      where: { id },
-      data,
-    });
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        const u = await tx.payable.update({ where: { id }, data });
 
-    return res.json(updated);
+        // CAIXA
+        const statusAfter = u.status;
+        const paidAtChanged = Object.prototype.hasOwnProperty.call(data, 'paidAt');
+
+        if (statusAfter === 'PAID') {
+          // se marcado como pago (ou mudou valor estando pago) → garante saída
+          await cashbox.ensureExpenseForPayable(tx, companyId, u);
+        } else if (statusAfter === 'OPEN' || statusAfter === 'CANCELED') {
+          // se voltou para aberto/cancelado → remove saída
+          await cashbox.removeForPayable(tx, u.id, companyId);
+        } else if (!status && amountChanged && current.status === 'PAID') {
+          // valor alterado mas status não enviado, e registro já estava PAID → reupsert
+          await cashbox.ensureExpenseForPayable(tx, companyId, u);
+        } else if (!status && !amountChanged && paidAtChanged && current.status === 'PAID') {
+          // mudou apenas paidAt em registro PAID → atualiza lançamento
+          await cashbox.ensureExpenseForPayable(tx, companyId, u);
+        }
+
+        return u;
+      });
+
+      return res.json(updated);
+    } catch (err) {
+      if (err?.code === 'NO_OPEN_CASHIER') {
+        return res.status(409).json({ message: err.message }); // caixa fechado
+      }
+      throw err;
+    }
   } catch (e) {
     if (e?.code === 'P2003') {
       return res
@@ -293,8 +352,59 @@ export const update = async (req, res) => {
 };
 
 /* ============================================================
+ * PATCH STATUS (opcional, mais direto para UI)
+ * PATCH /api/finance/payables/:id/status
+ * Body: { status: 'OPEN' | 'PAID' | 'CANCELED', paidAt? }
+ * ==========================================================*/
+export const patchStatus = async (req, res) => {
+  try {
+    const companyId = req.company.id;
+    const { id } = req.params;
+    const { status, paidAt } = req.body || {};
+
+    if (!status) return res.status(400).json({ message: 'status é obrigatório.' });
+
+    const current = await prisma.payable.findFirst({ where: { id, companyId } });
+    if (!current) return res.status(404).json({ message: 'Conta a pagar não encontrada.' });
+
+    const upStatus = String(status).toUpperCase();
+    const data = { status: upStatus };
+
+    if (upStatus === 'PAID') {
+      data.paidAt = paidAt ? new Date(paidAt) : new Date();
+    } else if (upStatus === 'OPEN' || upStatus === 'CANCELED') {
+      data.paidAt = paidAt ? new Date(paidAt) : null;
+    }
+
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        const u = await tx.payable.update({ where: { id }, data });
+
+        if (u.status === 'PAID') {
+          await cashbox.ensureExpenseForPayable(tx, companyId, u);
+        } else {
+          await cashbox.removeForPayable(tx, u.id, companyId);
+        }
+        return u;
+      });
+
+      return res.json(updated);
+    } catch (err) {
+      if (err?.code === 'NO_OPEN_CASHIER') {
+        return res.status(409).json({ message: err.message });
+      }
+      throw err;
+    }
+  } catch (e) {
+    console.error('Erro patchStatus payable:', e);
+    return res.status(500).json({ message: 'Erro ao atualizar status.' });
+  }
+};
+
+/* ============================================================
  * DELETE
  * DELETE /api/finance/payables/:id
+ * Remove o registro e, se existir, remove o lançamento do caixa.
  * ==========================================================*/
 export const remove = async (req, res) => {
   try {
@@ -304,7 +414,12 @@ export const remove = async (req, res) => {
     const found = await prisma.payable.findFirst({ where: { id, companyId } });
     if (!found) return res.status(404).json({ message: 'Conta a pagar não encontrada.' });
 
-    await prisma.payable.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.payable.delete({ where: { id } });
+      // remove o lançamento do caixa (se existir)
+      await cashbox.removeForPayable(tx, id, companyId);
+    });
+
     return res.status(204).send();
   } catch (e) {
     console.error('Erro delete payable:', e);

@@ -220,6 +220,8 @@ model Transaction {
   cashierSession CashierSession @relation(fields: [cashierSessionId], references: [id])
 
   @@index([cashierSessionId])
+  @@index([cashierSessionId, createdAt])  // acelera filtros por período
+  @@index([createdAt])                    // consultas por data
   @@unique([sourceType, sourceId])
 }
 
@@ -563,6 +565,7 @@ model Payable {
   paymentMethod PaymentMethod?  @relation(fields: [paymentMethodId], references: [id])
 
   @@index([companyId, dueDate])
+  @@index([companyId, status, paidAt])  // acelera KPIs (summary)
 }
 
 model Receivable {
@@ -586,6 +589,7 @@ model Receivable {
   paymentMethod PaymentMethod?   @relation(fields: [paymentMethodId], references: [id])
 
   @@index([companyId, dueDate])
+  @@index([companyId, status, receivedAt]) // acelera KPIs (summary)
 }
 
 model CancellationReason {

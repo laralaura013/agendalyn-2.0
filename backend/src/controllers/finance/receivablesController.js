@@ -1,5 +1,6 @@
 // src/controllers/finance/receivablesController.js
 import prisma from '../../prismaClient.js';
+import * as cashbox from '../../services/cashboxService.js';
 
 /* ========================= Helpers ========================= */
 const normalizeId = (v) =>
@@ -15,17 +16,23 @@ const parseDayBoundary = (isoOrDateOnly, end = false) => {
   return isNaN(d.getTime()) ? undefined : d;
 };
 
+const toNumber = (v) => {
+  const n = Number(v);
+  return isFinite(n) ? n : NaN;
+};
+
 /* ============================================================
  * LIST (Paginado)
  * GET /api/finance/receivables
  * Query:
- *  - status (string CSV opcional; ex: OPEN,RECEIVED)
- *  - date_from (YYYY-MM-DD ou ISO)
- *  - date_to   (YYYY-MM-DD ou ISO)
+ *  - status (CSV opcional; ex: OPEN,RECEIVED,CANCELED)
+ *  - date_from (YYYY-MM-DD ou ISO) / date_to (YYYY-MM-DD ou ISO)  -> filtro em dueDate
  *  - categoryId, clientId, orderId
  *  - q (busca por descrição/observação)
  *  - sortBy (default 'dueDate'), sortOrder ('asc'|'desc', default 'asc')
  *  - page (1-based), pageSize
+ * Response:
+ *  { items, total, page, pageSize, totalsByStatus: { OPEN, RECEIVED, CANCELED } }
  * ==========================================================*/
 export const list = async (req, res) => {
   try {
@@ -74,7 +81,7 @@ export const list = async (req, res) => {
       ];
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, totalsAgg] = await Promise.all([
       prisma.receivable.findMany({
         where,
         include: {
@@ -85,20 +92,38 @@ export const list = async (req, res) => {
         },
         orderBy: [
           { [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' },
-          // Ordenação estável secundária:
-          ...(sortBy !== 'createdAt' ? [{ createdAt: 'desc' }] : []),
+          ...(sortBy !== 'createdAt' ? [{ createdAt: 'desc' }] : []), // ordenação estável
         ],
         skip,
         take: pageSize,
       }),
       prisma.receivable.count({ where }),
+      prisma.receivable.groupBy({
+        by: ['status'],
+        where,
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
     ]);
+
+    const totalsByStatus = {
+      OPEN: { count: 0, amount: 0 },
+      RECEIVED: { count: 0, amount: 0 },
+      CANCELED: { count: 0, amount: 0 },
+    };
+    for (const r of totalsAgg) {
+      const key = r.status?.toUpperCase?.() || 'OPEN';
+      if (!totalsByStatus[key]) totalsByStatus[key] = { count: 0, amount: 0 };
+      totalsByStatus[key].count = r._count?._all || 0;
+      totalsByStatus[key].amount = Number(r._sum?.amount || 0);
+    }
 
     return res.status(200).json({
       items,
       total,
       page,
       pageSize,
+      totalsByStatus,
     });
   } catch (e) {
     console.error('Erro list receivables:', e);
@@ -126,7 +151,7 @@ export const create = async (req, res) => {
     const due = parseDayBoundary(dueDate);
     if (!due) return res.status(400).json({ message: 'dueDate inválido.' });
 
-    const amountNum = Number(amount);
+    const amountNum = toNumber(amount);
     if (!isFinite(amountNum) || amountNum <= 0) {
       return res.status(400).json({ message: 'amount deve ser um número positivo.' });
     }
@@ -208,11 +233,13 @@ export const create = async (req, res) => {
 };
 
 /* ============================================================
- * UPDATE
+ * UPDATE (integra com Caixa)
  * PUT /api/finance/receivables/:id
  * Regras status:
- *  - status='RECEIVED' e receivedAt ausente → define agora.
- *  - status='OPEN'|'CANCELED' → zera receivedAt (salvo se vier explicitamente).
+ *  - status='RECEIVED' e receivedAt ausente → define agora e lança ENTRADA no caixa (idempotente).
+ *  - status='OPEN'|'CANCELED' → zera receivedAt e remove a entrada do caixa.
+ *  - se valor mudar e registro estiver RECEIVED → reupsert da transação do caixa.
+ *  - se receivedAt mudar em RECEIVED → reupsert da transação do caixa.
  * ==========================================================*/
 export const update = async (req, res) => {
   try {
@@ -298,36 +325,64 @@ export const update = async (req, res) => {
       data.dueDate = d;
     }
 
+    let amountChanged = false;
     if (amount !== undefined && amount !== null) {
-      const amountNum = Number(amount);
+      const amountNum = toNumber(amount);
       if (!isFinite(amountNum) || amountNum <= 0) {
         return res.status(400).json({ message: 'amount deve ser um número positivo.' });
       }
       data.amount = amountNum;
+      amountChanged = amountNum !== Number(current.amount);
     }
 
     if (typeof notes === 'string') data.notes = notes;
 
+    // status + receivedAt
+    let statusNow = current.status;
     if (status) {
       const upStatus = String(status).toUpperCase();
       data.status = upStatus;
+      statusNow = upStatus;
 
       if (upStatus === 'RECEIVED') {
         data.receivedAt = receivedAt ? new Date(receivedAt) : new Date();
       } else if (upStatus === 'OPEN' || upStatus === 'CANCELED') {
-        // volta para aberto/cancelado → zera receivedAt, a menos que o front mande explicitamente
         data.receivedAt = receivedAt ? new Date(receivedAt) : null;
       }
     } else if (receivedAt) {
       data.receivedAt = new Date(receivedAt);
     }
 
-    const updated = await prisma.receivable.update({
-      where: { id },
-      data,
-    });
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        const u = await tx.receivable.update({ where: { id }, data });
 
-    return res.json(updated);
+        // CAIXA
+        const statusAfter = u.status;
+        const receivedAtChanged = Object.prototype.hasOwnProperty.call(data, 'receivedAt');
+
+        if (statusAfter === 'RECEIVED') {
+          // marcado como recebido, ou valor/data alterados enquanto RECEIVED → garante entrada
+          await cashbox.ensureIncomeForReceivable(tx, companyId, u);
+        } else if (statusAfter === 'OPEN' || statusAfter === 'CANCELED') {
+          // voltou para aberto/cancelado → remove lançamento do caixa
+          await cashbox.removeIncomeForReceivable(tx, u.id, companyId);
+        } else if (!status && amountChanged && current.status === 'RECEIVED') {
+          await cashbox.ensureIncomeForReceivable(tx, companyId, u);
+        } else if (!status && !amountChanged && receivedAtChanged && current.status === 'RECEIVED') {
+          await cashbox.ensureIncomeForReceivable(tx, companyId, u);
+        }
+
+        return u;
+      });
+
+      return res.json(updated);
+    } catch (err) {
+      if (err?.code === 'NO_OPEN_CASHIER') {
+        return res.status(409).json({ message: err.message }); // caixa fechado
+      }
+      throw err;
+    }
   } catch (e) {
     if (e?.code === 'P2003') {
       return res
@@ -340,8 +395,60 @@ export const update = async (req, res) => {
 };
 
 /* ============================================================
+ * PATCH STATUS (opcional, mais direto para UI)
+ * PATCH /api/finance/receivables/:id/status
+ * Body: { status: 'OPEN' | 'RECEIVED' | 'CANCELED', receivedAt? }
+ * ==========================================================*/
+export const patchStatus = async (req, res) => {
+  try {
+    const companyId = req.company.id;
+    const { id } = req.params;
+    const { status, receivedAt } = req.body || {};
+
+    if (!status) return res.status(400).json({ message: 'status é obrigatório.' });
+
+    const current = await prisma.receivable.findFirst({ where: { id, companyId } });
+    if (!current) return res.status(404).json({ message: 'Conta a receber não encontrada.' });
+
+    const upStatus = String(status).toUpperCase();
+    const data = { status: upStatus };
+
+    if (upStatus === 'RECEIVED') {
+      data.receivedAt = receivedAt ? new Date(receivedAt) : new Date();
+    } else if (upStatus === 'OPEN' || upStatus === 'CANCELED') {
+      data.receivedAt = receivedAt ? new Date(receivedAt) : null;
+    }
+
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        const u = await tx.receivable.update({ where: { id }, data });
+
+        if (u.status === 'RECEIVED') {
+          await cashbox.ensureIncomeForReceivable(tx, companyId, u);
+        } else {
+          await cashbox.removeIncomeForReceivable(tx, u.id, companyId);
+        }
+
+        return u;
+      });
+
+      return res.json(updated);
+    } catch (err) {
+      if (err?.code === 'NO_OPEN_CASHIER') {
+        return res.status(409).json({ message: err.message });
+      }
+      throw err;
+    }
+  } catch (e) {
+    console.error('Erro patchStatus receivable:', e);
+    return res.status(500).json({ message: 'Erro ao atualizar status.' });
+  }
+};
+
+/* ============================================================
  * DELETE
  * DELETE /api/finance/receivables/:id
+ * Remove o registro e, se existir, remove o lançamento do caixa.
  * ==========================================================*/
 export const remove = async (req, res) => {
   try {
@@ -351,7 +458,11 @@ export const remove = async (req, res) => {
     const found = await prisma.receivable.findFirst({ where: { id, companyId } });
     if (!found) return res.status(404).json({ message: 'Conta a receber não encontrada.' });
 
-    await prisma.receivable.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.receivable.delete({ where: { id } });
+      await cashbox.removeIncomeForReceivable(tx, id, companyId);
+    });
+
     return res.status(204).send();
   } catch (e) {
     console.error('Erro delete receivable:', e);
