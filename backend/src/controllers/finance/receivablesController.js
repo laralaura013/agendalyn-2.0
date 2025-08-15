@@ -1,13 +1,13 @@
 // src/controllers/finance/receivablesController.js
 import prisma from '../../prismaClient.js';
 
-// Helpers
+/* ========================= Helpers ========================= */
 const normalizeId = (v) =>
   v && typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
 
+// Aceita 'YYYY-MM-DD' (vira 00:00 local) ou ISO completo
 const parseDayBoundary = (isoOrDateOnly, end = false) => {
   if (!isoOrDateOnly) return undefined;
-  // aceita 'YYYY-MM-DD' ou ISO
   if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDateOnly)) {
     return new Date(`${isoOrDateOnly}T${end ? '23:59:59.999' : '00:00:00.000'}`);
   }
@@ -15,18 +15,17 @@ const parseDayBoundary = (isoOrDateOnly, end = false) => {
   return isNaN(d.getTime()) ? undefined : d;
 };
 
-// -----------------------------------------------------------------------------
-// LIST
-// GET /api/finance/receivables
-// Query: status, date_from, date_to, categoryId, clientId, orderId
-// -----------------------------------------------------------------------------
+/* ============================================================
+ * LIST
+ * GET /api/finance/receivables
+ * Query: status, date_from, date_to, categoryId, clientId, orderId
+ * ==========================================================*/
 export const list = async (req, res) => {
   try {
     const { status, date_from, date_to, categoryId, clientId, orderId } = req.query;
-
     const where = { companyId: req.company.id };
 
-    // status: aceita único ou múltiplos separados por vírgula
+    // status único ou CSV
     if (status) {
       const arr = String(status)
         .split(',')
@@ -36,9 +35,9 @@ export const list = async (req, res) => {
       else if (arr.length > 1) where.status = { in: arr };
     }
 
-    if (categoryId) where.categoryId = categoryId;
-    if (clientId) where.clientId = clientId;
-    if (orderId) where.orderId = orderId;
+    if (categoryId) where.categoryId = String(categoryId);
+    if (clientId) where.clientId = String(clientId);
+    if (orderId) where.orderId = String(orderId);
 
     const gte = parseDayBoundary(date_from, false);
     const lte = parseDayBoundary(date_to, true);
@@ -66,42 +65,40 @@ export const list = async (req, res) => {
   }
 };
 
-// -----------------------------------------------------------------------------
-// CREATE
-// POST /api/finance/receivables
-// Body: { clientId?, orderId?, categoryId?, paymentMethodId?, dueDate*, amount*, notes? }
-// -----------------------------------------------------------------------------
+/* ============================================================
+ * CREATE
+ * POST /api/finance/receivables
+ * Body: { clientId?, orderId?, categoryId?, paymentMethodId?, dueDate*, amount*, notes? }
+ * ==========================================================*/
 export const create = async (req, res) => {
   try {
     const companyId = req.company.id;
-    const { dueDate, amount, notes } = req.body;
+    const { notes } = req.body;
 
-    let { clientId, orderId, categoryId, paymentMethodId } = req.body;
+    let { clientId, orderId, categoryId, paymentMethodId, dueDate, amount } = req.body;
     clientId = normalizeId(clientId);
     orderId = normalizeId(orderId);
     categoryId = normalizeId(categoryId);
     paymentMethodId = normalizeId(paymentMethodId);
 
-    if (!dueDate || amount === undefined || amount === null) {
-      return res.status(400).json({ message: 'Campos obrigatórios: dueDate e amount.' });
-    }
+    // obrigatórios
+    const due = parseDayBoundary(dueDate);
+    if (!due) return res.status(400).json({ message: 'dueDate inválido.' });
+
     const amountNum = Number(amount);
     if (!isFinite(amountNum) || amountNum <= 0) {
       return res.status(400).json({ message: 'amount deve ser um número positivo.' });
     }
 
-    // Valida FKs SOMENTE se enviados
+    // Valida e carrega FKs SOMENTE se enviados
     const [client, order, category, pm] = await Promise.all([
       clientId
-        ? prisma.client.findFirst({
-            where: { id: clientId, companyId },
-            select: { id: true },
-          })
+        ? prisma.client.findFirst({ where: { id: clientId, companyId }, select: { id: true } })
         : null,
       orderId
         ? prisma.order.findFirst({
             where: { id: orderId, companyId },
-            select: { id: true },
+            select: { id: true, clientId: true },
           })
         : null,
       categoryId
@@ -120,20 +117,35 @@ export const create = async (req, res) => {
 
     if (clientId && !client)
       return res.status(400).json({ message: 'Cliente inválido para esta empresa.' });
+
     if (orderId && !order)
       return res.status(400).json({ message: 'Comanda inválida para esta empresa.' });
+
+    // Se veio orderId e não veio clientId, herda do pedido (se existir)
+    if (orderId && !clientId && order?.clientId) {
+      clientId = order.clientId;
+    }
+
+    // Se ambos vieram, precisam ser consistentes
+    if (orderId && clientId && order?.clientId && order.clientId !== clientId) {
+      return res
+        .status(400)
+        .json({ message: 'Cliente informado não corresponde ao cliente da comanda.' });
+    }
+
     if (categoryId && !category)
       return res.status(400).json({ message: 'Categoria (Receber) inválida.' });
+
     if (paymentMethodId && !pm)
       return res.status(400).json({ message: 'Forma de pagamento inválida.' });
 
     const created = await prisma.receivable.create({
       data: {
         companyId,
-        dueDate: new Date(dueDate),
+        dueDate: due,
         amount: amountNum,
         status: 'OPEN',
-        notes: notes || '',
+        notes: typeof notes === 'string' ? notes : '',
         ...(clientId && { clientId }),
         ...(orderId && { orderId }),
         ...(categoryId && { categoryId }),
@@ -143,8 +155,8 @@ export const create = async (req, res) => {
 
     return res.status(201).json(created);
   } catch (e) {
-    // FK genérica
     if (e?.code === 'P2003') {
+      // Violação de FK
       return res
         .status(400)
         .json({ message: 'Referência inválida (cliente/ordem/categoria/forma de pagamento).' });
@@ -154,24 +166,20 @@ export const create = async (req, res) => {
   }
 };
 
-// -----------------------------------------------------------------------------
-// UPDATE
-// PUT /api/finance/receivables/:id
-// Body parcial; regras: se status='RECEIVED' e receivedAt ausente → define agora
-// -----------------------------------------------------------------------------
+/* ============================================================
+ * UPDATE
+ * PUT /api/finance/receivables/:id
+ * Body parcial; se status='RECEIVED' e receivedAt ausente → define agora.
+ * Se status voltar para 'OPEN' ou 'CANCELED', zera receivedAt salvo se vier explicitamente.
+ * ==========================================================*/
 export const update = async (req, res) => {
   try {
     const companyId = req.company.id;
     const { id } = req.params;
 
-    const current = await prisma.receivable.findFirst({
-      where: { id, companyId },
-    });
-    if (!current) {
-      return res.status(404).json({ message: 'Conta a receber não encontrada.' });
-    }
+    const current = await prisma.receivable.findFirst({ where: { id, companyId } });
+    if (!current) return res.status(404).json({ message: 'Conta a receber não encontrada.' });
 
-    // Normaliza/valida IDs opcionais que vierem no body
     let {
       clientId,
       orderId,
@@ -189,14 +197,17 @@ export const update = async (req, res) => {
     categoryId = normalizeId(categoryId);
     paymentMethodId = normalizeId(paymentMethodId);
 
-    // Valida FKs apenas se enviados no update
+    // Valida FKs apenas se enviados
     if (clientId || orderId || categoryId || paymentMethodId) {
       const [client, order, category, pm] = await Promise.all([
         clientId
           ? prisma.client.findFirst({ where: { id: clientId, companyId }, select: { id: true } })
           : null,
         orderId
-          ? prisma.order.findFirst({ where: { id: orderId, companyId }, select: { id: true } })
+          ? prisma.order.findFirst({
+              where: { id: orderId, companyId },
+              select: { id: true, clientId: true },
+            })
           : null,
         categoryId
           ? prisma.financeCategory.findFirst({
@@ -214,21 +225,37 @@ export const update = async (req, res) => {
 
       if (clientId && !client)
         return res.status(400).json({ message: 'Cliente inválido para esta empresa.' });
+
       if (orderId && !order)
         return res.status(400).json({ message: 'Comanda inválida para esta empresa.' });
+
+      if (orderId && clientId && order?.clientId && order.clientId !== clientId) {
+        return res
+          .status(400)
+          .json({ message: 'Cliente informado não corresponde ao cliente da comanda.' });
+      }
+
       if (categoryId && !category)
         return res.status(400).json({ message: 'Categoria (Receber) inválida.' });
+
       if (paymentMethodId && !pm)
         return res.status(400).json({ message: 'Forma de pagamento inválida.' });
     }
 
     const data = {};
+
+    // IDs relacionais — permitem limpar (null) se vier string vazia
     if (clientId !== undefined) data.clientId = clientId || null;
     if (orderId !== undefined) data.orderId = orderId || null;
     if (categoryId !== undefined) data.categoryId = categoryId || null;
     if (paymentMethodId !== undefined) data.paymentMethodId = paymentMethodId || null;
 
-    if (dueDate) data.dueDate = new Date(dueDate);
+    if (dueDate) {
+      const d = parseDayBoundary(dueDate);
+      if (!d) return res.status(400).json({ message: 'dueDate inválido.' });
+      data.dueDate = d;
+    }
+
     if (amount !== undefined && amount !== null) {
       const amountNum = Number(amount);
       if (!isFinite(amountNum) || amountNum <= 0) {
@@ -242,10 +269,12 @@ export const update = async (req, res) => {
     if (status) {
       const upStatus = String(status).toUpperCase();
       data.status = upStatus;
+
       if (upStatus === 'RECEIVED') {
         data.receivedAt = receivedAt ? new Date(receivedAt) : new Date();
-      } else if (receivedAt) {
-        data.receivedAt = new Date(receivedAt); // permite ajustar manualmente
+      } else if (upStatus === 'OPEN' || upStatus === 'CANCELED') {
+        // volta para aberto/cancelado → zera receivedAt, a menos que o front mande explicitamente
+        data.receivedAt = receivedAt ? new Date(receivedAt) : null;
       }
     } else if (receivedAt) {
       data.receivedAt = new Date(receivedAt);
@@ -268,21 +297,17 @@ export const update = async (req, res) => {
   }
 };
 
-// -----------------------------------------------------------------------------
-// DELETE
-// DELETE /api/finance/receivables/:id
-// -----------------------------------------------------------------------------
+/* ============================================================
+ * DELETE
+ * DELETE /api/finance/receivables/:id
+ * ==========================================================*/
 export const remove = async (req, res) => {
   try {
     const companyId = req.company.id;
     const { id } = req.params;
 
-    const found = await prisma.receivable.findFirst({
-      where: { id, companyId },
-    });
-    if (!found) {
-      return res.status(404).json({ message: 'Conta a receber não encontrada.' });
-    }
+    const found = await prisma.receivable.findFirst({ where: { id, companyId } });
+    if (!found) return res.status(404).json({ message: 'Conta a receber não encontrada.' });
 
     await prisma.receivable.delete({ where: { id } });
     return res.status(204).send();

@@ -1,105 +1,175 @@
+// backend/src/controllers/exportsController.js
 import prisma from '../prismaClient.js';
 
-const toCsv = (rows) => {
-  if (!rows?.length) return '';
-  const headers = Object.keys(rows[0]);
-  const escape = (v) => {
-    if (v == null) return '';
-    const s = String(v);
-    if (s.includes('"') || s.includes(',') || s.includes('\n')) {
-      return `"${s.replace(/"/g, '""')}"`;
-    }
-    return s;
-  };
-  const lines = [
-    headers.join(','),
-    ...rows.map((r) => headers.map((h) => escape(r[h])).join(',')),
-  ];
-  return lines.join('\n');
+/* util: data início/fim do dia */
+const parseDayBoundary = (isoOrDateOnly, end = false) => {
+  if (!isoOrDateOnly) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDateOnly)) {
+    return new Date(`${isoOrDateOnly}T${end ? '23:59:59.999' : '00:00:00.000'}`);
+  }
+  const d = new Date(isoOrDateOnly);
+  return isNaN(d.getTime()) ? undefined : d;
 };
 
-export const exportCsv = async (req, res) => {
-  try {
-    const { entity } = req.params;
-    const companyId = req.company.id;
+/* util: gera CSV com escape correto e headers dinâmicos */
+function toCsv(rows, headers) {
+  const escapeCell = (v) => {
+    if (v == null) return '';
+    const s = String(v);
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
 
-    let rows = [];
-    if (entity === 'clients') {
-      const data = await prisma.client.findMany({
-        where: { companyId },
-        select: { id: true, name: true, phone: true, email: true, birthDate: true, createdAt: true },
-        orderBy: { name: 'asc' },
-      });
-      rows = data.map((c) => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone || '',
-        email: c.email || '',
-        birthDate: c.birthDate ? c.birthDate.toISOString().slice(0, 10) : '',
-        createdAt: c.createdAt.toISOString(),
-      }));
-    } else if (entity === 'appointments') {
-      const data = await prisma.appointment.findMany({
-        where: { companyId },
-        include: { client: true, user: true, service: true },
-        orderBy: { start: 'desc' },
-        take: 2000,
-      });
-      rows = data.map((a) => ({
-        id: a.id,
-        start: a.start.toISOString(),
-        end: a.end.toISOString(),
-        status: a.status,
-        client: a.client?.name || '',
-        professional: a.user?.name || '',
-        service: a.service?.name || '',
-        notes: a.notes || '',
-      }));
-    } else if (entity === 'payables') {
-      const data = await prisma.payable.findMany({
-        where: { companyId },
-        include: { supplier: true, category: true, paymentMethod: true },
-        orderBy: { dueDate: 'desc' },
-        take: 5000,
-      });
-      rows = data.map((p) => ({
-        id: p.id,
-        dueDate: p.dueDate.toISOString().slice(0, 10),
-        amount: p.amount.toString(),
-        status: p.status,
-        supplier: p.supplier?.name || '',
-        category: p.category?.name || '',
-        paymentMethod: p.paymentMethod?.name || '',
-        notes: p.notes || '',
-      }));
-    } else if (entity === 'receivables') {
-      const data = await prisma.receivable.findMany({
-        where: { companyId },
-        include: { client: true, order: true, category: true, paymentMethod: true },
-        orderBy: { dueDate: 'desc' },
-        take: 5000,
-      });
-      rows = data.map((r) => ({
-        id: r.id,
-        dueDate: r.dueDate.toISOString().slice(0, 10),
-        amount: r.amount.toString(),
-        status: r.status,
-        client: r.client?.name || '',
-        orderId: r.order?.id || '',
-        category: r.category?.name || '',
-        paymentMethod: r.paymentMethod?.name || '',
-        notes: r.notes || '',
-      }));
-    } else {
-      return res.status(400).json({ message: 'Entidade inválida para exportação.' });
+  const head = headers.map(h => h.label).join(',');
+  const body = rows
+    .map(r => headers.map(h => escapeCell(h.pick(r))).join(','))
+    .join('\n');
+
+  return `${head}\n${body}`;
+}
+
+/* =========================================
+   /exports/receivables.csv
+   Query (opcional): status, date_from, date_to, clientId, orderId, categoryId, paymentMethodId
+   ========================================= */
+export const exportReceivablesCsv = async (req, res) => {
+  try {
+    const companyId = req.company.id;
+    const {
+      status,
+      date_from,
+      date_to,
+      clientId,
+      orderId,
+      categoryId,
+      paymentMethodId,
+    } = req.query || {};
+
+    const where = { companyId };
+
+    // status: aceita único ou múltiplos separados por vírgula
+    if (status) {
+      const arr = String(status)
+        .split(',')
+        .map(s => s.trim().toUpperCase())
+        .filter(Boolean);
+      if (arr.length === 1) where.status = arr[0];
+      else if (arr.length > 1) where.status = { in: arr };
     }
 
-    const csv = toCsv(rows);
+    if (clientId) where.clientId = clientId;
+    if (orderId) where.orderId = orderId;
+    if (categoryId) where.categoryId = categoryId;
+    if (paymentMethodId) where.paymentMethodId = paymentMethodId;
+
+    const gte = parseDayBoundary(date_from, false);
+    const lte = parseDayBoundary(date_to, true);
+    if (gte || lte) {
+      where.dueDate = {};
+      if (gte) where.dueDate.gte = gte;
+      if (lte) where.dueDate.lte = lte;
+    }
+
+    const rows = await prisma.receivable.findMany({
+      where,
+      include: {
+        client: { select: { name: true } },
+        order: { select: { id: true } },
+        category: { select: { name: true } },
+        paymentMethod: { select: { name: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+    });
+
+    const headers = [
+      { label: 'ID', pick: r => r.id },
+      { label: 'Status', pick: r => r.status },
+      { label: 'Vencimento', pick: r => r.dueDate ? r.dueDate.toISOString().slice(0, 10) : '' },
+      { label: 'RecebidoEm', pick: r => r.receivedAt ? new Date(r.receivedAt).toISOString() : '' },
+      { label: 'Valor', pick: r => Number(r.amount ?? 0).toFixed(2) },
+      { label: 'Cliente', pick: r => r.client?.name || '' },
+      { label: 'Comanda', pick: r => r.order?.id || '' },
+      { label: 'Categoria', pick: r => r.category?.name || '' },
+      { label: 'Forma de Pagamento', pick: r => r.paymentMethod?.name || '' },
+      { label: 'Observações', pick: r => r.notes || '' },
+    ];
+
+    const csv = toCsv(rows, headers);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${entity}.csv"`);
+    res.setHeader('Content-Disposition', 'attachment; filename="receivables.csv"');
     return res.status(200).send(csv);
   } catch (e) {
-    console.error('Erro export csv:', e);
-    res.status(500).json({ message: 'Erro ao exportar CSV.' });
+    console.error('Erro exportReceivablesCsv:', e);
+    return res.status(500).json({ message: 'Erro ao exportar receivíveis.' });
+  }
+};
+
+/* =========================================
+   /exports/payables.csv
+   Query (opcional): status, date_from, date_to, supplierId, categoryId, paymentMethodId
+   ========================================= */
+export const exportPayablesCsv = async (req, res) => {
+  try {
+    const companyId = req.company.id;
+    const {
+      status,
+      date_from,
+      date_to,
+      supplierId,
+      categoryId,
+      paymentMethodId,
+    } = req.query || {};
+
+    const where = { companyId };
+
+    if (status) {
+      const arr = String(status)
+        .split(',')
+        .map(s => s.trim().toUpperCase())
+        .filter(Boolean);
+      if (arr.length === 1) where.status = arr[0];
+      else if (arr.length > 1) where.status = { in: arr };
+    }
+
+    if (supplierId) where.supplierId = supplierId;
+    if (categoryId) where.categoryId = categoryId;
+    if (paymentMethodId) where.paymentMethodId = paymentMethodId;
+
+    const gte = parseDayBoundary(date_from, false);
+    const lte = parseDayBoundary(date_to, true);
+    if (gte || lte) {
+      where.dueDate = {};
+      if (gte) where.dueDate.gte = gte;
+      if (lte) where.dueDate.lte = lte;
+    }
+
+    const rows = await prisma.payable.findMany({
+      where,
+      include: {
+        supplier: { select: { name: true } },
+        category: { select: { name: true } },
+        paymentMethod: { select: { name: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+    });
+
+    const headers = [
+      { label: 'ID', pick: r => r.id },
+      { label: 'Status', pick: r => r.status },
+      { label: 'Vencimento', pick: r => r.dueDate ? r.dueDate.toISOString().slice(0, 10) : '' },
+      { label: 'PagoEm', pick: r => r.paidAt ? new Date(r.paidAt).toISOString() : '' },
+      { label: 'Valor', pick: r => Number(r.amount ?? 0).toFixed(2) },
+      { label: 'Fornecedor', pick: r => r.supplier?.name || '' },
+      { label: 'Categoria', pick: r => r.category?.name || '' },
+      { label: 'Forma de Pagamento', pick: r => r.paymentMethod?.name || '' },
+      { label: 'Observações', pick: r => r.notes || '' },
+    ];
+
+    const csv = toCsv(rows, headers);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="payables.csv"');
+    return res.status(200).send(csv);
+  } catch (e) {
+    console.error('Erro exportPayablesCsv:', e);
+    return res.status(500).json({ message: 'Erro ao exportar pagáveis.' });
   }
 };

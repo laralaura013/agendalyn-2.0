@@ -1,14 +1,12 @@
 import express from 'express';
 import { protect, checkRole } from '../middlewares/authMiddleware.js';
-import { getRevenueReport, getBirthdaysReport } from '../controllers/reportsController.js';
+import { exportReceivablesCsv, exportPayablesCsv } from '../controllers/exportsController.js';
 
 const router = express.Router();
 router.use(protect);
+router.use(checkRole(['OWNER']));
 
-// Apenas OWNER
-router.get('/revenue', checkRole(['OWNER']), getRevenueReport);
-
-// Aniversariantes (OWNER)
-router.get('/birthdays', checkRole(['OWNER']), getBirthdaysReport);
+router.get('/receivables.csv', exportReceivablesCsv);
+router.get('/payables.csv', exportPayablesCsv);
 
 export default router;

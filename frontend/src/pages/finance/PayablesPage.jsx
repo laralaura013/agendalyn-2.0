@@ -1,105 +1,393 @@
-import React, { useEffect, useState } from 'react';
+// frontend/src/pages/finance/PayablesPage.jsx
+import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import ExportCsvButton from '../../components/common/ExportCsvButton';
+import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
+
+const STATUSES = ['OPEN', 'PAID', 'CANCELED'];
+
+const toIsoNoon = (d) => (d ? `${d}T12:00:00` : null);
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : '');
+const currency = (n) =>
+  n != null ? Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '';
 
 export default function PayablesPage() {
-  const [items, setItems] = useState([]);
-  const [cats, setCats] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [methods, setMethods] = useState([]);
-  const [form, setForm] = useState({ categoryId: '', supplierId: '', paymentMethodId: '', dueDate: '', amount: '', notes: '' });
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const fetchAll = async () => {
+  const [filters, setFilters] = useState({
+    status: 'OPEN',
+    date_from: '',
+    date_to: '',
+    supplierId: '',
+    categoryId: '',
+  });
+
+  const [suppliers, setSuppliers] = useState([]);
+  const [categories, setCategories] = useState([]); // type=PAYABLE
+  const [methods, setMethods] = useState([]);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    supplierId: '',
+    categoryId: '',
+    paymentMethodId: '',
+    dueDate: '',
+    amount: '',
+    notes: '',
+  });
+
+  const totalList = useMemo(
+    () => rows.reduce((s, r) => s + Number(r.amount || 0), 0),
+    [rows]
+  );
+
+  // ========= LOAD OPTIONS =========
+  const loadOptions = async () => {
     try {
-      const [p, c, s, m] = await Promise.all([
-        api.get('/finance/payables'),
-        api.get('/finance/categories?type=PAYABLE'),
+      const [sup, cats, pms] = await Promise.all([
         api.get('/finance/suppliers'),
+        api.get('/finance/categories', { params: { type: 'PAYABLE' } }),
         api.get('/finance/payment-methods'),
       ]);
-      setItems(p.data); setCats(c.data); setSuppliers(s.data); setMethods(m.data);
-    } catch {
-      toast.error('Erro ao carregar dados.');
+      setSuppliers(sup.data || []);
+      setCategories(cats.data || []);
+      setMethods(pms.data || []);
+    } catch (e) {
+      console.warn(e);
     }
   };
-  useEffect(()=>{ fetchAll(); },[]);
 
-  const submit = async (e) => {
+  // ========= LIST =========
+  const fetchList = async () => {
+    setLoading(true);
+    try {
+      const r = await api.get('/finance/payables', { params: filters });
+      setRows(r.data || []);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Erro ao listar Pagar.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOptions();
+    fetchList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ========= FILTERS =========
+  const onChangeFilter = (e) => {
+    const { name, value } = e.target;
+    setFilters((f) => ({ ...f, [name]: value }));
+  };
+  const applyFilters = async (e) => {
+    e?.preventDefault();
+    await fetchList();
+  };
+  const resetFilters = async () => {
+    setFilters({
+      status: 'OPEN',
+      date_from: '',
+      date_to: '',
+      supplierId: '',
+      categoryId: '',
+    });
+    setTimeout(fetchList, 0);
+  };
+
+  // ========= FORM =========
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      supplierId: '',
+      categoryId: '',
+      paymentMethodId: '',
+      dueDate: '',
+      amount: '',
+      notes: '',
+    });
+    setFormOpen(true);
+  };
+  const openEdit = (row) => {
+    setEditing(row);
+    setForm({
+      supplierId: row.supplierId || '',
+      categoryId: row.categoryId || '',
+      paymentMethodId: row.paymentMethodId || '',
+      dueDate: row.dueDate ? String(row.dueDate).slice(0, 10) : '',
+      amount: row.amount != null ? String(row.amount) : '',
+      notes: row.notes || '',
+    });
+    setFormOpen(true);
+  };
+  const submitForm = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/finance/payables', {
-        ...form,
-        amount: Number(form.amount || 0),
-        supplierId: form.supplierId || null,
-        paymentMethodId: form.paymentMethodId || null,
-      });
-      toast.success('Conta a pagar criada!');
-      setForm({ categoryId: '', supplierId: '', paymentMethodId: '', dueDate: '', amount: '', notes: '' });
-      fetchAll();
-    } catch {
-      toast.error('Erro ao criar conta.');
+      const payload = {
+        categoryId: form.categoryId || undefined, // Payable exige categoryId no backend
+        dueDate: toIsoNoon(form.dueDate),
+        amount: Number(form.amount),
+        notes: form.notes?.trim() || '',
+      };
+      if (form.supplierId) payload.supplierId = form.supplierId;
+      if (form.paymentMethodId) payload.paymentMethodId = form.paymentMethodId;
+
+      if (!editing) {
+        await api.post('/finance/payables', payload);
+        toast.success('Conta a pagar criada!');
+      } else {
+        await api.put(`/finance/payables/${editing.id}`, payload);
+        toast.success('Conta a pagar atualizada!');
+      }
+      setFormOpen(false);
+      fetchList();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Erro ao salvar.');
+    }
+  };
+
+  // ========= ACTIONS =========
+  const markPaid = async (row) => {
+    try {
+      await api.put(`/finance/payables/${row.id}`, { status: 'PAID' });
+      toast.success('Marcado como pago.');
+      fetchList();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
+    }
+  };
+  const cancelItem = async (row) => {
+    if (!window.confirm('Cancelar este pagável?')) return;
+    try {
+      await api.put(`/finance/payables/${row.id}`, { status: 'CANCELED' });
+      toast.success('Pagável cancelado.');
+      fetchList();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
+    }
+  };
+  const removeItem = async (row) => {
+    if (!window.confirm('Excluir permanentemente?')) return;
+    try {
+      await api.delete(`/finance/payables/${row.id}`);
+      toast.success('Excluído.');
+      fetchList();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Erro ao excluir.');
+    }
+  };
+
+  // ========= EXPORT =========
+  const exportCsv = async () => {
+    try {
+      const r = await api.get('/exports/payables.csv', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'payables.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error('Erro ao exportar CSV.');
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Contas a Pagar</h2>
-        <ExportCsvButton entity="payables" />
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Contas a Pagar</h2>
+        <div className="flex gap-2">
+          <button onClick={exportCsv} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-2">
+            <Download size={16} /> Exportar CSV
+          </button>
+          <button onClick={openCreate} className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-2">
+            <Plus size={16} /> Novo
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white p-4 rounded-md shadow">
-        <h3 className="font-medium mb-3">Nova Conta</h3>
-        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <select className="border rounded px-3 py-2" value={form.categoryId} onChange={e=>setForm({...form, categoryId:e.target.value})} required>
-            <option value="">Categoria</option>
-            {cats.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select className="border rounded px-3 py-2" value={form.supplierId} onChange={e=>setForm({...form, supplierId:e.target.value})}>
-            <option value="">Fornecedor (opcional)</option>
-            {suppliers.map(s=> <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <select className="border rounded px-3 py-2" value={form.paymentMethodId} onChange={e=>setForm({...form, paymentMethodId:e.target.value})}>
-            <option value="">Forma de pagamento</option>
-            {methods.map(m=> <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
-          <input type="date" className="border rounded px-3 py-2" value={form.dueDate} onChange={e=>setForm({...form, dueDate:e.target.value})} required/>
-          <input type="number" step="0.01" className="border rounded px-3 py-2" placeholder="Valor" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} required/>
-          <input type="text" className="border rounded px-3 py-2" placeholder="Observações" value={form.notes} onChange={e=>setForm({...form, notes:e.target.value})}/>
-          <div className="sm:col-span-3">
-            <button className="px-4 py-2 bg-gray-900 text-white rounded">Salvar</button>
-          </div>
-        </form>
-      </div>
+      {/* Filtros */}
+      <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-white p-4 rounded border mb-4">
+        <select name="status" value={filters.status} onChange={onChangeFilter} className="border rounded px-2 py-2">
+          <option value="">Todos status</option>
+          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <input type="date" name="date_from" value={filters.date_from} onChange={onChangeFilter} className="border rounded px-2 py-2" />
+        <input type="date" name="date_to" value={filters.date_to} onChange={onChangeFilter} className="border rounded px-2 py-2" />
+        <select name="supplierId" value={filters.supplierId} onChange={onChangeFilter} className="border rounded px-2 py-2">
+          <option value="">Fornecedor: todos</option>
+          {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select name="categoryId" value={filters.categoryId} onChange={onChangeFilter} className="border rounded px-2 py-2">
+          <option value="">Categoria: todas</option>
+          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <div className="md:col-span-5 flex justify-end gap-2">
+          <button type="button" onClick={resetFilters} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-2">
+            <RefreshCw size={16} /> Limpar
+          </button>
+          <button type="submit" className="px-3 py-2 bg-gray-900 text-white rounded hover:bg-black">Aplicar</button>
+        </div>
+      </form>
 
-      <div className="bg-white p-4 rounded-md shadow">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left border-b">
-              <th className="py-2">Vencimento</th>
-              <th>Categoria</th>
-              <th>Fornecedor</th>
-              <th>Forma</th>
-              <th>Valor</th>
-              <th>Status</th>
-            </tr>
-          </thead>
+      {/* Tabela */}
+      <div className="bg-white border rounded overflow-hidden">
+        <div className="px-4 py-2 border-b flex justify-between items-center text-sm">
+          <span>{loading ? 'Carregando...' : `${rows.length} registro(s)`}</span>
+          <span className="font-medium">Total listado: {currency(totalList)}</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left p-2">Vencimento</th>
+                <th className="text-left p-2">Fornecedor</th>
+                <th className="text-left p-2">Categoria</th>
+                <th className="text-left p-2">Forma Pgto</th>
+                <th className="text-right p-2">Valor</th>
+                <th className="text-left p-2">Status</th>
+                <th className="text-left p-2">Obs.</th>
+                <th className="text-right p-2">Ações</th>
+              </tr>
+            </thead>
             <tbody>
-              {items.map(it=>(
-                <tr key={it.id} className="border-b">
-                  <td className="py-2">{String(it.dueDate).slice(0,10)}</td>
-                  <td>{it.category?.name}</td>
-                  <td>{it.supplier?.name || '-'}</td>
-                  <td>{it.paymentMethod?.name || '-'}</td>
-                  <td>R$ {Number(it.amount).toFixed(2)}</td>
-                  <td>{it.status}</td>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-t">
+                  <td className="p-2">{fmtDate(r.dueDate)}</td>
+                  <td className="p-2">{r.supplier?.name || '—'}</td>
+                  <td className="p-2">{r.category?.name || '—'}</td>
+                  <td className="p-2">{r.paymentMethod?.name || '—'}</td>
+                  <td className="p-2 text-right">{currency(r.amount)}</td>
+                  <td className="p-2">{r.status}</td>
+                  <td className="p-2">{r.notes}</td>
+                  <td className="p-2">
+                    <div className="flex justify-end gap-2">
+                      {r.status === 'OPEN' && (
+                        <>
+                          <button onClick={() => markPaid(r)} className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700" title="Marcar pago">
+                            <CheckCircle2 size={16} />
+                          </button>
+                          <button onClick={() => cancelItem(r)} className="px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700" title="Cancelar">
+                            <XCircle size={16} />
+                          </button>
+                        </>
+                      )}
+                      <button onClick={() => openEdit(r)} className="px-2 py-1 bg-gray-100 rounded hover:bg-gray-200" title="Editar">
+                        <Edit3 size={16} />
+                      </button>
+                      <button onClick={() => removeItem(r)} className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Excluir">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
-              {!items.length && <tr><td colSpan="6" className="py-3 text-gray-500">Nenhum registro</td></tr>}
+              {!rows.length && !loading && (
+                <tr>
+                  <td colSpan="8" className="p-4 text-center text-gray-500">Nenhum registro.</td>
+                </tr>
+              )}
             </tbody>
-        </table>
+          </table>
+        </div>
       </div>
+
+      {/* Modal */}
+      {formOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white w-full max-w-lg rounded shadow-lg">
+            <div className="px-4 py-3 border-b font-medium">{editing ? 'Editar Pagável' : 'Novo Pagável'}</div>
+            <form onSubmit={submitForm} className="p-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm text-gray-600">Fornecedor</label>
+                  <select
+                    value={form.supplierId}
+                    onChange={(e) => setForm((f) => ({ ...f, supplierId: e.target.value }))}
+                    className="border rounded px-2 py-2 w-full"
+                  >
+                    <option value="">Nenhum</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Categoria *</label>
+                  <select
+                    value={form.categoryId}
+                    onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                    className="border rounded px-2 py-2 w-full"
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Forma de Pagamento</label>
+                  <select
+                    value={form.paymentMethodId}
+                    onChange={(e) => setForm((f) => ({ ...f, paymentMethodId: e.target.value }))}
+                    className="border rounded px-2 py-2 w-full"
+                  >
+                    <option value="">Nenhuma</option>
+                    {methods.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Vencimento *</label>
+                  <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
+                    className="border rounded px-2 py-2 w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600">Valor *</label>
+                  <input
+                    type="number" step="0.01" min="0"
+                    value={form.amount}
+                    onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                    className="border rounded px-2 py-2 w-full"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-600">Observações</label>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                  className="border rounded px-2 py-2 w-full"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setFormOpen(false)} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+                  Cancelar
+                </button>
+                <button type="submit" className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

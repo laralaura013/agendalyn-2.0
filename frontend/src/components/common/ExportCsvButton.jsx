@@ -1,14 +1,24 @@
+// frontend/src/components/common/ExportCsvButton.jsx
 import React, { useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const ExportCsvButton = ({ entity, label = 'Exportar CSV', fileName }) => {
+/**
+ * Exemplo de uso:
+ * <ExportCsvButton entity="payables" />
+ * <ExportCsvButton entity="receivables" label="Exportar Receber" fileName="receber.csv" params={{ status:'OPEN' }} />
+ */
+const ExportCsvButton = ({ entity, label = 'Exportar CSV', fileName, params }) => {
   const [loading, setLoading] = useState(false);
 
   const handleExport = async () => {
+    if (!entity) return;
     try {
       setLoading(true);
-      const res = await api.get(`/exports/${entity}.csv`, { responseType: 'blob' });
+      const res = await api.get(`/exports/${entity}.csv`, {
+        responseType: 'blob',
+        params: params || {},
+      });
       const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
