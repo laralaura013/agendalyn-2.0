@@ -2,11 +2,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
+import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2, Search } from 'lucide-react';
 
 const STATUSES = ['OPEN', 'PAID', 'CANCELED'];
 
-const toIsoNoon = (d) => (d ? `${d}T12:00:00` : null);
+// Helpers visuais
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : '');
 const currency = (n) =>
   n != null ? Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '';
@@ -20,13 +20,17 @@ export default function PayablesPage() {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
 
+  // filtros “editáveis” no formulário
   const [filters, setFilters] = useState({
     status: 'OPEN',
     date_from: '',
     date_to: '',
     supplierId: '',
     categoryId: '',
+    q: '',
   });
+  // gatilho para aplicar filtros sem buscar a cada digitação
+  const [filtersApplied, setFiltersApplied] = useState(0);
 
   const [suppliers, setSuppliers] = useState([]);
   const [categories, setCategories] = useState([]); // type=PAYABLE
@@ -72,7 +76,6 @@ export default function PayablesPage() {
         params: { ...filters, page, pageSize },
       });
 
-      // aceita forma paginada { items, total, page, pageSize } ou array simples
       if (Array.isArray(r.data)) {
         setRows(r.data);
         setTotal(r.data.length);
@@ -93,10 +96,11 @@ export default function PayablesPage() {
     loadOptions();
   }, []);
 
+  // Busca quando muda página / pageSize / “filtros aplicados”
   useEffect(() => {
     fetchList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize]);
+  }, [page, pageSize, filtersApplied]);
 
   // ========= FILTERS =========
   const onChangeFilter = (e) => {
@@ -106,7 +110,10 @@ export default function PayablesPage() {
 
   const applyFilters = (e) => {
     e?.preventDefault();
+    // sempre volta para página 1
     setPage(1);
+    // se já estiver na página 1, garante re-fetch
+    setFiltersApplied((v) => v + 1);
   };
 
   const resetFilters = () => {
@@ -116,8 +123,10 @@ export default function PayablesPage() {
       date_to: '',
       supplierId: '',
       categoryId: '',
+      q: '',
     });
     setPage(1);
+    setFiltersApplied((v) => v + 1);
   };
 
   // ========= FORM =========
@@ -163,7 +172,8 @@ export default function PayablesPage() {
     try {
       const payload = {
         categoryId: form.categoryId, // Payable exige categoryId
-        dueDate: toIsoNoon(form.dueDate),
+        // envia 'YYYY-MM-DD' — backend aceita e converte com parseDayBoundary
+        dueDate: form.dueDate,
         amount: amountOk,
         notes: form.notes?.trim() || '',
       };
@@ -178,7 +188,8 @@ export default function PayablesPage() {
         toast.success('Conta a pagar atualizada!');
       }
       setFormOpen(false);
-      fetchList();
+      // re-carrega mantendo filtros/página
+      setFiltersApplied((v) => v + 1);
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao salvar.');
     }
@@ -189,9 +200,16 @@ export default function PayablesPage() {
     try {
       await api.put(`/finance/payables/${row.id}`, { status: 'PAID' });
       toast.success('Marcado como pago.');
-      fetchList();
+      setFiltersApplied((v) => v + 1);
+      // opcional: notificar tela de Caixa para recarregar
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch (e) {
-      toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
+      const msg = e?.response?.data?.message || 'Erro ao atualizar.';
+      if (e?.response?.status === 409) {
+        toast.error(msg || 'Caixa fechado. Abra o caixa para registrar o pagamento.');
+      } else {
+        toast.error(msg);
+      }
     }
   };
 
@@ -200,7 +218,8 @@ export default function PayablesPage() {
     try {
       await api.put(`/finance/payables/${row.id}`, { status: 'CANCELED' });
       toast.success('Pagável cancelado.');
-      fetchList();
+      setFiltersApplied((v) => v + 1);
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
     }
@@ -211,7 +230,8 @@ export default function PayablesPage() {
     try {
       await api.delete(`/finance/payables/${row.id}`);
       toast.success('Excluído.');
-      fetchList();
+      setFiltersApplied((v) => v + 1);
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao excluir.');
     }
@@ -250,7 +270,7 @@ export default function PayablesPage() {
       </div>
 
       {/* Filtros */}
-      <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-white p-4 rounded border mb-4">
+      <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-white p-4 rounded border mb-4">
         <select name="status" value={filters.status} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Todos status</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -265,7 +285,18 @@ export default function PayablesPage() {
           <option value="">Categoria: todas</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <div className="md:col-span-5 flex justify-end gap-2">
+        <div className="flex items-center gap-2">
+          <Search size={16} className="text-gray-500" />
+          <input
+            type="text"
+            name="q"
+            value={filters.q}
+            onChange={onChangeFilter}
+            placeholder="Buscar por descrição/obs."
+            className="border rounded px-2 py-2 w-full"
+          />
+        </div>
+        <div className="md:col-span-6 flex justify-end gap-2">
           <button type="button" onClick={resetFilters} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-2">
             <RefreshCw size={16} /> Limpar
           </button>
