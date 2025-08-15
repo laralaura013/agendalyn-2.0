@@ -28,7 +28,7 @@ const safeNumber = (v) => {
  *  - status (CSV opcional; ex: OPEN,PAID,CANCELED)
  *  - date_from, date_to (filtro em dueDate)
  *  - categoryId, supplierId
- *  - q (busca por descrição/observação)
+ *  - q (busca por observação)
  *  - sortBy (default 'dueDate'), sortOrder ('asc'|'desc', default 'asc')
  *  - page (1-based), pageSize
  * Response:
@@ -61,8 +61,8 @@ export const list = async (req, res) => {
       else if (arr.length > 1) where.status = { in: arr };
     }
 
-    if (categoryId) where.categoryId = categoryId;
-    if (supplierId) where.supplierId = supplierId;
+    if (categoryId) where.categoryId = String(categoryId);
+    if (supplierId) where.supplierId = String(supplierId);
 
     const gte = parseDayBoundary(date_from, false);
     const lte = parseDayBoundary(date_to, true);
@@ -75,7 +75,6 @@ export const list = async (req, res) => {
     if (q && String(q).trim()) {
       const query = String(q).trim();
       where.OR = [
-        { description: { contains: query, mode: 'insensitive' } },
         { notes: { contains: query, mode: 'insensitive' } },
       ];
     }
@@ -211,7 +210,7 @@ export const create = async (req, res) => {
 /* ============================================================
  * UPDATE (integra com Caixa)
  * PUT /api/finance/payables/:id
- * Regras de status:
+ * Regras:
  *  - Se status='PAID' e paidAt ausente → define agora e lança saída no caixa (idempotente).
  *  - Se status voltar para 'OPEN' ou 'CANCELED' → zera paidAt e remove a saída do caixa.
  *  - Se valor mudar e registro estiver PAID → reupsert da transação do caixa.
