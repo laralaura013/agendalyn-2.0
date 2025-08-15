@@ -17,7 +17,7 @@ export default function ReceivablesPage() {
   const [loading, setLoading] = useState(false);
 
   // paginação
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1);       // 1-based
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
 
@@ -85,13 +85,15 @@ export default function ReceivablesPage() {
         params: { ...filters, page, pageSize },
       });
 
-      // aceita forma paginada { items, total } ou array simples
+      // aceita forma paginada { items, total, page, pageSize } ou array simples
       if (Array.isArray(r.data)) {
         setRows(r.data);
         setTotal(r.data.length);
       } else {
         setRows(r.data.items || []);
-        setTotal(r.data.total || 0);
+        setTotal(r.data.total ?? 0);
+        if (r.data.page) setPage(r.data.page);
+        if (r.data.pageSize) setPageSize(r.data.pageSize);
       }
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao listar Receber.');
@@ -114,12 +116,14 @@ export default function ReceivablesPage() {
     const { name, value } = e.target;
     setFilters((f) => ({ ...f, [name]: value }));
   };
-  const applyFilters = async (e) => {
+
+  const applyFilters = (e) => {
     e?.preventDefault();
+    // Apenas reposiciona para a página 1; o useEffect cuidará do fetch
     setPage(1);
-    await fetchList();
   };
-  const resetFilters = async () => {
+
+  const resetFilters = () => {
     setFilters({
       status: 'OPEN',
       date_from: '',
@@ -129,7 +133,6 @@ export default function ReceivablesPage() {
       orderId: '',
     });
     setPage(1);
-    setTimeout(fetchList, 0);
   };
 
   // ========= FORM =========
@@ -146,6 +149,7 @@ export default function ReceivablesPage() {
     });
     setFormOpen(true);
   };
+
   const openEdit = (row) => {
     setEditing(row);
     setForm({
@@ -159,6 +163,7 @@ export default function ReceivablesPage() {
     });
     setFormOpen(true);
   };
+
   const submitForm = async (e) => {
     e.preventDefault();
     const amountOk = Number(form.amount);
@@ -201,6 +206,7 @@ export default function ReceivablesPage() {
       toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
     }
   };
+
   const cancelItem = async (row) => {
     if (!window.confirm('Cancelar este recebível?')) return;
     try {
@@ -211,6 +217,7 @@ export default function ReceivablesPage() {
       toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
     }
   };
+
   const removeItem = async (row) => {
     if (!window.confirm('Excluir permanentemente?')) return;
     try {
@@ -350,7 +357,7 @@ export default function ReceivablesPage() {
         {/* paginação */}
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            Página {page} de {totalPages} • {total} registro(s)
+            Página {page} de {Math.max(1, Math.ceil(total / pageSize))} • {total} registro(s)
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -370,9 +377,10 @@ export default function ReceivablesPage() {
             <button
               className="px-3 py-1 text-sm border rounded disabled:opacity-50"
               onClick={()=>{
+                const totalPages = Math.max(1, Math.ceil(total / pageSize));
                 setPage(p => Math.min(totalPages, p+1));
               }}
-              disabled={page >= totalPages || loading}
+              disabled={page >= Math.max(1, Math.ceil(total / pageSize)) || loading}
             >
               Próxima
             </button>

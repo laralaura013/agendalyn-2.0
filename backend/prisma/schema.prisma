@@ -213,9 +213,14 @@ model Transaction {
   cashierSessionId String
   createdAt        DateTime        @default(now())
 
+  // Campos para idempotência de integrações (Caixa)
+  sourceType       CashSourceType?
+  sourceId         String?
+
   cashierSession CashierSession @relation(fields: [cashierSessionId], references: [id])
 
   @@index([cashierSessionId])
+  @@unique([sourceType, sourceId])
 }
 
 model Plan {
@@ -449,6 +454,11 @@ enum CashierStatus {
 enum TransactionType {
   INCOME
   EXPENSE
+}
+
+enum CashSourceType {
+  RECEIVABLE
+  PAYABLE
 }
 
 enum SubscriptionStatus {

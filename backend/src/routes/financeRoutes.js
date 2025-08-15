@@ -48,7 +48,7 @@ router.delete('/payment-methods/:id', checkRole(['OWNER']), methods.remove);
 /* ============================================================================
  * CONTAS A PAGAR
  * - Operação (listar/criar/atualizar) liberada para STAFF + OWNER
- * - Exclusão restrita a OWNER (segurança)
+ * - Exclusão restrita a OWNER
  * ==========================================================================*/
 router.get('/payables', payables.list);
 router.post('/payables', payables.create);
@@ -58,7 +58,7 @@ router.delete('/payables/:id', checkRole(['OWNER']), payables.remove);
 /* ============================================================================
  * CONTAS A RECEBER
  * - Operação (listar/criar/atualizar) liberada para STAFF + OWNER
- * - Exclusão restrita a OWNER (segurança)
+ * - Exclusão restrita a OWNER
  * ==========================================================================*/
 router.get('/receivables', receivables.list);
 router.post('/receivables', receivables.create);

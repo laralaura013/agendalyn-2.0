@@ -16,7 +16,7 @@ export default function PayablesPage() {
   const [loading, setLoading] = useState(false);
 
   // paginação
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1);       // 1-based
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
 
@@ -72,13 +72,15 @@ export default function PayablesPage() {
         params: { ...filters, page, pageSize },
       });
 
-      // aceita forma paginada { items, total } ou array simples
+      // aceita forma paginada { items, total, page, pageSize } ou array simples
       if (Array.isArray(r.data)) {
         setRows(r.data);
         setTotal(r.data.length);
       } else {
         setRows(r.data.items || []);
-        setTotal(r.data.total || 0);
+        setTotal(r.data.total ?? 0);
+        if (r.data.page) setPage(r.data.page);
+        if (r.data.pageSize) setPageSize(r.data.pageSize);
       }
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao listar Pagar.');
@@ -90,6 +92,7 @@ export default function PayablesPage() {
   useEffect(() => {
     loadOptions();
   }, []);
+
   useEffect(() => {
     fetchList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,12 +103,13 @@ export default function PayablesPage() {
     const { name, value } = e.target;
     setFilters((f) => ({ ...f, [name]: value }));
   };
-  const applyFilters = async (e) => {
+
+  const applyFilters = (e) => {
     e?.preventDefault();
     setPage(1);
-    await fetchList();
   };
-  const resetFilters = async () => {
+
+  const resetFilters = () => {
     setFilters({
       status: 'OPEN',
       date_from: '',
@@ -114,7 +118,6 @@ export default function PayablesPage() {
       categoryId: '',
     });
     setPage(1);
-    setTimeout(fetchList, 0);
   };
 
   // ========= FORM =========
@@ -130,6 +133,7 @@ export default function PayablesPage() {
     });
     setFormOpen(true);
   };
+
   const openEdit = (row) => {
     setEditing(row);
     setForm({
@@ -142,6 +146,7 @@ export default function PayablesPage() {
     });
     setFormOpen(true);
   };
+
   const submitForm = async (e) => {
     e.preventDefault();
 
@@ -189,6 +194,7 @@ export default function PayablesPage() {
       toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
     }
   };
+
   const cancelItem = async (row) => {
     if (!window.confirm('Cancelar este pagável?')) return;
     try {
@@ -199,6 +205,7 @@ export default function PayablesPage() {
       toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
     }
   };
+
   const removeItem = async (row) => {
     if (!window.confirm('Excluir permanentemente?')) return;
     try {

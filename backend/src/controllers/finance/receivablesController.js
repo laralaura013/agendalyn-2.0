@@ -5,7 +5,7 @@ import prisma from '../../prismaClient.js';
 const normalizeId = (v) =>
   v && typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
 
-// Aceita 'YYYY-MM-DD' (vira 00:00 local) ou ISO completo
+// Aceita 'YYYY-MM-DD' (vira 00:00 local / 23:59 local) ou ISO completo
 const parseDayBoundary = (isoOrDateOnly, end = false) => {
   if (!isoOrDateOnly) return undefined;
   if (/^\d{4}-\d{2}-\d{2}$/.test(isoOrDateOnly)) {
@@ -19,24 +19,30 @@ const parseDayBoundary = (isoOrDateOnly, end = false) => {
  * LIST (Paginado)
  * GET /api/finance/receivables
  * Query:
- *  - status (string CSV opcional)
+ *  - status (string CSV opcional; ex: OPEN,RECEIVED)
  *  - date_from (YYYY-MM-DD ou ISO)
  *  - date_to   (YYYY-MM-DD ou ISO)
  *  - categoryId, clientId, orderId
- *  - page, pageSize
+ *  - q (busca por descrição/observação)
+ *  - sortBy (default 'dueDate'), sortOrder ('asc'|'desc', default 'asc')
+ *  - page (1-based), pageSize
  * ==========================================================*/
 export const list = async (req, res) => {
   try {
     const {
       status, date_from, date_to, categoryId, clientId, orderId,
+      q, sortBy = 'dueDate', sortOrder = 'asc',
       page: pageQ, pageSize: pageSizeQ
     } = req.query;
+
+    const companyId = req.company?.id;
+    if (!companyId) return res.status(400).json({ message: 'Empresa não identificada.' });
 
     const page = Math.max(parseInt(pageQ || '1', 10), 1);
     const pageSize = Math.min(Math.max(parseInt(pageSizeQ || '10', 10), 1), 100);
     const skip = (page - 1) * pageSize;
 
-    const where = { companyId: req.company.id };
+    const where = { companyId };
 
     // status único ou CSV
     if (status) {
@@ -60,6 +66,14 @@ export const list = async (req, res) => {
       if (lte) where.dueDate.lte = lte;
     }
 
+    if (q && String(q).trim()) {
+      const query = String(q).trim();
+      where.OR = [
+        { description: { contains: query, mode: 'insensitive' } },
+        { notes: { contains: query, mode: 'insensitive' } },
+      ];
+    }
+
     const [items, total] = await Promise.all([
       prisma.receivable.findMany({
         where,
@@ -69,19 +83,22 @@ export const list = async (req, res) => {
           category: { select: { id: true, name: true, type: true } },
           paymentMethod: { select: { id: true, name: true } },
         },
-        orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+        orderBy: [
+          { [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' },
+          // Ordenação estável secundária:
+          ...(sortBy !== 'createdAt' ? [{ createdAt: 'desc' }] : []),
+        ],
         skip,
         take: pageSize,
       }),
       prisma.receivable.count({ where }),
     ]);
 
-    return res.json({
+    return res.status(200).json({
       items,
       total,
       page,
       pageSize,
-      totalPages: Math.ceil(total / pageSize),
     });
   } catch (e) {
     console.error('Erro list receivables:', e);
@@ -193,8 +210,9 @@ export const create = async (req, res) => {
 /* ============================================================
  * UPDATE
  * PUT /api/finance/receivables/:id
- * Body parcial; se status='RECEIVED' e receivedAt ausente → define agora.
- * Se status voltar para 'OPEN' ou 'CANCELED', zera receivedAt salvo se vier explicitamente.
+ * Regras status:
+ *  - status='RECEIVED' e receivedAt ausente → define agora.
+ *  - status='OPEN'|'CANCELED' → zera receivedAt (salvo se vier explicitamente).
  * ==========================================================*/
 export const update = async (req, res) => {
   try {
