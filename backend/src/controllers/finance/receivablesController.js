@@ -93,15 +93,17 @@ export const list = async (req, res) => {
       if (lte) where.dueDate.lte = lte;
     }
 
+    // Normaliza min/max (não retorna 400 se vier invertido)
     const min = parseNumber(minAmount);
     const max = parseNumber(maxAmount);
-    if (min != null && max != null && min > max) {
-      return res.status(400).json({ message: 'Intervalo de valores inválido (minAmount > maxAmount).' });
-    }
-    if (min != null || max != null) {
-      where.amount = {};
-      if (min != null) where.amount.gte = min;
-      if (max != null) where.amount.lte = max;
+    if (min != null && max != null) {
+      const lo = Math.min(min, max);
+      const hi = Math.max(min, max);
+      where.amount = { gte: lo, lte: hi };
+    } else if (min != null) {
+      where.amount = { gte: min };
+    } else if (max != null) {
+      where.amount = { lte: max };
     }
 
     if (q && String(q).trim()) {
