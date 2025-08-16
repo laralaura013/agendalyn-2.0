@@ -16,30 +16,44 @@ const parseDayBoundary = (isoOrDateOnly, end = false) => {
   return isNaN(d.getTime()) ? undefined : d;
 };
 
+// parse de um Date "livre" (pra paidAt/receivedAt vindos do payload)
+const parseDateLoose = (v) => {
+  if (v == null || v === '') return undefined;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : d;
+};
+
 const safeNumber = (v) => {
   const n = Number(v);
   return isFinite(n) ? n : NaN;
 };
 
+const parseNumber = (v) => {
+  if (v == null || v === '') return undefined;
+  const n = Number(v);
+  return isFinite(n) ? n : undefined;
+};
+
 /* ============================================================
  * LIST (Paginado)
  * GET /api/finance/payables
- * Query:
- *  - status (CSV opcional; ex: OPEN,PAID,CANCELED)
- *  - date_from, date_to (filtro em dueDate)
- *  - categoryId, supplierId
- *  - q (busca por observação)
- *  - sortBy (default 'dueDate'), sortOrder ('asc'|'desc', default 'asc')
- *  - page (1-based), pageSize
- * Response:
- *  { items, total, page, pageSize, totalsByStatus: { OPEN, PAID, CANCELED } }
  * ==========================================================*/
 export const list = async (req, res) => {
   try {
     const {
-      status, date_from, date_to, categoryId, supplierId,
-      q, sortBy = 'dueDate', sortOrder = 'asc',
-      page: pageQ, pageSize: pageSizeQ,
+      status,
+      date_from,
+      date_to,
+      categoryId,
+      supplierId,
+      paymentMethodId,
+      minAmount,
+      maxAmount,
+      q,
+      sortBy: sortByQ = 'dueDate',
+      sortOrder: sortOrderQ = 'asc',
+      page: pageQ,
+      pageSize: pageSizeQ,
     } = req.query;
 
     const companyId = req.company?.id;
@@ -63,33 +77,52 @@ export const list = async (req, res) => {
 
     if (categoryId) where.categoryId = String(categoryId);
     if (supplierId) where.supplierId = String(supplierId);
+    if (paymentMethodId) where.paymentMethodId = String(paymentMethodId);
 
     const gte = parseDayBoundary(date_from, false);
     const lte = parseDayBoundary(date_to, true);
+    if (gte && lte && gte > lte) {
+      return res.status(400).json({ message: 'Intervalo de datas inválido (date_from > date_to).' });
+    }
     if (gte || lte) {
       where.dueDate = {};
       if (gte) where.dueDate.gte = gte;
       if (lte) where.dueDate.lte = lte;
     }
 
-    if (q && String(q).trim()) {
-      const query = String(q).trim();
-      where.OR = [
-        { notes: { contains: query, mode: 'insensitive' } },
-      ];
+    const minV = parseNumber(minAmount);
+    const maxV = parseNumber(maxAmount);
+    if (minV != null && maxV != null && minV > maxV) {
+      return res.status(400).json({ message: 'Intervalo de valores inválido (minAmount > maxAmount).' });
+    }
+    if (minV != null || maxV != null) {
+      where.amount = {};
+      if (minV != null) where.amount.gte = minV;
+      if (maxV != null) where.amount.lte = maxV;
     }
 
-    const [items, total, totalsAgg] = await Promise.all([
+    if (q && String(q).trim()) {
+      const query = String(q).trim();
+      // Payable não tem 'description' no schema -> busca apenas em notes
+      where.OR = [{ notes: { contains: query, mode: 'insensitive' } }];
+    }
+
+    // Ordenação com whitelist
+    const allowedSort = new Set(['dueDate', 'createdAt', 'updatedAt', 'amount', 'status']);
+    const sortKey = allowedSort.has(String(sortByQ)) ? String(sortByQ) : 'dueDate';
+    const sortOrder = String(sortOrderQ).toLowerCase() === 'desc' ? 'desc' : 'asc';
+
+    const [items, total, totalsAgg, agg] = await Promise.all([
       prisma.payable.findMany({
         where,
         include: {
-          supplier: true,
-          category: true,
-          paymentMethod: true,
+          supplier: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true } },
+          paymentMethod: { select: { id: true, name: true } },
         },
         orderBy: [
-          { [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' },
-          ...(sortBy !== 'createdAt' ? [{ createdAt: 'desc' }] : []),
+          { [sortKey]: sortOrder },
+          ...(sortKey !== 'createdAt' ? [{ createdAt: 'desc' }] : []), // ordenação estável
         ],
         skip,
         take: pageSize,
@@ -100,6 +133,10 @@ export const list = async (req, res) => {
         where,
         _sum: { amount: true },
         _count: { _all: true },
+      }),
+      prisma.payable.aggregate({
+        _sum: { amount: true },
+        where,
       }),
     ]);
 
@@ -121,6 +158,7 @@ export const list = async (req, res) => {
       page,
       pageSize,
       totalsByStatus,
+      summary: { amountSum: Number(agg?._sum?.amount || 0) },
     });
   } catch (e) {
     console.error('Erro list payables:', e);
@@ -131,10 +169,6 @@ export const list = async (req, res) => {
 /* ============================================================
  * CREATE
  * POST /api/finance/payables
- * Body: { supplierId?, categoryId*, paymentMethodId?, dueDate*, amount*, notes? }
- * Regras:
- *  - categoryId deve existir e ser do tipo PAYABLE.
- *  - supplier/paymentMethod, se enviados, devem existir na empresa.
  * ==========================================================*/
 export const create = async (req, res) => {
   try {
@@ -210,10 +244,6 @@ export const create = async (req, res) => {
 /* ============================================================
  * UPDATE (integra com Caixa)
  * PUT /api/finance/payables/:id
- * Regras:
- *  - Se status='PAID' e paidAt ausente → define agora e lança saída no caixa (idempotente).
- *  - Se status voltar para 'OPEN' ou 'CANCELED' → zera paidAt e remove a saída do caixa.
- *  - Se valor mudar e registro estiver PAID → reupsert da transação do caixa.
  * ==========================================================*/
 export const update = async (req, res) => {
   try {
@@ -222,6 +252,16 @@ export const update = async (req, res) => {
 
     const current = await prisma.payable.findFirst({ where: { id, companyId } });
     if (!current) return res.status(404).json({ message: 'Conta a pagar não encontrada.' });
+
+    // 🔒 Bloqueia tentativa de remover categoryId ('' ou null)
+    if (Object.prototype.hasOwnProperty.call(req.body, 'categoryId')) {
+      const raw = req.body.categoryId;
+      if (raw === null || (typeof raw === 'string' && raw.trim() === '')) {
+        return res.status(400).json({
+          message: 'categoryId é obrigatório e não pode ser removido no update.',
+        });
+      }
+    }
 
     let {
       supplierId,
@@ -268,9 +308,9 @@ export const update = async (req, res) => {
 
     const data = {};
 
-    // IDs relacionais — permitem limpar (null) se vier string vazia
+    // IDs relacionais — permitem limpar supplier/paymentMethod (null), mas não categoryId
     if (supplierId !== undefined) data.supplierId = supplierId || null;
-    if (categoryId !== undefined) data.categoryId = categoryId || null;
+    if (categoryId !== undefined) data.categoryId = categoryId; // já validado acima; não zera
     if (paymentMethodId !== undefined) data.paymentMethodId = paymentMethodId || null;
 
     if (dueDate) {
@@ -291,20 +331,36 @@ export const update = async (req, res) => {
 
     if (typeof notes === 'string') data.notes = notes;
 
-    // status + paidAt
-    let statusNow = current.status;
-    if (status) {
-      const upStatus = String(status).toUpperCase();
+    // ======== Status + paidAt ========
+    const allowedStatus = new Set(['OPEN', 'PAID', 'CANCELED']);
+    let upStatus;
+    if (status != null) {
+      upStatus = String(status).toUpperCase();
+      if (!allowedStatus.has(upStatus)) {
+        return res.status(400).json({ message: 'status inválido.' });
+      }
       data.status = upStatus;
-      statusNow = upStatus;
 
       if (upStatus === 'PAID') {
-        data.paidAt = paidAt ? new Date(paidAt) : new Date();
-      } else if (upStatus === 'OPEN' || upStatus === 'CANCELED') {
-        data.paidAt = paidAt ? new Date(paidAt) : null;
+        if (paidAt != null) {
+          const d = parseDateLoose(paidAt);
+          if (!d) return res.status(400).json({ message: 'paidAt inválido.' });
+          data.paidAt = d;
+        } else {
+          data.paidAt = new Date();
+        }
+      } else {
+        // OPEN ou CANCELED → sempre zera paidAt
+        data.paidAt = null;
       }
-    } else if (paidAt) {
-      data.paidAt = new Date(paidAt);
+    } else if (paidAt != null) {
+      // Só permite ajustar paidAt se já estiver PAID
+      if (current.status !== 'PAID') {
+        return res.status(400).json({ message: 'paidAt só pode ser definido quando status=PAID.' });
+      }
+      const d = parseDateLoose(paidAt);
+      if (!d) return res.status(400).json({ message: 'paidAt inválido.' });
+      data.paidAt = d;
     }
 
     try {
@@ -316,16 +372,14 @@ export const update = async (req, res) => {
         const paidAtChanged = Object.prototype.hasOwnProperty.call(data, 'paidAt');
 
         if (statusAfter === 'PAID') {
-          // se marcado como pago (ou mudou valor estando pago) → garante saída
+          // marcado como pago, ou valor/data alterados enquanto PAID → garante saída
           await cashbox.ensureExpenseForPayable(tx, companyId, u);
         } else if (statusAfter === 'OPEN' || statusAfter === 'CANCELED') {
-          // se voltou para aberto/cancelado → remove saída
+          // voltou para aberto/cancelado → remove saída
           await cashbox.removeForPayable(tx, u.id, companyId);
         } else if (!status && amountChanged && current.status === 'PAID') {
-          // valor alterado mas status não enviado, e registro já estava PAID → reupsert
           await cashbox.ensureExpenseForPayable(tx, companyId, u);
         } else if (!status && !amountChanged && paidAtChanged && current.status === 'PAID') {
-          // mudou apenas paidAt em registro PAID → atualiza lançamento
           await cashbox.ensureExpenseForPayable(tx, companyId, u);
         }
 
@@ -353,7 +407,6 @@ export const update = async (req, res) => {
 /* ============================================================
  * PATCH STATUS (opcional, mais direto para UI)
  * PATCH /api/finance/payables/:id/status
- * Body: { status: 'OPEN' | 'PAID' | 'CANCELED', paidAt? }
  * ==========================================================*/
 export const patchStatus = async (req, res) => {
   try {
@@ -367,12 +420,24 @@ export const patchStatus = async (req, res) => {
     if (!current) return res.status(404).json({ message: 'Conta a pagar não encontrada.' });
 
     const upStatus = String(status).toUpperCase();
+    const allowedStatus = new Set(['OPEN', 'PAID', 'CANCELED']);
+    if (!allowedStatus.has(upStatus)) {
+      return res.status(400).json({ message: 'status inválido.' });
+    }
+
     const data = { status: upStatus };
 
     if (upStatus === 'PAID') {
-      data.paidAt = paidAt ? new Date(paidAt) : new Date();
-    } else if (upStatus === 'OPEN' || upStatus === 'CANCELED') {
-      data.paidAt = paidAt ? new Date(paidAt) : null;
+      if (paidAt != null) {
+        const d = parseDateLoose(paidAt);
+        if (!d) return res.status(400).json({ message: 'paidAt inválido.' });
+        data.paidAt = d;
+      } else {
+        data.paidAt = new Date();
+      }
+    } else {
+      // OPEN/CANCELED zera sempre
+      data.paidAt = null;
     }
 
     try {
@@ -403,7 +468,6 @@ export const patchStatus = async (req, res) => {
 /* ============================================================
  * DELETE
  * DELETE /api/finance/payables/:id
- * Remove o registro e, se existir, remove o lançamento do caixa.
  * ==========================================================*/
 export const remove = async (req, res) => {
   try {

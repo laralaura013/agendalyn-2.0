@@ -16,30 +16,45 @@ const parseDayBoundary = (isoOrDateOnly, end = false) => {
   return isNaN(d.getTime()) ? undefined : d;
 };
 
+// parse de um Date "livre" (pra receivedAt/paidAt vindos do payload)
+const parseDateLoose = (v) => {
+  if (v == null || v === '') return undefined;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? undefined : d;
+};
+
 const toNumber = (v) => {
   const n = Number(v);
   return isFinite(n) ? n : NaN;
 };
 
+const parseNumber = (v) => {
+  if (v == null || v === '') return undefined;
+  const n = Number(v);
+  return isFinite(n) ? n : undefined;
+};
+
 /* ============================================================
  * LIST (Paginado)
  * GET /api/finance/receivables
- * Query:
- *  - status (CSV opcional; ex: OPEN,RECEIVED,CANCELED)
- *  - date_from (YYYY-MM-DD ou ISO) / date_to (YYYY-MM-DD ou ISO)  -> filtro em dueDate
- *  - categoryId, clientId, orderId
- *  - q (busca por descrição/observação)
- *  - sortBy (default 'dueDate'), sortOrder ('asc'|'desc', default 'asc')
- *  - page (1-based), pageSize
- * Response:
- *  { items, total, page, pageSize, totalsByStatus: { OPEN, RECEIVED, CANCELED } }
  * ==========================================================*/
 export const list = async (req, res) => {
   try {
     const {
-      status, date_from, date_to, categoryId, clientId, orderId,
-      q, sortBy = 'dueDate', sortOrder = 'asc',
-      page: pageQ, pageSize: pageSizeQ
+      status,
+      date_from,
+      date_to,
+      categoryId,
+      clientId,
+      orderId,
+      paymentMethodId,
+      minAmount,
+      maxAmount,
+      q,
+      sortBy: sortByQ = 'dueDate',
+      sortOrder: sortOrderQ = 'asc',
+      page: pageQ,
+      pageSize: pageSizeQ,
     } = req.query;
 
     const companyId = req.company?.id;
@@ -49,6 +64,7 @@ export const list = async (req, res) => {
     const pageSize = Math.min(Math.max(parseInt(pageSizeQ || '10', 10), 1), 100);
     const skip = (page - 1) * pageSize;
 
+    // Filtros
     const where = { companyId };
 
     // status único ou CSV
@@ -64,24 +80,45 @@ export const list = async (req, res) => {
     if (categoryId) where.categoryId = String(categoryId);
     if (clientId) where.clientId = String(clientId);
     if (orderId) where.orderId = String(orderId);
+    if (paymentMethodId) where.paymentMethodId = String(paymentMethodId);
 
     const gte = parseDayBoundary(date_from, false);
     const lte = parseDayBoundary(date_to, true);
+    if (gte && lte && gte > lte) {
+      return res.status(400).json({ message: 'Intervalo de datas inválido (date_from > date_to).' });
+    }
     if (gte || lte) {
       where.dueDate = {};
       if (gte) where.dueDate.gte = gte;
       if (lte) where.dueDate.lte = lte;
     }
 
+    const min = parseNumber(minAmount);
+    const max = parseNumber(maxAmount);
+    if (min != null && max != null && min > max) {
+      return res.status(400).json({ message: 'Intervalo de valores inválido (minAmount > maxAmount).' });
+    }
+    if (min != null || max != null) {
+      where.amount = {};
+      if (min != null) where.amount.gte = min;
+      if (max != null) where.amount.lte = max;
+    }
+
     if (q && String(q).trim()) {
       const query = String(q).trim();
+      // Se seu schema não tiver "description", remova a primeira linha do OR abaixo.
       where.OR = [
         { description: { contains: query, mode: 'insensitive' } },
         { notes: { contains: query, mode: 'insensitive' } },
       ];
     }
 
-    const [items, total, totalsAgg] = await Promise.all([
+    // Ordenação com whitelist (evita erro Prisma por coluna inválida)
+    const allowedSort = new Set(['dueDate', 'createdAt', 'updatedAt', 'amount', 'status']);
+    const sortKey = allowedSort.has(String(sortByQ)) ? String(sortByQ) : 'dueDate';
+    const sortOrder = String(sortOrderQ).toLowerCase() === 'desc' ? 'desc' : 'asc';
+
+    const [items, total, totalsAgg, agg] = await Promise.all([
       prisma.receivable.findMany({
         where,
         include: {
@@ -91,8 +128,8 @@ export const list = async (req, res) => {
           paymentMethod: { select: { id: true, name: true } },
         },
         orderBy: [
-          { [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' },
-          ...(sortBy !== 'createdAt' ? [{ createdAt: 'desc' }] : []), // ordenação estável
+          { [sortKey]: sortOrder },
+          ...(sortKey !== 'createdAt' ? [{ createdAt: 'desc' }] : []), // ordenação estável
         ],
         skip,
         take: pageSize,
@@ -103,6 +140,10 @@ export const list = async (req, res) => {
         where,
         _sum: { amount: true },
         _count: { _all: true },
+      }),
+      prisma.receivable.aggregate({
+        _sum: { amount: true },
+        where,
       }),
     ]);
 
@@ -124,6 +165,7 @@ export const list = async (req, res) => {
       page,
       pageSize,
       totalsByStatus,
+      summary: { amountSum: Number(agg?._sum?.amount || 0) },
     });
   } catch (e) {
     console.error('Erro list receivables:', e);
@@ -134,7 +176,6 @@ export const list = async (req, res) => {
 /* ============================================================
  * CREATE
  * POST /api/finance/receivables
- * Body: { clientId?, orderId?, categoryId?, paymentMethodId?, dueDate*, amount*, notes? }
  * ==========================================================*/
 export const create = async (req, res) => {
   try {
@@ -235,11 +276,6 @@ export const create = async (req, res) => {
 /* ============================================================
  * UPDATE (integra com Caixa)
  * PUT /api/finance/receivables/:id
- * Regras status:
- *  - status='RECEIVED' e receivedAt ausente → define agora e lança ENTRADA no caixa (idempotente).
- *  - status='OPEN'|'CANCELED' → zera receivedAt e remove a entrada do caixa.
- *  - se valor mudar e registro estiver RECEIVED → reupsert da transação do caixa.
- *  - se receivedAt mudar em RECEIVED → reupsert da transação do caixa.
  * ==========================================================*/
 export const update = async (req, res) => {
   try {
@@ -313,7 +349,7 @@ export const update = async (req, res) => {
 
     const data = {};
 
-    // IDs relacionais — permitem limpar (null) se vier string vazia
+    // IDs relacionais — permitem limpar (null) se vier string vazia (categoria é opcional)
     if (clientId !== undefined) data.clientId = clientId || null;
     if (orderId !== undefined) data.orderId = orderId || null;
     if (categoryId !== undefined) data.categoryId = categoryId || null;
@@ -337,20 +373,36 @@ export const update = async (req, res) => {
 
     if (typeof notes === 'string') data.notes = notes;
 
-    // status + receivedAt
-    let statusNow = current.status;
-    if (status) {
-      const upStatus = String(status).toUpperCase();
+    // ======== Status + receivedAt ========
+    const allowedStatus = new Set(['OPEN', 'RECEIVED', 'CANCELED']);
+    let upStatus;
+    if (status != null) {
+      upStatus = String(status).toUpperCase();
+      if (!allowedStatus.has(upStatus)) {
+        return res.status(400).json({ message: 'status inválido.' });
+      }
       data.status = upStatus;
-      statusNow = upStatus;
 
       if (upStatus === 'RECEIVED') {
-        data.receivedAt = receivedAt ? new Date(receivedAt) : new Date();
-      } else if (upStatus === 'OPEN' || upStatus === 'CANCELED') {
-        data.receivedAt = receivedAt ? new Date(receivedAt) : null;
+        if (receivedAt != null) {
+          const d = parseDateLoose(receivedAt);
+          if (!d) return res.status(400).json({ message: 'receivedAt inválido.' });
+          data.receivedAt = d;
+        } else {
+          data.receivedAt = new Date();
+        }
+      } else {
+        // OPEN ou CANCELED → sempre zera receivedAt (ignora recebido do payload)
+        data.receivedAt = null;
       }
-    } else if (receivedAt) {
-      data.receivedAt = new Date(receivedAt);
+    } else if (receivedAt != null) {
+      // Só permite ajustar receivedAt se já estiver RECEIVED
+      if (current.status !== 'RECEIVED') {
+        return res.status(400).json({ message: 'receivedAt só pode ser definido quando status=RECEIVED.' });
+      }
+      const d = parseDateLoose(receivedAt);
+      if (!d) return res.status(400).json({ message: 'receivedAt inválido.' });
+      data.receivedAt = d;
     }
 
     try {
@@ -397,7 +449,6 @@ export const update = async (req, res) => {
 /* ============================================================
  * PATCH STATUS (opcional, mais direto para UI)
  * PATCH /api/finance/receivables/:id/status
- * Body: { status: 'OPEN' | 'RECEIVED' | 'CANCELED', receivedAt? }
  * ==========================================================*/
 export const patchStatus = async (req, res) => {
   try {
@@ -411,12 +462,24 @@ export const patchStatus = async (req, res) => {
     if (!current) return res.status(404).json({ message: 'Conta a receber não encontrada.' });
 
     const upStatus = String(status).toUpperCase();
+    const allowedStatus = new Set(['OPEN', 'RECEIVED', 'CANCELED']);
+    if (!allowedStatus.has(upStatus)) {
+      return res.status(400).json({ message: 'status inválido.' });
+    }
+
     const data = { status: upStatus };
 
     if (upStatus === 'RECEIVED') {
-      data.receivedAt = receivedAt ? new Date(receivedAt) : new Date();
-    } else if (upStatus === 'OPEN' || upStatus === 'CANCELED') {
-      data.receivedAt = receivedAt ? new Date(receivedAt) : null;
+      if (receivedAt != null) {
+        const d = parseDateLoose(receivedAt);
+        if (!d) return res.status(400).json({ message: 'receivedAt inválido.' });
+        data.receivedAt = d;
+      } else {
+        data.receivedAt = new Date();
+      }
+    } else {
+      // OPEN/CANCELED zera sempre
+      data.receivedAt = null;
     }
 
     try {
@@ -448,7 +511,6 @@ export const patchStatus = async (req, res) => {
 /* ============================================================
  * DELETE
  * DELETE /api/finance/receivables/:id
- * Remove o registro e, se existir, remove o lançamento do caixa.
  * ==========================================================*/
 export const remove = async (req, res) => {
   try {

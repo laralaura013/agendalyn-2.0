@@ -1,10 +1,17 @@
-// frontend/src/pages/finance/PayablesPage.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2, Search } from 'lucide-react';
+import {
+  Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2, Search,
+  ArrowUp, ArrowDown
+} from 'lucide-react';
 
 const STATUSES = ['OPEN', 'PAID', 'CANCELED'];
+const DEFAULT_TOTALS = {
+  OPEN: { count: 0, amount: 0 },
+  PAID: { count: 0, amount: 0 },
+  CANCELED: { count: 0, amount: 0 },
+};
 
 // Helpers visuais
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : '');
@@ -20,21 +27,34 @@ export default function PayablesPage() {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
 
-  // filtros “editáveis” no formulário
+  // ordenação server-side
+  const [sortBy, setSortBy] = useState('dueDate'); // allowed: dueDate|createdAt|updatedAt|amount|status
+  const [sortOrder, setSortOrder] = useState('asc'); // asc|desc
+
+  // filtros
   const [filters, setFilters] = useState({
     status: 'OPEN',
     date_from: '',
     date_to: '',
     supplierId: '',
     categoryId: '',
+    paymentMethodId: '',
+    minAmount: '',
+    maxAmount: '',
     q: '',
   });
-  // gatilho para aplicar filtros sem buscar a cada digitação
   const [filtersApplied, setFiltersApplied] = useState(0);
 
   const [suppliers, setSuppliers] = useState([]);
   const [categories, setCategories] = useState([]); // type=PAYABLE
   const [methods, setMethods] = useState([]);
+
+  // resumo (do backend)
+  const [totalsByStatus, setTotalsByStatus] = useState(DEFAULT_TOTALS);
+  const [summary, setSummary] = useState({ amountSum: 0 });
+
+  // seleção
+  const [selected, setSelected] = useState(new Set());
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -51,6 +71,9 @@ export default function PayablesPage() {
     () => rows.reduce((s, r) => s + Number(r.amount || 0), 0),
     [rows]
   );
+
+  const allPageIds = useMemo(() => rows.map(r => r.id), [rows]);
+  const allPageSelected = allPageIds.length > 0 && allPageIds.every(id => selected.has(id));
 
   // ========= LOAD OPTIONS =========
   const loadOptions = async () => {
@@ -73,18 +96,32 @@ export default function PayablesPage() {
     setLoading(true);
     try {
       const r = await api.get('/finance/payables', {
-        params: { ...filters, page, pageSize },
+        params: {
+          ...filters,
+          page, pageSize,
+          sortBy, sortOrder,
+        },
       });
 
       if (Array.isArray(r.data)) {
-        setRows(r.data);
-        setTotal(r.data.length);
+        const arr = r.data;
+        setRows(arr);
+        setTotal(arr.length);
+        setTotalsByStatus(DEFAULT_TOTALS);
+        const sum = arr.reduce((acc, it) => acc + Number(it.amount || 0), 0);
+        setSummary({ amountSum: sum });
       } else {
         setRows(r.data.items || []);
         setTotal(r.data.total ?? 0);
+        setTotalsByStatus(r.data.totalsByStatus || DEFAULT_TOTALS);
+        setSummary(r.data.summary || { amountSum: 0 });
         if (r.data.page) setPage(r.data.page);
         if (r.data.pageSize) setPageSize(r.data.pageSize);
       }
+
+      // preservar seleção apenas do que existe na página atual
+      const pageArr = Array.isArray(r.data) ? r.data : (r.data.items || []);
+      setSelected(prev => new Set([...prev].filter(id => pageArr.some(x => x.id === id))));
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao listar Pagar.');
     } finally {
@@ -96,11 +133,10 @@ export default function PayablesPage() {
     loadOptions();
   }, []);
 
-  // Busca quando muda página / pageSize / “filtros aplicados”
   useEffect(() => {
     fetchList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, filtersApplied]);
+  }, [page, pageSize, filtersApplied, sortBy, sortOrder]);
 
   // ========= FILTERS =========
   const onChangeFilter = (e) => {
@@ -110,9 +146,7 @@ export default function PayablesPage() {
 
   const applyFilters = (e) => {
     e?.preventDefault();
-    // sempre volta para página 1
     setPage(1);
-    // se já estiver na página 1, garante re-fetch
     setFiltersApplied((v) => v + 1);
   };
 
@@ -123,6 +157,9 @@ export default function PayablesPage() {
       date_to: '',
       supplierId: '',
       categoryId: '',
+      paymentMethodId: '',
+      minAmount: '',
+      maxAmount: '',
       q: '',
     });
     setPage(1);
@@ -171,9 +208,8 @@ export default function PayablesPage() {
 
     try {
       const payload = {
-        categoryId: form.categoryId, // Payable exige categoryId
-        // envia 'YYYY-MM-DD' — backend aceita e converte com parseDayBoundary
-        dueDate: form.dueDate,
+        categoryId: form.categoryId,
+        dueDate: form.dueDate, // backend aceita 'YYYY-MM-DD'
         amount: amountOk,
         notes: form.notes?.trim() || '',
       };
@@ -188,20 +224,77 @@ export default function PayablesPage() {
         toast.success('Conta a pagar atualizada!');
       }
       setFormOpen(false);
-      // re-carrega mantendo filtros/página
       setFiltersApplied((v) => v + 1);
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao salvar.');
     }
   };
 
-  // ========= ACTIONS =========
+  // ========= SELEÇÃO / AÇÕES EM LOTE =========
+  const toggleSelectAllPage = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        allPageIds.forEach((id) => next.delete(id));
+      } else {
+        allPageIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectRow = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const bulkUpdateStatus = async (newStatus) => {
+    if (selected.size === 0) return;
+    try {
+      const ids = [...selected];
+      const ops = ids.map(id =>
+        api.put(`/finance/payables/${id}`, { status: newStatus })
+      );
+      const results = await Promise.allSettled(ops);
+      const fails = results.filter(r => r.status === 'rejected').length;
+      if (fails === 0) toast.success(`Atualizado(s) ${ids.length} registro(s).`);
+      else toast.error(`Alguns registros falharam (${fails}).`);
+      setSelected(new Set());
+      setFiltersApplied((v) => v + 1);
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
+    } catch {
+      toast.error('Falha na atualização em lote.');
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Excluir ${selected.size} registro(s)?`)) return;
+    try {
+      const ids = [...selected];
+      const ops = ids.map(id => api.delete(`/finance/payables/${id}`));
+      const results = await Promise.allSettled(ops);
+      const fails = results.filter(r => r.status === 'rejected').length;
+      if (fails === 0) toast.success(`Excluído(s) ${ids.length} registro(s).`);
+      else toast.error(`Alguns registros falharam (${fails}).`);
+      setSelected(new Set());
+      setFiltersApplied((v) => v + 1);
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
+    } catch {
+      toast.error('Falha na exclusão em lote.');
+    }
+  };
+
+  // ========= AÇÕES POR LINHA =========
   const markPaid = async (row) => {
     try {
       await api.put(`/finance/payables/${row.id}`, { status: 'PAID' });
       toast.success('Marcado como pago.');
       setFiltersApplied((v) => v + 1);
-      // opcional: notificar tela de Caixa para recarregar
       window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch (e) {
       const msg = e?.response?.data?.message || 'Erro ao atualizar.';
@@ -240,7 +333,10 @@ export default function PayablesPage() {
   // ========= EXPORT =========
   const exportCsv = async () => {
     try {
-      const r = await api.get('/exports/payables.csv', { responseType: 'blob' });
+      const r = await api.get('/exports/payables.csv', {
+        params: { ...filters, sortBy, sortOrder },
+        responseType: 'blob'
+      });
       const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv' }));
       const a = document.createElement('a');
       a.href = url;
@@ -252,12 +348,19 @@ export default function PayablesPage() {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const sortable = (key) => ['dueDate', 'createdAt', 'updatedAt', 'amount', 'status'].includes(key);
+  const toggleSort = (key) => {
+    if (!sortable(key)) return;
+    setSortBy(key);
+    setSortOrder((prev) => (sortBy === key ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'));
+  };
+  const SortIcon = ({ col }) =>
+    sortBy === col ? (sortOrder === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />) : null;
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Contas a Pagar</h2>
         <div className="flex gap-2">
           <button onClick={exportCsv} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-2" disabled={loading}>
@@ -269,14 +372,31 @@ export default function PayablesPage() {
         </div>
       </div>
 
+      {/* Cards de resumo */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="p-4 rounded-xl bg-white shadow">
+          <div className="text-sm text-gray-500">Total (filtro)</div>
+          <div className="text-lg font-semibold">{currency(summary.amountSum)}</div>
+        </div>
+        {STATUSES.map((st) => (
+          <div key={st} className="p-4 rounded-xl bg-white shadow">
+            <div className="text-sm text-gray-500">{st}</div>
+            <div className="text-sm text-gray-700">
+              {totalsByStatus[st]?.count || 0} itens — {currency(totalsByStatus[st]?.amount || 0)}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Filtros */}
-      <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-white p-4 rounded border mb-4">
+      <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-8 gap-3 bg-white p-4 rounded border">
         <select name="status" value={filters.status} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Todos status</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <input type="date" name="date_from" value={filters.date_from} onChange={onChangeFilter} className="border rounded px-2 py-2" />
         <input type="date" name="date_to" value={filters.date_to} onChange={onChangeFilter} className="border rounded px-2 py-2" />
+
         <select name="supplierId" value={filters.supplierId} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Fornecedor: todos</option>
           {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -285,6 +405,11 @@ export default function PayablesPage() {
           <option value="">Categoria: todas</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        <select name="paymentMethodId" value={filters.paymentMethodId} onChange={onChangeFilter} className="border rounded px-2 py-2">
+          <option value="">Pagamento: todos</option>
+          {methods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+
         <div className="flex items-center gap-2">
           <Search size={16} className="text-gray-500" />
           <input
@@ -292,17 +417,44 @@ export default function PayablesPage() {
             name="q"
             value={filters.q}
             onChange={onChangeFilter}
-            placeholder="Buscar por descrição/obs."
+            placeholder="Buscar por observação"
             className="border rounded px-2 py-2 w-full"
           />
         </div>
-        <div className="md:col-span-6 flex justify-end gap-2">
+
+        <div className="grid grid-cols-2 gap-3">
+          <input type="number" step="0.01" name="minAmount" value={filters.minAmount} onChange={onChangeFilter} placeholder="Valor min" className="border rounded px-2 py-2" />
+          <input type="number" step="0.01" name="maxAmount" value={filters.maxAmount} onChange={onChangeFilter} placeholder="Valor máx" className="border rounded px-2 py-2" />
+        </div>
+
+        <div className="md:col-span-8 flex justify-end gap-2">
           <button type="button" onClick={resetFilters} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-2">
             <RefreshCw size={16} /> Limpar
           </button>
           <button type="submit" className="px-3 py-2 bg-gray-900 text-white rounded hover:bg-black">Aplicar</button>
         </div>
       </form>
+
+      {/* Barra de ações em massa */}
+      {selected.size > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center justify-between">
+          <div className="text-sm text-indigo-800">{selected.size} selecionado(s)</div>
+          <div className="flex gap-2">
+            <button onClick={() => bulkUpdateStatus('PAID')} className="px-3 py-2 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700">
+              Marcar PAGO
+            </button>
+            <button onClick={() => bulkUpdateStatus('OPEN')} className="px-3 py-2 text-sm bg-gray-700 text-white rounded hover:bg-gray-800">
+              Voltar para ABERTO
+            </button>
+            <button onClick={() => bulkUpdateStatus('CANCELED')} className="px-3 py-2 text-sm bg-orange-600 text-white rounded hover:bg-orange-700">
+              Cancelar
+            </button>
+            <button onClick={bulkDelete} className="px-3 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700">
+              Excluir
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tabela */}
       <div className="bg-white border rounded overflow-hidden">
@@ -314,51 +466,66 @@ export default function PayablesPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="text-left p-2">Vencimento</th>
+                <th className="p-2">
+                  <input type="checkbox" checked={allPageSelected} onChange={toggleSelectAllPage} />
+                </th>
+                <th className="text-left p-2 cursor-pointer select-none" onClick={() => toggleSort('dueDate')}>
+                  <div className="inline-flex items-center gap-1">Vencimento <SortIcon col="dueDate" /></div>
+                </th>
                 <th className="text-left p-2">Fornecedor</th>
                 <th className="text-left p-2">Categoria</th>
                 <th className="text-left p-2">Forma Pgto</th>
-                <th className="text-right p-2">Valor</th>
-                <th className="text-left p-2">Status</th>
+                <th className="text-right p-2 cursor-pointer select-none" onClick={() => toggleSort('amount')}>
+                  <div className="inline-flex items-center gap-1 justify-end">Valor <SortIcon col="amount" /></div>
+                </th>
+                <th className="text-left p-2 cursor-pointer select-none" onClick={() => toggleSort('status')}>
+                  <div className="inline-flex items-center gap-1">Status <SortIcon col="status" /></div>
+                </th>
                 <th className="text-left p-2">Obs.</th>
                 <th className="text-right p-2">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="p-2">{fmtDate(r.dueDate)}</td>
-                  <td className="p-2">{r.supplier?.name || '—'}</td>
-                  <td className="p-2">{r.category?.name || '—'}</td>
-                  <td className="p-2">{r.paymentMethod?.name || '—'}</td>
-                  <td className="p-2 text-right">{currency(r.amount)}</td>
-                  <td className="p-2">{r.status}</td>
-                  <td className="p-2">{r.notes}</td>
-                  <td className="p-2">
-                    <div className="flex justify-end gap-2">
-                      {r.status === 'OPEN' && (
-                        <>
-                          <button onClick={() => markPaid(r)} className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700" title="Marcar pago" disabled={loading}>
-                            <CheckCircle2 size={16} />
-                          </button>
-                          <button onClick={() => cancelItem(r)} className="px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700" title="Cancelar" disabled={loading}>
-                            <XCircle size={16} />
-                          </button>
-                        </>
-                      )}
-                      <button onClick={() => openEdit(r)} className="px-2 py-1 bg-gray-100 rounded hover:bg-gray-200" title="Editar" disabled={loading}>
-                        <Edit3 size={16} />
-                      </button>
-                      <button onClick={() => removeItem(r)} className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Excluir" disabled={loading}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const isSel = selected.has(r.id);
+                return (
+                  <tr key={r.id} className="border-t">
+                    <td className="p-2">
+                      <input type="checkbox" checked={isSel} onChange={() => toggleSelectRow(r.id)} />
+                    </td>
+                    <td className="p-2">{fmtDate(r.dueDate)}</td>
+                    <td className="p-2">{r.supplier?.name || '—'}</td>
+                    <td className="p-2">{r.category?.name || '—'}</td>
+                    <td className="p-2">{r.paymentMethod?.name || '—'}</td>
+                    <td className="p-2 text-right">{currency(r.amount)}</td>
+                    <td className="p-2">{r.status}</td>
+                    <td className="p-2">{r.notes}</td>
+                    <td className="p-2">
+                      <div className="flex justify-end gap-2">
+                        {r.status === 'OPEN' && (
+                          <>
+                            <button onClick={() => markPaid(r)} className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700" title="Marcar pago" disabled={loading}>
+                              <CheckCircle2 size={16} />
+                            </button>
+                            <button onClick={() => cancelItem(r)} className="px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700" title="Cancelar" disabled={loading}>
+                              <XCircle size={16} />
+                            </button>
+                          </>
+                        )}
+                        <button onClick={() => openEdit(r)} className="px-2 py-1 bg-gray-100 rounded hover:bg-gray-200" title="Editar" disabled={loading}>
+                          <Edit3 size={16} />
+                        </button>
+                        <button onClick={() => removeItem(r)} className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700" title="Excluir" disabled={loading}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {!rows.length && !loading && (
                 <tr>
-                  <td colSpan="8" className="p-4 text-center text-gray-500">Nenhum registro.</td>
+                  <td colSpan="9" className="p-4 text-center text-gray-500">Nenhum registro.</td>
                 </tr>
               )}
             </tbody>
