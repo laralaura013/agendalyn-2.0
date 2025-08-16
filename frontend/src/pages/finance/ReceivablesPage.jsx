@@ -1,3 +1,4 @@
+// frontend/src/pages/finance/ReceivablesPage.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -83,16 +84,16 @@ export default function ReceivablesPage() {
   const loadOptions = async () => {
     try {
       const [cats, pms] = await Promise.all([
-        api.get('/finance/categories', { params: { type: 'RECEIVABLE', page: 1, pageSize: 1000 } }),
-        api.get('/finance/payment-methods', { params: { page: 1, pageSize: 1000 } }),
+        api.get('/finance/categories', { params: { type: 'RECEIVABLE' } }),
+        api.get('/finance/payment-methods'),
       ]);
-      const unwrap = (resp) => (Array.isArray(resp?.data) ? resp.data : (resp?.data?.items || []));
-      setCategories(unwrap(cats));
-      setMethods(unwrap(pms));
+      setCategories(cats.data?.items || cats.data || []);
+      setMethods(pms.data?.items || pms.data || []);
     } catch (e) {
       console.warn(e);
     }
 
+    // clientes — aceita lista direta ou { items: [] }
     try {
       const r = await api.get('/clients', { params: { q: '', limit: 200 } });
       const list = Array.isArray(r.data) ? r.data : (r.data?.items || []);
@@ -114,25 +115,21 @@ export default function ReceivablesPage() {
         },
       });
 
-      if (Array.isArray(r.data)) {
-        setRows(r.data);
-        setTotal(r.data.length);
-        setTotalsByStatus({ OPEN: {count:0,amount:0}, RECEIVED:{count:0,amount:0}, CANCELED:{count:0,amount:0} });
-        setSummary({ amountSum: r.data.reduce((s, x) => s + Number(x.amount || 0), 0) });
-      } else {
-        setRows(r.data.items || []);
-        setTotal(r.data.total ?? 0);
-        setTotalsByStatus(r.data.totalsByStatus || totalsByStatus);
-        setSummary(r.data.summary || { amountSum: 0 });
-        if (r.data.page) setPage(r.data.page);
-        if (r.data.pageSize) setPageSize(r.data.pageSize);
-      }
+      // normaliza payload (array direto OU objeto paginado)
+      const payload = Array.isArray(r.data)
+        ? { items: r.data, total: r.data.length, page, pageSize, totalsByStatus: { OPEN:{count:0,amount:0}, RECEIVED:{count:0,amount:0}, CANCELED:{count:0,amount:0} }, summary: { amountSum: r.data.reduce((s,x)=>s+Number(x.amount||0),0) } }
+        : r.data || {};
+
+      const items = payload.items || [];
+      setRows(items);
+      setTotal(payload.total ?? items.length);
+      setTotalsByStatus(payload.totalsByStatus || { OPEN:{count:0,amount:0}, RECEIVED:{count:0,amount:0}, CANCELED:{count:0,amount:0} });
+      setSummary(payload.summary || { amountSum: items.reduce((s,x)=>s+Number(x.amount||0),0) });
+      if (payload.page) setPage(payload.page);
+      if (payload.pageSize) setPageSize(payload.pageSize);
 
       // ao carregar nova página, limpe seleção de ids que não estão mais na página
-      setSelected(prev => {
-        const currentIds = (Array.isArray(r.data) ? r.data : (r.data.items || [])).map(x => x.id);
-        return new Set([...prev].filter(id => currentIds.includes(id)));
-      });
+      setSelected(prev => new Set([...prev].filter(id => items.some(x => x.id === id))));
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao listar Receber.');
     } finally {
@@ -274,6 +271,8 @@ export default function ReceivablesPage() {
       else toast.error(`Alguns registros falharam (${fails}).`);
       setSelected(new Set());
       setFiltersApplied((v) => v + 1);
+      // notifica o caixa (ex.: se virou RECEIVED)
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch {
       toast.error('Falha na atualização em lote.');
     }
@@ -291,6 +290,7 @@ export default function ReceivablesPage() {
       else toast.error(`Alguns registros falharam (${fails}).`);
       setSelected(new Set());
       setFiltersApplied((v) => v + 1);
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch {
       toast.error('Falha na exclusão em lote.');
     }
@@ -302,8 +302,15 @@ export default function ReceivablesPage() {
       await api.put(`/finance/receivables/${row.id}`, { status: 'RECEIVED' });
       toast.success('Marcado como recebido.');
       setFiltersApplied((v) => v + 1);
+      // atualiza componentes que dependem do caixa
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch (e) {
-      toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
+      const msg = e?.response?.data?.message || 'Erro ao atualizar.';
+      if (e?.response?.status === 409) {
+        toast.error(msg || 'Caixa fechado. Abra o caixa para registrar o recebimento.');
+      } else {
+        toast.error(msg);
+      }
     }
   };
 
@@ -313,6 +320,7 @@ export default function ReceivablesPage() {
       await api.put(`/finance/receivables/${row.id}`, { status: 'CANCELED' });
       toast.success('Recebível cancelado.');
       setFiltersApplied((v) => v + 1);
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao atualizar.');
     }
@@ -324,6 +332,7 @@ export default function ReceivablesPage() {
       await api.delete(`/finance/receivables/${row.id}`);
       toast.success('Excluído.');
       setFiltersApplied((v) => v + 1);
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao excluir.');
     }
@@ -339,7 +348,8 @@ export default function ReceivablesPage() {
       const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'receivables.csv';
+      const ts = new Date().toISOString().slice(0,10);
+      a.download = `receivables_${ts}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
