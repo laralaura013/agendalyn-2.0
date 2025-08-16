@@ -7,11 +7,6 @@ import {
 } from 'lucide-react';
 
 const STATUSES = ['OPEN', 'RECEIVED', 'CANCELED'];
-const DEFAULT_TOTALS = {
-  OPEN: { count: 0, amount: 0 },
-  RECEIVED: { count: 0, amount: 0 },
-  CANCELED: { count: 0, amount: 0 },
-};
 
 const toIsoNoon = (d) => (d ? `${d}T12:00:00` : null);
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : '');
@@ -53,7 +48,11 @@ export default function ReceivablesPage() {
   const [methods, setMethods] = useState([]);
 
   // resumo (do backend)
-  const [totalsByStatus, setTotalsByStatus] = useState(DEFAULT_TOTALS);
+  const [totalsByStatus, setTotalsByStatus] = useState({
+    OPEN: { count: 0, amount: 0 },
+    RECEIVED: { count: 0, amount: 0 },
+    CANCELED: { count: 0, amount: 0 },
+  });
   const [summary, setSummary] = useState({ amountSum: 0 });
 
   // seleção em massa
@@ -84,16 +83,16 @@ export default function ReceivablesPage() {
   const loadOptions = async () => {
     try {
       const [cats, pms] = await Promise.all([
-        api.get('/finance/categories', { params: { type: 'RECEIVABLE' } }),
-        api.get('/finance/payment-methods'),
+        api.get('/finance/categories', { params: { type: 'RECEIVABLE', page: 1, pageSize: 1000 } }),
+        api.get('/finance/payment-methods', { params: { page: 1, pageSize: 1000 } }),
       ]);
-      setCategories(cats.data || []);
-      setMethods(pms.data || []);
+      const unwrap = (resp) => (Array.isArray(resp?.data) ? resp.data : (resp?.data?.items || []));
+      setCategories(unwrap(cats));
+      setMethods(unwrap(pms));
     } catch (e) {
       console.warn(e);
     }
 
-    // clientes — aceita lista direta ou { items: [] }
     try {
       const r = await api.get('/clients', { params: { q: '', limit: 200 } });
       const list = Array.isArray(r.data) ? r.data : (r.data?.items || []);
@@ -116,24 +115,24 @@ export default function ReceivablesPage() {
       });
 
       if (Array.isArray(r.data)) {
-        const arr = r.data;
-        setRows(arr);
-        setTotal(arr.length);
-        setTotalsByStatus(DEFAULT_TOTALS);
-        const sum = arr.reduce((acc, it) => acc + Number(it.amount || 0), 0);
-        setSummary({ amountSum: sum });
+        setRows(r.data);
+        setTotal(r.data.length);
+        setTotalsByStatus({ OPEN: {count:0,amount:0}, RECEIVED:{count:0,amount:0}, CANCELED:{count:0,amount:0} });
+        setSummary({ amountSum: r.data.reduce((s, x) => s + Number(x.amount || 0), 0) });
       } else {
         setRows(r.data.items || []);
         setTotal(r.data.total ?? 0);
-        setTotalsByStatus(r.data.totalsByStatus || DEFAULT_TOTALS);
+        setTotalsByStatus(r.data.totalsByStatus || totalsByStatus);
         setSummary(r.data.summary || { amountSum: 0 });
         if (r.data.page) setPage(r.data.page);
         if (r.data.pageSize) setPageSize(r.data.pageSize);
       }
 
-      // limpar/preservar seleção com base no que está na página
-      const pageArr = Array.isArray(r.data) ? r.data : (r.data.items || []);
-      setSelected(prev => new Set([...prev].filter(id => pageArr.some(x => x.id === id))));
+      // ao carregar nova página, limpe seleção de ids que não estão mais na página
+      setSelected(prev => {
+        const currentIds = (Array.isArray(r.data) ? r.data : (r.data.items || [])).map(x => x.id);
+        return new Set([...prev].filter(id => currentIds.includes(id)));
+      });
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao listar Receber.');
     } finally {

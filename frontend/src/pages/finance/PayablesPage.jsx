@@ -7,11 +7,6 @@ import {
 } from 'lucide-react';
 
 const STATUSES = ['OPEN', 'PAID', 'CANCELED'];
-const DEFAULT_TOTALS = {
-  OPEN: { count: 0, amount: 0 },
-  PAID: { count: 0, amount: 0 },
-  CANCELED: { count: 0, amount: 0 },
-};
 
 // Helpers visuais
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : '');
@@ -50,7 +45,11 @@ export default function PayablesPage() {
   const [methods, setMethods] = useState([]);
 
   // resumo (do backend)
-  const [totalsByStatus, setTotalsByStatus] = useState(DEFAULT_TOTALS);
+  const [totalsByStatus, setTotalsByStatus] = useState({
+    OPEN: { count: 0, amount: 0 },
+    PAID: { count: 0, amount: 0 },
+    CANCELED: { count: 0, amount: 0 },
+  });
   const [summary, setSummary] = useState({ amountSum: 0 });
 
   // seleção
@@ -79,13 +78,14 @@ export default function PayablesPage() {
   const loadOptions = async () => {
     try {
       const [sup, cats, pms] = await Promise.all([
-        api.get('/finance/suppliers'),
-        api.get('/finance/categories', { params: { type: 'PAYABLE' } }),
-        api.get('/finance/payment-methods'),
+        api.get('/finance/suppliers', { params: { page: 1, pageSize: 1000 } }),
+        api.get('/finance/categories', { params: { type: 'PAYABLE', page: 1, pageSize: 1000 } }),
+        api.get('/finance/payment-methods', { params: { page: 1, pageSize: 1000 } }),
       ]);
-      setSuppliers(sup.data || []);
-      setCategories(cats.data || []);
-      setMethods(pms.data || []);
+      const unwrap = (resp) => (Array.isArray(resp?.data) ? resp.data : (resp?.data?.items || []));
+      setSuppliers(unwrap(sup));
+      setCategories(unwrap(cats));
+      setMethods(unwrap(pms));
     } catch (e) {
       console.warn(e);
     }
@@ -104,24 +104,23 @@ export default function PayablesPage() {
       });
 
       if (Array.isArray(r.data)) {
-        const arr = r.data;
-        setRows(arr);
-        setTotal(arr.length);
-        setTotalsByStatus(DEFAULT_TOTALS);
-        const sum = arr.reduce((acc, it) => acc + Number(it.amount || 0), 0);
-        setSummary({ amountSum: sum });
+        setRows(r.data);
+        setTotal(r.data.length);
+        setTotalsByStatus({ OPEN: {count:0,amount:0}, PAID:{count:0,amount:0}, CANCELED:{count:0,amount:0} });
+        setSummary({ amountSum: r.data.reduce((s, x) => s + Number(x.amount || 0), 0) });
       } else {
         setRows(r.data.items || []);
         setTotal(r.data.total ?? 0);
-        setTotalsByStatus(r.data.totalsByStatus || DEFAULT_TOTALS);
+        setTotalsByStatus(r.data.totalsByStatus || totalsByStatus);
         setSummary(r.data.summary || { amountSum: 0 });
         if (r.data.page) setPage(r.data.page);
         if (r.data.pageSize) setPageSize(r.data.pageSize);
       }
 
-      // preservar seleção apenas do que existe na página atual
-      const pageArr = Array.isArray(r.data) ? r.data : (r.data.items || []);
-      setSelected(prev => new Set([...prev].filter(id => pageArr.some(x => x.id === id))));
+      setSelected(prev => {
+        const currentIds = (Array.isArray(r.data) ? r.data : (r.data.items || [])).map(x => x.id);
+        return new Set([...prev].filter(id => currentIds.includes(id)));
+      });
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao listar Pagar.');
     } finally {
@@ -225,6 +224,7 @@ export default function PayablesPage() {
       }
       setFormOpen(false);
       setFiltersApplied((v) => v + 1);
+      window.dispatchEvent?.(new CustomEvent('cashier:refresh'));
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao salvar.');
     }
