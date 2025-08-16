@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import ReloadPrompt from './components/pwa/ReloadPrompt'
+import ErrorBoundary from './components/ErrorBoundary'
 
 // Páginas Públicas
 import Home from './pages/Home'
@@ -65,86 +66,90 @@ function App() {
       />
       <ReloadPrompt />
 
-      <Routes>
-        {/* Rotas Públicas */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/agendar/:companyId" element={<BookingPage />} />
+      <ErrorBoundary>
+        <Suspense fallback={<div className="p-4">Carregando…</div>}>
+          <Routes>
+            {/* Rotas Públicas */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/agendar/:companyId" element={<BookingPage />} />
 
-        {/* Portal do Cliente */}
-        <Route
-          path="/portal"
-          element={
-            <ClientProtectedRoute>
-              <ClientLayout />
-            </ClientProtectedRoute>
-          }
-        >
-          <Route path="agenda" element={<ClientDashboardPage />} />
-          <Route path="perfil" element={<ClientProfilePage />} />
-          <Route path="pacotes" element={<ClientPackagesPage />} />
-          <Route path="historico" element={<ClientHistoryPage />} />
-          <Route path="notificacoes" element={<ClientNoticesPage />} />
-        </Route>
-        <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
-        <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
+            {/* Portal do Cliente */}
+            <Route
+              path="/portal"
+              element={
+                <ClientProtectedRoute>
+                  <ClientLayout />
+                </ClientProtectedRoute>
+              }
+            >
+              <Route path="agenda" element={<ClientDashboardPage />} />
+              <Route path="perfil" element={<ClientProfilePage />} />
+              <Route path="pacotes" element={<ClientPackagesPage />} />
+              <Route path="historico" element={<ClientHistoryPage />} />
+              <Route path="notificacoes" element={<ClientNoticesPage />} />
+            </Route>
+            <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
+            <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
 
-        {/* Painel Admin (prefixo /dashboard) */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="clients" element={<Clients />} />
-          <Route path="clients/new" element={<ClientForm />} />
-          <Route path="clients/:id/edit" element={<ClientForm />} />
-          <Route path="schedule" element={<Schedule />} />
-          <Route path="waitlist" element={<WaitlistPage />} />
-          <Route path="staff" element={<Staff />} />
-          <Route path="services" element={<Services />} />
-          <Route path="orders" element={<Orders />} />
-          <Route path="cashier" element={<Cashier />} />
-          <Route path="subscription" element={<SubscriptionPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="reports/birthdays" element={<BirthdaysReportPage />} />
-          <Route path="goals" element={<GoalsPage />} />
-          <Route path="anamnesis" element={<AnamnesisPage />} />
-          <Route path="packages" element={<PackagesPage />} />
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="categories" element={<CategoriesPage />} />
-          <Route path="brands" element={<BrandsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="commissions" element={<CommissionsPage />} />
+            {/* Painel Admin (prefixo /dashboard) */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="clients" element={<Clients />} />
+              <Route path="clients/new" element={<ClientForm />} />
+              <Route path="clients/:id/edit" element={<ClientForm />} />
+              <Route path="schedule" element={<Schedule />} />
+              <Route path="waitlist" element={<WaitlistPage />} />
+              <Route path="staff" element={<Staff />} />
+              <Route path="services" element={<Services />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="cashier" element={<Cashier />} />
+              <Route path="subscription" element={<SubscriptionPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="reports/birthdays" element={<BirthdaysReportPage />} />
+              <Route path="goals" element={<GoalsPage />} />
+              <Route path="anamnesis" element={<AnamnesisPage />} />
+              <Route path="packages" element={<PackagesPage />} />
+              <Route path="products" element={<ProductsPage />} />
+              <Route path="categories" element={<CategoriesPage />} />
+              <Route path="brands" element={<BrandsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="commissions" element={<CommissionsPage />} />
 
-          {/* 🆕 Financeiro */}
-          <Route path="payables" element={<PayablesPage />} />
-          <Route path="receivables" element={<ReceivablesPage />} />
-          <Route path="finance-categories" element={<FinanceCategoriesPage />} />
-          <Route path="suppliers" element={<SuppliersPage />} />
-          <Route path="payment-methods" element={<PaymentMethodsPage />} />
+              {/* 🆕 Financeiro */}
+              <Route path="payables" element={<PayablesPage />} />
+              <Route path="receivables" element={<ReceivablesPage />} />
+              <Route path="finance-categories" element={<FinanceCategoriesPage />} />
+              <Route path="suppliers" element={<SuppliersPage />} />
+              <Route path="payment-methods" element={<PaymentMethodsPage />} />
 
-          {/* 🆕 Configurações */}
-          <Route path="cancellation-reasons" element={<CancellationReasonsPage />} />
-          <Route path="client-origins" element={<ClientOriginsPage />} />
-        </Route>
+              {/* 🆕 Configurações */}
+              <Route path="cancellation-reasons" element={<CancellationReasonsPage />} />
+              <Route path="client-origins" element={<ClientOriginsPage />} />
+            </Route>
 
-        {/* ✅ Rota direta para /settings (evita tela branca no retorno do Google) */}
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<SettingsPage />} />
-        </Route>
-      </Routes>
+            {/* ✅ Rota direta para /settings (evita tela branca no retorno do Google) */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<SettingsPage />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </>
   )
 }
