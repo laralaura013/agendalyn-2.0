@@ -16,18 +16,21 @@ router.use(protect);
 
 /* Categorias */
 router.get('/categories', categories.list);
+router.get('/categories/export/csv', categories.exportCsv);
 router.post('/categories', checkRole(['OWNER']), categories.create);
 router.put('/categories/:id', checkRole(['OWNER']), categories.update);
 router.delete('/categories/:id', checkRole(['OWNER']), categories.remove);
 
 /* Fornecedores */
 router.get('/suppliers', suppliers.list);
+router.get('/suppliers/export/csv', suppliers.exportCsv);
 router.post('/suppliers', checkRole(['OWNER']), suppliers.create);
 router.put('/suppliers/:id', checkRole(['OWNER']), suppliers.update);
 router.delete('/suppliers/:id', checkRole(['OWNER']), suppliers.remove);
 
 /* Formas de pagamento */
 router.get('/payment-methods', methods.list);
+router.get('/payment-methods/export/csv', methods.exportCsv);
 router.post('/payment-methods', checkRole(['OWNER']), methods.create);
 router.put('/payment-methods/:id', checkRole(['OWNER']), methods.update);
 router.delete('/payment-methods/:id', checkRole(['OWNER']), methods.remove);
@@ -37,7 +40,7 @@ router.get('/payables', payables.list);
 router.post('/payables', payables.create);
 router.put('/payables/:id', payables.update);
 router.patch('/payables/:id/status', payables.patchStatus);
-router.patch('/payables/bulk/status', bulk.payablesBulkStatus); // NOVO (lote)
+router.patch('/payables/bulk/status', bulk.payablesBulkStatus); // lote
 router.delete('/payables/:id', checkRole(['OWNER']), payables.remove);
 
 /* Contas a receber */
@@ -45,7 +48,7 @@ router.get('/receivables', receivables.list);
 router.post('/receivables', receivables.create);
 router.put('/receivables/:id', receivables.update);
 router.patch('/receivables/:id/status', receivables.patchStatus);
-router.patch('/receivables/bulk/status', bulk.receivablesBulkStatus); // NOVO (lote)
+router.patch('/receivables/bulk/status', bulk.receivablesBulkStatus); // lote
 router.delete('/receivables/:id', checkRole(['OWNER']), receivables.remove);
 
 export default router;

@@ -510,6 +510,7 @@ model Supplier {
   phone     String?
   email     String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   company Company   @relation(fields: [companyId], references: [id])
   bills   Payable[]
@@ -519,10 +520,12 @@ model Supplier {
 }
 
 model PaymentMethod {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   companyId String
   name      String
-  active    Boolean @default(true)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   company     Company      @relation(fields: [companyId], references: [id])
   payables    Payable[]
@@ -537,6 +540,8 @@ model FinanceCategory {
   companyId String
   name      String
   type      FinanceCategoryType
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   company     Company      @relation(fields: [companyId], references: [id])
   payables    Payable[]

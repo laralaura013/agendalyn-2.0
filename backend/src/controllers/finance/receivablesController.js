@@ -1,4 +1,3 @@
-// src/controllers/finance/receivablesController.js
 import prisma from '../../prismaClient.js';
 import * as cashbox from '../../services/cashboxService.js';
 
@@ -93,17 +92,15 @@ export const list = async (req, res) => {
       if (lte) where.dueDate.lte = lte;
     }
 
-    // Normaliza min/max (não retorna 400 se vier invertido)
     const min = parseNumber(minAmount);
     const max = parseNumber(maxAmount);
-    if (min != null && max != null) {
-      const lo = Math.min(min, max);
-      const hi = Math.max(min, max);
-      where.amount = { gte: lo, lte: hi };
-    } else if (min != null) {
-      where.amount = { gte: min };
-    } else if (max != null) {
-      where.amount = { lte: max };
+    // normaliza faixa (se ambos vierem trocados, inverte)
+    if (min != null || max != null) {
+      const lo = min != null && max != null ? Math.min(min, max) : min;
+      const hi = min != null && max != null ? Math.max(min, max) : max;
+      where.amount = {};
+      if (lo != null) where.amount.gte = lo;
+      if (hi != null) where.amount.lte = hi;
     }
 
     if (q && String(q).trim()) {

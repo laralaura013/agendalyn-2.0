@@ -1,94 +1,83 @@
 // src/controllers/finance/financeCategoriesController.js
 import prisma from '../../prismaClient.js';
+import { norm, parseBool, getPageParams, sendCsv } from './_shared.js';
 
-/* ========================= Helpers ========================= */
 const VALID_TYPES = new Set(['PAYABLE', 'RECEIVABLE']);
-const bool = (v) => {
-  if (v === true) return true;
-  if (v === false) return false;
-  const s = String(v || '').toLowerCase();
-  return s === '1' || s === 'true' || s === 'yes';
-};
-const norm = (s) => (typeof s === 'string' ? s.trim() : s);
 
-/**
- * Carrega contagens de uso (payables e receivables) por categoryId.
- * Retorna: { [categoryId]: { payables: number, receivables: number } }
- */
-async function loadUsageStats(companyId, categoryIds) {
-  if (!categoryIds.length) return {};
-
+/** contagens de uso por categoryId */
+async function loadUsageStats(companyId, ids) {
+  if (!ids.length) return {};
   const [pay, rec] = await Promise.all([
     prisma.payable.groupBy({
       by: ['categoryId'],
-      where: { companyId, categoryId: { in: categoryIds } },
+      where: { companyId, categoryId: { in: ids } },
       _count: { _all: true },
     }),
     prisma.receivable.groupBy({
       by: ['categoryId'],
-      where: { companyId, categoryId: { in: categoryIds } },
+      where: { companyId, categoryId: { in: ids } },
       _count: { _all: true },
     }),
   ]);
-
   const map = {};
-  for (const row of pay) {
-    map[row.categoryId] = map[row.categoryId] || { payables: 0, receivables: 0 };
-    map[row.categoryId].payables = row._count._all || 0;
+  for (const r of pay) {
+    if (!r.categoryId) continue;
+    map[r.categoryId] = map[r.categoryId] || { payables: 0, receivables: 0 };
+    map[r.categoryId].payables = r._count._all || 0;
   }
-  for (const row of rec) {
-    map[row.categoryId] = map[row.categoryId] || { payables: 0, receivables: 0 };
-    map[row.categoryId].receivables = row._count._all || 0;
+  for (const r of rec) {
+    if (!r.categoryId) continue;
+    map[r.categoryId] = map[r.categoryId] || { payables: 0, receivables: 0 };
+    map[r.categoryId].receivables = r._count._all || 0;
   }
   return map;
 }
 
-/* ============================================================
- * LIST
- * GET /api/finance/categories?type=PAYABLE|RECEIVABLE&q=...&withUsage=1
- * ==========================================================*/
+/* LIST: GET /api/finance/categories?page=&pageSize=&q=&type=PAYABLE|RECEIVABLE&sortBy=name|createdAt&sortOrder= */
 export const list = async (req, res) => {
   try {
     const companyId = req.company.id;
-    const type = norm(req.query.type);
+    const { page, pageSize, sortBy, sortOrder } = getPageParams(req.query);
     const q = norm(req.query.q);
-    const withUsage = bool(req.query.withUsage);
+    const type = norm(req.query.type);
+    const withUsage = parseBool(req.query.withUsage);
 
-    const where = { companyId };
-    if (type) where.type = type;
-    if (q) where.name = { contains: q, mode: 'insensitive' };
+    const where = {
+      companyId,
+      ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+      ...(VALID_TYPES.has(type) ? { type } : {}),
+    };
 
-    const categories = await prisma.financeCategory.findMany({
-      where,
-      orderBy: [{ type: 'asc' }, { name: 'asc' }],
-    });
+    const orderBy = [{ [sortBy]: sortOrder }];
+    const [total, itemsRaw] = await Promise.all([
+      prisma.financeCategory.count({ where }),
+      prisma.financeCategory.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
 
     if (!withUsage) {
-      return res.json(categories);
+      return res.status(200).json({ total, page, pageSize, items: itemsRaw });
     }
 
-    // Acrescenta stats de uso e canDelete
-    const ids = categories.map((c) => c.id);
+    const ids = itemsRaw.map(c => c.id);
     const usage = await loadUsageStats(companyId, ids);
-
-    const enriched = categories.map((c) => {
+    const items = itemsRaw.map(c => {
       const u = usage[c.id] || { payables: 0, receivables: 0 };
-      const canDelete = (u.payables + u.receivables) === 0;
-      return { ...c, usage: u, canDelete };
+      return { ...c, usage: u, canDelete: (u.payables + u.receivables) === 0 };
     });
 
-    return res.json(enriched);
+    return res.status(200).json({ total, page, pageSize, items });
   } catch (e) {
     console.error('Erro list categories:', e);
     return res.status(500).json({ message: 'Erro ao listar categorias.' });
   }
 };
 
-/* ============================================================
- * CREATE
- * POST /api/finance/categories
- * Body: { name*, type* }  (type: PAYABLE|RECEIVABLE)
- * ==========================================================*/
+/* CREATE: POST /api/finance/categories { name*, type* } */
 export const create = async (req, res) => {
   try {
     const companyId = req.company.id;
@@ -103,16 +92,11 @@ export const create = async (req, res) => {
     }
 
     try {
-      const created = await prisma.financeCategory.create({
-        data: { companyId, name, type },
-      });
+      const created = await prisma.financeCategory.create({ data: { companyId, name, type } });
       return res.status(201).json(created);
     } catch (e) {
       if (e?.code === 'P2002') {
-        // unique (companyId, name, type)
-        return res
-          .status(409)
-          .json({ message: 'Já existe uma categoria com esse nome e tipo nessa empresa.' });
+        return res.status(409).json({ message: 'Já existe uma categoria com esse nome e tipo nessa empresa.' });
       }
       throw e;
     }
@@ -122,25 +106,14 @@ export const create = async (req, res) => {
   }
 };
 
-/* ============================================================
- * UPDATE
- * PUT /api/finance/categories/:id
- * Body parcial: { name?, type? }
- * Regras:
- *  - type só pode ser alterado se NÃO houver payables/receivables vinculados.
- *  - Trata conflito único (companyId, name, type).
- * ==========================================================*/
+/* UPDATE: PUT /api/finance/categories/:id { name?, type? } */
 export const update = async (req, res) => {
   try {
     const companyId = req.company.id;
     const { id } = req.params;
 
-    const current = await prisma.financeCategory.findFirst({
-      where: { id, companyId },
-    });
-    if (!current) {
-      return res.status(404).json({ message: 'Categoria não encontrada.' });
-    }
+    const current = await prisma.financeCategory.findFirst({ where: { id, companyId } });
+    if (!current) return res.status(404).json({ message: 'Categoria não encontrada.' });
 
     const name = req.body.name !== undefined ? norm(req.body.name) : undefined;
     const type = req.body.type !== undefined ? norm(req.body.type) : undefined;
@@ -149,7 +122,7 @@ export const update = async (req, res) => {
       return res.status(400).json({ message: 'type inválido. Use PAYABLE ou RECEIVABLE.' });
     }
 
-    // Se tentar alterar o TYPE e a categoria estiver em uso, bloqueia.
+    // Se tentar alterar TYPE e houver vínculos, bloqueia
     if (type !== undefined && type !== current.type) {
       const [payCount, recCount] = await Promise.all([
         prisma.payable.count({ where: { companyId, categoryId: id } }),
@@ -157,8 +130,7 @@ export const update = async (req, res) => {
       ]);
       if (payCount + recCount > 0) {
         return res.status(409).json({
-          message:
-            'Não é possível alterar o tipo de uma categoria que já possui lançamentos vinculados.',
+          message: 'Não é possível alterar o tipo de uma categoria que já possui lançamentos vinculados.',
           usage: { payables: payCount, receivables: recCount },
         });
       }
@@ -167,17 +139,12 @@ export const update = async (req, res) => {
     try {
       const updated = await prisma.financeCategory.update({
         where: { id },
-        data: {
-          ...(name !== undefined ? { name } : {}),
-          ...(type !== undefined ? { type } : {}),
-        },
+        data: { ...(name !== undefined ? { name } : {}), ...(type !== undefined ? { type } : {}) },
       });
       return res.json(updated);
     } catch (e) {
       if (e?.code === 'P2002') {
-        return res
-          .status(409)
-          .json({ message: 'Já existe uma categoria com esse nome e tipo nessa empresa.' });
+        return res.status(409).json({ message: 'Já existe uma categoria com esse nome e tipo nessa empresa.' });
       }
       throw e;
     }
@@ -187,32 +154,22 @@ export const update = async (req, res) => {
   }
 };
 
-/* ============================================================
- * DELETE
- * DELETE /api/finance/categories/:id
- * Bloqueia exclusão se houver vínculos.
- * ==========================================================*/
+/* DELETE */
 export const remove = async (req, res) => {
   try {
     const companyId = req.company.id;
     const { id } = req.params;
 
-    const found = await prisma.financeCategory.findFirst({
-      where: { id, companyId },
-    });
-    if (!found) {
-      return res.status(404).json({ message: 'Categoria não encontrada.' });
-    }
+    const found = await prisma.financeCategory.findFirst({ where: { id, companyId } });
+    if (!found) return res.status(404).json({ message: 'Categoria não encontrada.' });
 
     const [payCount, recCount] = await Promise.all([
       prisma.payable.count({ where: { companyId, categoryId: id } }),
       prisma.receivable.count({ where: { companyId, categoryId: id } }),
     ]);
-
     if (payCount + recCount > 0) {
       return res.status(409).json({
-        message:
-          'Não é possível excluir a categoria. Existem lançamentos vinculados a ela.',
+        message: 'Não é possível excluir a categoria. Existem lançamentos vinculados a ela.',
         usage: { payables: payCount, receivables: recCount },
       });
     }
@@ -222,5 +179,30 @@ export const remove = async (req, res) => {
   } catch (e) {
     console.error('Erro delete category:', e);
     return res.status(500).json({ message: 'Erro ao excluir categoria.' });
+  }
+};
+
+/* EXPORT CSV: GET /api/finance/categories/export/csv?q=&type=&sortBy=&sortOrder= */
+export const exportCsv = async (req, res) => {
+  try {
+    const companyId = req.company.id;
+    const { sortBy = 'name', sortOrder = 'asc', q, type } = req.query;
+
+    const where = {
+      companyId,
+      ...(q ? { name: { contains: norm(q), mode: 'insensitive' } } : {}),
+      ...(VALID_TYPES.has(norm(type)) ? { type: norm(type) } : {}),
+    };
+
+    const rows = await prisma.financeCategory.findMany({
+      where,
+      orderBy: [{ [sortBy]: sortOrder === 'desc' ? 'desc' : 'asc' }],
+    });
+
+    const mapped = rows.map(r => ({ name: r.name || '', type: r.type || '' }));
+    sendCsv(res, 'finance-categories.csv', mapped, ['name','type']);
+  } catch (e) {
+    console.error('Erro export categories csv:', e);
+    return res.status(500).json({ message: 'Erro ao exportar CSV.' });
   }
 };
