@@ -19,7 +19,7 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
   };
 
   return (
-  <AdminLayout>
+  
 
     <div className="bg-white p-5 rounded-2xl shadow hover:shadow-lg transition-all border flex flex-col justify-between">
       <div className="flex justify-between items-center mb-2">
@@ -59,7 +59,7 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
       </div>
     </div>
   
-  </AdminLayout>
+  
 );
 };
 
