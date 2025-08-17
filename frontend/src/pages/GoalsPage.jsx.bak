@@ -3,7 +3,7 @@ import api from '../services/api';
 import Modal from '../components/dashboard/Modal';
 import GoalForm from '../components/forms/GoalForm';
 import GoalProgress from '../components/goals/GoalProgress';
-// // REMOVIDO
+// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const GoalsPage = () => {
   const [goals, setGoals] = useState([]);

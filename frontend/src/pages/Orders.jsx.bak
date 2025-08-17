@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import Modal from '../components/dashboard/Modal';
 import OrderForm from '../components/forms/OrderForm';
 import api from '../services/api';
-// // REMOVIDO
+// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const statusMap = {
   OPEN: { text: 'ABERTA', style: 'bg-yellow-100 text-yellow-800' },

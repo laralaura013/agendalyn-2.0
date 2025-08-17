@@ -4,7 +4,7 @@ import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import StaffForm from '../components/forms/StaffForm';
 import api from '../services/api';
-// // REMOVIDO
+// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const Staff = () => {
   const [staff, setStaff] = useState([]);

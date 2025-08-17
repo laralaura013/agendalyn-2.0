@@ -1,49 +1,79 @@
-// remove-adminlayout.mjs  (Node 18+ / ESM)
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve } from "path";
-import { globby } from "globby";
+// remove-adminlayout.mjs (ESM)
+// Varre src/pages/**.jsx e remove import AdminLayout e <AdminLayout>...</AdminLayout>
 
-const GLOB = [
-  "src/pages/**/*.jsx",
-  "!src/pages/**/__tests__/**",
-  "!src/pages/**/test/**",
-];
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
-function stripAdminLayout(code) {
-  let out = code;
+const ROOT = process.cwd();
+const PAGES_DIR = path.join(ROOT, "src", "pages");
 
-  // remove import AdminLayout ...
-  out = out.replace(
-    /^import\s+AdminLayout\s+from\s+["'].*?["'];?\s*$/gm,
-    ""
-  );
-
-  // remove <AdminLayout> e </AdminLayout>
-  out = out.replace(/<AdminLayout\s*>/g, "");
-  out = out.replace(/<\/AdminLayout>/g, "");
-
-  // limpeza de linhas em branco duplas
-  out = out.replace(/\n{3,}/g, "\n\n");
-  return out;
-}
-
-(async () => {
-  const files = await globby(GLOB);
-  if (!files.length) {
-    console.log("[remove-adminlayout] Nenhum arquivo encontrado.");
-    process.exit(0);
-  }
-  let changed = 0;
-  for (const f of files) {
-    const abs = resolve(f);
-    if (!existsSync(abs)) continue;
-    const src = readFileSync(abs, "utf8");
-    const out = stripAdminLayout(src);
-    if (out !== src) {
-      writeFileSync(abs, out, "utf8");
-      console.log(`[remove-adminlayout] Atualizado: ${f}`);
-      changed++;
+async function walk(dir) {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      files.push(...(await walk(full)));
+    } else if (e.isFile() && /\.jsx?$/.test(e.name)) {
+      files.push(full);
     }
   }
-  console.log(`[remove-adminlayout] Concluído (${changed} arquivos alterados).`);
-})();
+  return files;
+}
+
+function stripAdminLayout(code) {
+  let changed = false;
+  let out = code;
+
+  // 1) remove import AdminLayout ... from '.../components/layouts/AdminLayout'
+  const importRegex =
+    /import\s+AdminLayout\s+from\s+["'][.^/]*\/?components\/layouts\/AdminLayout["'];?\s*\r?\n?/g;
+  if (importRegex.test(out)) {
+    out = out.replace(importRegex, "");
+    changed = true;
+  }
+
+  // 2) remove <AdminLayout> e </AdminLayout> (com atributos ou espaços)
+  const openTag = /<\s*AdminLayout(\s+[^>]*)?>\s*/g;
+  const closeTag = /\s*<\/\s*AdminLayout\s*>\s*/g;
+  if (openTag.test(out) || closeTag.test(out)) {
+    out = out.replace(openTag, "");
+    out = out.replace(closeTag, "");
+    changed = true;
+  }
+
+  return { out, changed };
+}
+
+async function run() {
+  try {
+    const all = await walk(PAGES_DIR);
+    const targets = all.filter((f) => f.endsWith(".jsx"));
+    if (targets.length === 0) {
+      console.log("[remove-adminlayout] Nenhum .jsx encontrado em src/pages");
+      return;
+    }
+
+    for (const file of targets) {
+      const src = await fs.readFile(file, "utf8");
+      const { out, changed } = stripAdminLayout(src);
+      if (changed) {
+        // backup .bak uma vez
+        const bak = file + ".bak";
+        try {
+          await fs.access(bak);
+        } catch {
+          await fs.writeFile(bak, src, "utf8");
+        }
+        await fs.writeFile(file, out, "utf8");
+        console.log(`[remove-adminlayout] Limpo: ${path.relative(ROOT, file)}`);
+      }
+    }
+    console.log("[remove-adminlayout] Concluído.");
+  } catch (e) {
+    console.error("[remove-adminlayout] Erro:", e);
+    process.exit(1);
+  }
+}
+
+run();

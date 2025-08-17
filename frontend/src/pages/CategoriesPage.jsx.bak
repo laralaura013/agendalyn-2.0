@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
 import api from '../services/api';
-// // REMOVIDO
+// import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const CategoryForm = ({ initialData, onSave, onCancel }) => {
   const [name, setName] = useState(initialData?.name || '');
