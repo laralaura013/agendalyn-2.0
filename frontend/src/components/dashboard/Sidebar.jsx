@@ -42,8 +42,10 @@ const menuGroups = [
       { name: 'Pagar', icon: <Wallet size={18} />, path: '/dashboard/payables' },
       { name: 'Receber', icon: <Wallet size={18} />, path: '/dashboard/receivables' },
 
-      // 🔁 agora aponta direto para o relatório de Fluxo de Caixa
-      { name: 'Relatórios', icon: <BarChart3 size={18} />, path: '/dashboard/reports/cashflow', allowedRoles: ['OWNER'] },
+      // Relatórios
+      { name: 'Relatórios', icon: <BarChart3 size={18} />, path: '/dashboard/reports', allowedRoles: ['OWNER'] },
+      { name: 'Fluxo de Caixa', icon: <BarChart3 size={18} />, path: '/dashboard/reports/cashflow', allowedRoles: ['OWNER'] },
+
       { name: 'Comissões', icon: <ArrowRightLeft size={18} />, path: '/dashboard/commissions', allowedRoles: ['OWNER'] },
       { name: 'Caixa', icon: <Wallet size={18} />, path: '/dashboard/cashier' },
     ],
