@@ -1,39 +1,62 @@
+// src/components/mobile/MobileShell.jsx
 import React from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import BottomTabs from "./BottomTabs";
-import FloatingActions from "./FloatingActions";
 
-/**
- * Layout “app” para mobile/PWA.
- * - Renderiza Outlet (rotas aninhadas)
- * - Mostra BottomTabs conforme área (/dashboard vs /portal)
- * - Mostra FAB/contexto conforme rota atual
- */
-export default function MobileShell({ children }) {
-  const location = useLocation();
-  const path = location.pathname || "";
+export default function MobileShell() {
+  const loc = useLocation();
+  const navigate = useNavigate();
 
-  // Descobre “área” atual (admin x cliente) para tabs/ações
-  const area = path.startsWith("/dashboard") ? "admin" : "client";
+  const onFab = () => {
+    // atalho do FAB: ir direto para a agenda (como no mock)
+    navigate("/dashboard/schedule");
+  };
+
+  // título simples por rota
+  const title =
+    loc.pathname.startsWith("/dashboard/schedule") ? "Agendalyn" :
+    loc.pathname.startsWith("/dashboard/cashier")  ? "Agendalyn" :
+    loc.pathname.startsWith("/dashboard/orders")   ? "Agendalyn" :
+    loc.pathname.startsWith("/dashboard/clients")  ? "Agendalyn" :
+    "Agendalyn";
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <header className="h-12 px-4 flex items-center justify-between bg-white border-b border-gray-200">
-        <div className="text-sm font-semibold">
-          {area === "admin" ? "Agendalyn • Admin" : "Agendalyn • Cliente"}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header roxo fixo */}
+      <header
+        className="sticky top-0 z-40 text-white"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="bg-purple-700">
+          <div className="h-12 flex items-center justify-center px-4">
+            <h1 className="text-base font-semibold">{title}</h1>
+          </div>
         </div>
-        <div />
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-[88px]">
-        {/* Se foi usado diretamente como wrapper de página */}
-        {children}
-        {/* Se foi usado como element de <Route> (App.jsx) */}
+      {/* Conteúdo */}
+      <main className="px-3 pb-[104px] pt-3 max-w-md mx-auto">
         <Outlet />
       </main>
 
-      <FloatingActions area={area} />
-      <BottomTabs area={area} />
+      {/* FAB central (agenda) */}
+      <button
+        onClick={onFab}
+        aria-label="Novo / Agenda"
+        className="fixed bottom-16 left-1/2 -translate-x-1/2 md:hidden
+                   w-14 h-14 rounded-full shadow-lg bg-purple-600 text-white
+                   flex items-center justify-center active:scale-95"
+        style={{ boxShadow: "0 10px 25px rgba(91,33,182,0.35)" }}
+      >
+        {/* ícone calendário simples */}
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2"/>
+          <path d="M16 3v4M8 3v4M3 11h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </button>
+
+      {/* Bottom tabs */}
+      <BottomTabs area="admin" />
     </div>
   );
 }
