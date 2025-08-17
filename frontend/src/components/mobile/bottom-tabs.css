@@ -1,0 +1,68 @@
+/* Container fixo no rodapé */
+.mobile-tabs {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 64px;
+  z-index: 50;
+}
+
+/* Fundo com sombra suave */
+.tabs-bg {
+  position: absolute; inset: 0;
+  background: #ffffff;
+  box-shadow: 0 -6px 20px rgba(0,0,0,0.06);
+  border-top: 1px solid #e5e7eb; /* gray-200 */
+}
+
+/* “Notch” para o botão central elevado */
+.mobile-tabs::before {
+  content: "";
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  bottom: 44px;
+  width: 64px; height: 32px;
+  background: #ffffff;
+  border-top-left-radius: 9999px;
+  border-top-right-radius: 9999px;
+  box-shadow: 0 -6px 16px rgba(0,0,0,0.08);
+}
+
+/* Grid das 5 abas */
+.tabs-row {
+  position: relative;
+  height: 64px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+/* Link da aba */
+.tab-link {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  text-decoration: none;
+  font-size: 11px;
+  color: #6b7280; /* gray-500 */
+  transition: color .15s ease;
+}
+
+.tab-link:hover { color: #4f46e5; } /* indigo-600 */
+.tab-link.active { color: #111827; font-weight: 600; } /* gray-900 */
+
+.tab-label { line-height: 1; }
+
+/* Aba central elevada (ícone maior) */
+.tab-link.center {
+  transform: translateY(-18px);
+  background: #ffffff;
+  margin: 0 6px;
+  border-radius: 9999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  height: 56px; width: 56px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.tab-link.center svg { transform: translateY(1px); }
+.tab-link.center .tab-label { display: none; }

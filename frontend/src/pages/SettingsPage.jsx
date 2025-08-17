@@ -1,3 +1,5 @@
+import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
+import AdminLayout from '../components/layouts/AdminLayout';
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -101,10 +103,14 @@ const SettingsPage = () => {
 
   if (loading) {
     return (
+  <AdminLayout>
+
       <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
         <p className="text-gray-500">Loading settings...</p>
       </div>
-    );
+    
+  </AdminLayout>
+);
   }
 
   const userData = getSafeUser();

@@ -2,20 +2,26 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Ícone padrão -->
+    <link rel="icon" href="/favicon.ico" />
+
+    <!-- Viewport otimizado para PWA/mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!-- Cor do tema (status bar Android / iOS Safari) -->
     <meta name="theme-color" content="#6B21A8" />
 
-    <!-- (opcional) só mantenha se esse arquivo existir em /public -->
+    <!-- iOS: ícone de atalho (adicione em /public se ainda não tiver) -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
 
-    <!-- ✅ manifest correto -->
+    <!-- Manifest PWA -->
     <link rel="manifest" href="/manifest.webmanifest" />
 
+    <!-- Título -->
     <title>Agendalyn 2.0</title>
 
-    <!-- Ionicons CDN para ícones do menu inferior -->
+    <!-- Ionicons CDN (opcional, se ainda usa junto com lucide-react) -->
     <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
   </head>

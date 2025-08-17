@@ -1,3 +1,7 @@
+import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import api from '../services/api';
+import AdminLayout from '../components/layouts/AdminLayout';
 // ✅ ARQUIVO: src/pages/Schedule.jsx (corrigido)
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Calendar from "../components/schedule/Calendar";
@@ -225,7 +229,11 @@ const Schedule = () => {
       }
     })();
 
-    return () => ac.abort();
+    return (
+  <AdminLayout>
+) => ac.abort(
+  </AdminLayout>
+);
   }, [loadShared]);
 
   // 2) quando staff carregar, define profissional padrão

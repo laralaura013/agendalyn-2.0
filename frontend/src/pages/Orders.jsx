@@ -1,3 +1,4 @@
+import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../components/dashboard/Modal';
@@ -19,6 +20,8 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
   };
 
   return (
+  <AdminLayout>
+
     <div className="bg-white p-5 rounded-2xl shadow hover:shadow-lg transition-all border flex flex-col justify-between">
       <div className="flex justify-between items-center mb-2">
         <h3 className="font-semibold text-lg">#{order.id.slice(0, 8)}</h3>
@@ -56,7 +59,9 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
         )}
       </div>
     </div>
-  );
+  
+  </AdminLayout>
+);
 };
 
 const Orders = () => {

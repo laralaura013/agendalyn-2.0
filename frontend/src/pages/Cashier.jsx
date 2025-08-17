@@ -1,3 +1,6 @@
+import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import AdminLayout from '../components/layouts/AdminLayout';
 // src/pages/Cashier.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
@@ -89,7 +92,11 @@ const Cashier = () => {
   useEffect(() => {
     const handler = () => fetchCashierStatus();
     window.addEventListener('cashier:refresh', handler);
-    return () => window.removeEventListener('cashier:refresh', handler);
+    return (
+  <AdminLayout>
+) => window.removeEventListener('cashier:refresh', handler
+  </AdminLayout>
+);
   }, [fetchCashierStatus]);
 
   const handleOpenCashier = async () => {
