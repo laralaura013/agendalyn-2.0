@@ -1,64 +1,79 @@
 // src/hooks/useAppShellMode.js
 import { useEffect, useState } from "react";
 
-/**
- * isMobile = tela <= 768px  OU  app instalado (PWA standalone / iOS standalone)
- * Overrides de teste:
- *  - ?mobile=1 -> força mobile
- *  - ?desktop=1 -> força desktop
- *  - localStorage.forceMobile = "1"  (ou "0")
- *  - localStorage.forceDesktop = "1" (ou "0")
- */
+/** Cálculo único do modo atual (respeita override salvo) */
+function computeIsMobile() {
+  // Overrides persistentes
+  const override = (() => {
+    try {
+      return localStorage.getItem("forceShell");
+    } catch {
+      return null;
+    }
+  })();
+  if (override === "mobile") return true;
+  if (override === "desktop") return false;
+
+  // Heurísticas reais
+  const small =
+    window.matchMedia?.("(max-width: 767.98px)")?.matches ||
+    window.innerWidth < 768;
+
+  const standalone =
+    window.matchMedia?.("(display-mode: standalone)")?.matches ||
+    // iOS Safari standalone
+    window.navigator?.standalone === true;
+
+  return small || standalone;
+}
+
 export default function useAppShellMode() {
-  const [isMobile, setIsMobile] = useState(false);
+  // Lê overrides do querystring na primeira montagem
+  const [isMobile, setIsMobile] = useState(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.has("mobile")) localStorage.setItem("forceShell", "mobile");
+      if (sp.has("desktop")) localStorage.setItem("forceShell", "desktop");
+      if (sp.has("clearShell")) localStorage.removeItem("forceShell");
+    } catch {}
+    return computeIsMobile();
+  });
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const dm = window.matchMedia("(display-mode: standalone)");
+    const recalc = () => setIsMobile(computeIsMobile());
 
-    const readOverrides = () => {
-      const qs = new URLSearchParams(window.location.search);
-      const qMobile = qs.get("mobile");
-      const qDesktop = qs.get("desktop");
-      const lsMobile = localStorage.getItem("forceMobile");
-      const lsDesktop = localStorage.getItem("forceDesktop");
+    // Recalcula em mudanças relevantes
+    window.addEventListener("resize", recalc);
+    window.addEventListener("orientationchange", recalc);
 
-      if (qMobile === "1" || lsMobile === "1") return true;
-      if (qDesktop === "1" || lsDesktop === "1") return false;
-      return null;
-    };
+    // Mudança de display-mode (PWA)
+    const mql = window.matchMedia?.("(display-mode: standalone)");
+    mql?.addEventListener?.("change", recalc);
 
-    const compute = () => {
-      const override = readOverrides();
-      if (override !== null) {
-        setIsMobile(override);
-        return;
-      }
-      const small = mq.matches;
-      const standalone = dm.matches || window.navigator?.standalone === true; // iOS
-      setIsMobile(small || standalone);
-    };
+    // Em alguns casos, quando volta do background
+    document.addEventListener("visibilitychange", recalc);
 
-    // cálculo inicial
-    compute();
-
-    // ouvir mudanças
-    const onChange = () => compute();
-
-    mq.addEventListener?.("change", onChange);
-    dm.addEventListener?.("change", onChange);
-    window.addEventListener("resize", onChange);
-    window.addEventListener("orientationchange", onChange);
-    window.addEventListener("visibilitychange", onChange);
+    // Recalcula uma vez após o paint (útil em iOS)
+    const t = setTimeout(recalc, 0);
 
     return () => {
-      mq.removeEventListener?.("change", onChange);
-      dm.removeEventListener?.("change", onChange);
-      window.removeEventListener("resize", onChange);
-      window.removeEventListener("orientationchange", onChange);
-      window.removeEventListener("visibilitychange", onChange);
+      clearTimeout(t);
+      window.removeEventListener("resize", recalc);
+      window.removeEventListener("orientationchange", recalc);
+      document.removeEventListener("visibilitychange", recalc);
+      mql?.removeEventListener?.("change", recalc);
     };
   }, []);
+
+  // Ajuda de diagnóstico no console (desligue se quiser)
+  if (import.meta.env?.DEV) {
+    // eslint-disable-next-line no-console
+    console.debug(
+      "[useAppShellMode]",
+      { isMobile },
+      { override: localStorage.getItem("forceShell") }
+    );
+  }
 
   return { isMobile };
 }
