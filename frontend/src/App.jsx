@@ -54,6 +54,9 @@ import CancellationReasonsPage from './pages/settings/CancellationReasonsPage'
 import ClientOriginsPage from './pages/settings/ClientOriginsPage'
 import BirthdaysReportPage from './pages/reports/BirthdaysReportPage'
 
+// 🆕 Relatório: Fluxo de Caixa
+import CashflowReportPage from './pages/reports/CashflowReportPage'
+
 function App() {
   return (
     <>
@@ -115,6 +118,8 @@ function App() {
               <Route path="subscription" element={<SubscriptionPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="reports/birthdays" element={<BirthdaysReportPage />} />
+              {/* 🆕 Rota do Fluxo de Caixa */}
+              <Route path="reports/cashflow" element={<CashflowReportPage />} />
               <Route path="goals" element={<GoalsPage />} />
               <Route path="anamnesis" element={<AnamnesisPage />} />
               <Route path="packages" element={<PackagesPage />} />
