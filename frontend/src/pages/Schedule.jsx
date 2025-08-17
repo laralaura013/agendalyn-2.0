@@ -1,90 +1,52 @@
-// ✅ ARQUIVO: src/pages/Schedule.jsx
+// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
-import api from "../services/api";
-
-import Calendar from "../components/schedule/Calendar";
-import AppointmentModal from "../components/schedule/AppointmentModal";
-
 import {
   PlusCircle,
   ChevronLeft,
   ChevronRight,
   Lock,
   Calendar as CalendarIcon,
-  ClipboardList,
   List,
+  ClipboardList,
   Filter,
   X,
   CheckCircle2,
 } from "lucide-react";
 
+import useAppShellMode from "../hooks/useAppShellMode";
+import api from "../services/api";
+import Calendar from "../components/schedule/Calendar";
+import AppointmentModal from "../components/schedule/AppointmentModal";
+
 /**
- * Endpoints usados:
- * - GET  /appointments?professionalId&date | date_from&date_to
- * - POST /appointments
- * - PUT  /appointments/:id
- * - DELETE /appointments/:id
+ * Endpoints esperados:
+ *  - GET  /appointments?professionalId&date | date_from&date_to
+ *  - POST /appointments
+ *  - PUT  /appointments/:id
+ *  - DELETE /appointments/:id
  *
- * - GET  /agenda/blocks?professionalId&date | date_from&date_to
- * - POST /agenda/blocks
- * - DELETE /agenda/blocks/:id
+ *  - GET  /agenda/blocks?professionalId&date | date_from&date_to
+ *  - POST /agenda/blocks  { professionalId, date:'YYYY-MM-DD', startTime:'HH:mm', endTime:'HH:mm', reason }
+ *  - DELETE /agenda/blocks/:id
  *
- * - GET  /public/available-slots?date&serviceId&staffId
- * - GET  /waitlist
+ *  - GET  /public/available-slots?date&serviceId&staffId
+ *  - GET  /waitlist
  */
+
 const DEFAULT_SLOT_MINUTES = 30;
 
-function isAbort(err) {
-  return (
-    err?.name === "CanceledError" ||
-    err?.code === "ERR_CANCELED" ||
-    err?.message === "canceled"
-  );
-}
-function toYMD(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-function startOfWeek(d) {
-  const c = new Date(d);
-  const day = c.getDay();
-  const diff = (day + 6) % 7; // segunda
-  c.setDate(c.getDate() - diff);
-  c.setHours(0, 0, 0, 0);
-  return c;
-}
-function endOfWeek(d) {
-  const s = startOfWeek(d);
-  const e = new Date(s);
-  e.setDate(s.getDate() + 6);
-  e.setHours(23, 59, 59, 999);
-  return e;
-}
-function startOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
-}
-function endOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-function formatDateInput(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+export default function Schedule() {
+  const { isMobile } = useAppShellMode();
 
-const Schedule = () => {
-  // Estado principal
+  // estado principal
   const [events, setEvents] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  // Catálogos compartilhados
+  // catálogos
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -92,8 +54,8 @@ const Schedule = () => {
   const [loading, setLoading] = useState(true);
   const [blocks, setBlocks] = useState([]);
 
-  // Visão/filtros
-  const [view, setView] = useState("day"); // "day" | "week" | "month"
+  // visão e filtros
+  const [view, setView] = useState("day");
   const [date, setDate] = useState(() => new Date());
   const [selectedPro, setSelectedPro] = useState(null);
 
@@ -106,16 +68,16 @@ const Schedule = () => {
   const [openProducts, setOpenProducts] = useState(true);
   const [openLegend, setOpenLegend] = useState(true);
 
-  // Slots & waitlist
+  // slots & waitlist
   const [slotsLoading, setSlotsLoading] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]); // ["07:00", ...]
   const [waitlist, setWaitlist] = useState([]);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
 
-  // Evita duplo carregamento no StrictMode
+  // evita duplo disparo em StrictMode
   const loadedOnceRef = useRef(false);
 
-  /** ---------- Helpers de range ---------- */
+  /** ------- HELPERS DE PARAMS (mês/semana/dia) ------- */
   const buildRangeParams = useCallback(
     (baseDate) => {
       const params = {};
@@ -134,7 +96,8 @@ const Schedule = () => {
     [view, selectedPro]
   );
 
-  /** ---------- Loaders ---------- */
+  /** ------- LOADERS ------- */
+
   const loadShared = useCallback(async (signal) => {
     const [c, s, st] = await Promise.all([
       api.get("/clients", { signal }),
@@ -150,8 +113,9 @@ const Schedule = () => {
     async (signal) => {
       try {
         const params = buildRangeParams(date);
-        const res = await api.get("/appointments", { params, signal });
-        const rows = (res.data || []).filter((apt) => {
+        const response = await api.get("/appointments", { params, signal });
+
+        const rows = (response.data || []).filter((apt) => {
           const st = String(apt.status || "").toUpperCase();
           return !["CANCELED", "DELETED", "REMOVED"].includes(st);
         });
@@ -164,9 +128,9 @@ const Schedule = () => {
           resource: apt,
         }));
         setEvents(formatted);
-      } catch (e) {
-        if (isAbort(e)) return;
-        console.error(e);
+      } catch (error) {
+        if (isAbort(error)) return;
+        console.error("Erro ao buscar agendamentos:", error);
         toast.error("Erro ao carregar os agendamentos.");
       }
     },
@@ -181,7 +145,7 @@ const Schedule = () => {
         setBlocks(res.data || []);
       } catch (e) {
         if (isAbort(e)) return;
-        console.error(e);
+        console.error("Erro ao carregar bloqueios:", e);
         toast.error("Erro ao carregar bloqueios.");
       }
     },
@@ -192,6 +156,7 @@ const Schedule = () => {
     async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES, signal) => {
       try {
         setSlotsLoading(true);
+
         const baseParams = { date: toYMD(targetDate) };
         if (proId) baseParams.staffId = proId;
 
@@ -199,6 +164,7 @@ const Schedule = () => {
           params: { ...baseParams, duration: minutes },
           signal,
         });
+
         let items = (res.data || [])
           .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time))
           .filter(Boolean);
@@ -216,7 +182,7 @@ const Schedule = () => {
         setAvailableSlots(items);
       } catch (e) {
         if (isAbort(e)) return;
-        console.error(e);
+        console.error("Erro ao carregar horários disponíveis:", e);
         toast.error("Erro ao carregar horários disponíveis.");
       } finally {
         setSlotsLoading(false);
@@ -232,15 +198,16 @@ const Schedule = () => {
       setWaitlist(res.data || []);
     } catch (e) {
       if (isAbort(e)) return;
-      console.error(e);
+      console.error("Erro ao carregar lista de espera:", e);
       toast.error("Erro ao carregar a lista de espera.");
     } finally {
       setWaitlistLoading(false);
     }
   }, []);
 
-  /** ---------- Efeitos ---------- */
-  // 1) Carrega catálogos apenas uma vez
+  /** ------- EFEITOS ------- */
+
+  // 1) carregamento inicial (catálogos)
   useEffect(() => {
     if (loadedOnceRef.current) return;
     loadedOnceRef.current = true;
@@ -260,14 +227,15 @@ const Schedule = () => {
     return () => ac.abort();
   }, [loadShared]);
 
-  // 2) Define profissional padrão quando staff carregar
+  // 2) define profissional padrão
   useEffect(() => {
     if (!selectedPro && staff?.length) setSelectedPro(staff[0]?.id);
   }, [staff, selectedPro]);
 
-  // 3) Recarrega agenda e bloqueios quando view/date/pro mudarem
+  // 3) refetch de agenda/blocos ao mudar view/date/pro
   useEffect(() => {
     if (!loadedOnceRef.current) return;
+
     const ac = new AbortController();
     (async () => {
       setLoading(true);
@@ -279,13 +247,16 @@ const Schedule = () => {
         setLoading(false);
       }
     })();
+
     return () => ac.abort();
   }, [view, date, selectedPro, fetchAppointments, fetchBlocks]);
 
-  /** ---------- Handlers ---------- */
+  /** ------- HANDLERS ------- */
+
   const handleSelectSlot = useCallback(
     (slotInfo) => {
       const { start, end } = slotInfo;
+
       const conflito = (blocks || []).some((b) => {
         const base = new Date(b.date);
         const [sh, sm] = (b.startTime || "00:00").split(":").map(Number);
@@ -296,7 +267,10 @@ const Schedule = () => {
         bEnd.setHours(eh, em, 0, 0);
         return start < bEnd && end > bStart;
       });
-      if (conflito) return toast.error("Horário bloqueado. Escolha outro.");
+      if (conflito) {
+        toast.error("Horário bloqueado. Escolha outro horário.");
+        return;
+      }
 
       setSelectedEvent(null);
       setSelectedSlot(slotInfo);
@@ -308,6 +282,7 @@ const Schedule = () => {
   const handleSelectEvent = useCallback(
     (event) => {
       const data = event.resource;
+
       if (data?.type === "BLOCK") {
         if (window.confirm("Deseja remover este bloqueio?")) {
           api
@@ -321,6 +296,7 @@ const Schedule = () => {
         }
         return;
       }
+
       setSelectedSlot(null);
       setSelectedEvent(data);
       setIsModalOpen(true);
@@ -330,11 +306,11 @@ const Schedule = () => {
 
   const handleSave = async (payload) => {
     const isEditing = !!(selectedEvent && selectedEvent.id);
-    const req = isEditing
+    const p = isEditing
       ? api.put(`/appointments/${selectedEvent.id}`, payload)
       : api.post("/appointments", payload);
 
-    toast.promise(req, {
+    toast.promise(p, {
       loading: "Salvando agendamento...",
       success: () => {
         const ac = new AbortController();
@@ -348,7 +324,9 @@ const Schedule = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir este agendamento?")) return;
+
     setEvents((prev) => prev.filter((ev) => ev.id !== id));
+
     toast.promise(api.delete(`/appointments/${id}`), {
       loading: "Excluindo agendamento...",
       success: () => {
@@ -388,7 +366,7 @@ const Schedule = () => {
   };
 
   const pageTitle = useMemo(() => {
-    const fmt =
+    const formatter =
       view === "month"
         ? new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" })
         : new Intl.DateTimeFormat("pt-BR", {
@@ -397,7 +375,7 @@ const Schedule = () => {
             month: "short",
             year: "numeric",
           });
-    return fmt.format(date);
+    return formatter.format(date);
   }, [date, view]);
 
   const blockEvents = useMemo(() => {
@@ -458,10 +436,202 @@ const Schedule = () => {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  /** ---------- Render ---------- */
+  /** ------- RENDER ------- */
+
+  if (isMobile) {
+    // ====== LAYOUT MOBILE ======
+    return (
+      <div className="relative p-3 max-w-md mx-auto">
+        {/* Cabeçalho leve */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-[26px] font-bold leading-none">Agenda</h1>
+            <div className="text-sm text-gray-600">• hoje ▸</div>
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <button onClick={goPrev} className="px-2 py-1 border rounded hover:bg-gray-50" title="Anterior">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button onClick={goToday} className="px-3 py-1.5 border rounded hover:bg-gray-50">
+              Hoje
+            </button>
+            <button onClick={goNext} className="px-2 py-1 border rounded hover:bg-gray-50" title="Próximo">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <div className="ml-auto">
+              <ProfessionalsSelect
+                value={selectedPro || ""}
+                onChange={setSelectedPro}
+                options={staff?.map((s) => ({ id: s.id, name: s.name })) || []}
+              />
+            </div>
+          </div>
+
+          <div className="mt-2">
+            <ViewToggle value={view} onChange={setView} />
+          </div>
+        </div>
+
+        {/* Calendário */}
+        <div className="bg-white border rounded overflow-hidden">
+          {loading ? (
+            <p className="text-sm text-gray-500 p-4">Carregando agenda...</p>
+          ) : (
+            <Calendar
+              events={combinedEvents}
+              onSelectSlot={handleSelectSlot}
+              onSelectEvent={handleSelectEvent}
+              view={view}
+              date={date}
+              onView={(v) => setView(v)}
+              onNavigate={(d) => setDate(d)}
+            />
+          )}
+        </div>
+
+        {/* Ações rápidas (slots / lista / espera) */}
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <button
+            onClick={() => {
+              setOpenSlots(true);
+              const ac = new AbortController();
+              fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
+            }}
+            className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+          >
+            <CalendarIcon className="w-4 h-4" />
+            Horários
+          </button>
+
+          <button
+            onClick={() => setOpenApptList(true)}
+            className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+          >
+            <ClipboardList className="w-4 h-4" />
+            Agendamentos
+          </button>
+
+          <button
+            onClick={() => {
+              setOpenWaitlist(true);
+              const ac = new AbortController();
+              fetchWaitlist(ac.signal);
+            }}
+            className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+          >
+            <List className="w-4 h-4" />
+            Espera
+          </button>
+        </div>
+
+        {/* FAB mobile */}
+        <button
+          onClick={openEmptyModal}
+          className="fixed bottom-24 right-6 bg-purple-600 text-white rounded-full p-3 shadow-lg hover:bg-purple-700"
+          title="Novo agendamento"
+        >
+          <PlusCircle size={28} />
+        </button>
+
+        {/* Modais */}
+        {isModalOpen && (
+          <AppointmentModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            event={selectedEvent}
+            slot={selectedSlot}
+            clients={clients}
+            services={services}
+            staff={staff}
+            onSave={handleSave}
+            onDelete={handleDelete}
+            fetchAppointments={(...args) => {
+              const ac = new AbortController();
+              fetchAppointments(ac.signal, ...args);
+            }}
+          />
+        )}
+
+        {openSlots && (
+          <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
+            <SlotsModalContent
+              date={date}
+              proId={selectedPro}
+              loading={slotsLoading}
+              slots={availableSlots}
+              onReload={() => {
+                const ac = new AbortController();
+                fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
+              }}
+              onPick={handlePickAvailableSlot}
+            />
+          </BaseModal>
+        )}
+
+        {openApptList && (
+          <SideDrawer title="Agendamentos" onClose={() => setOpenApptList(false)}>
+            <AppointmentsListContent
+              events={events}
+              onOpen={handleOpenEventFromList}
+              onRefresh={() => {
+                const ac = new AbortController();
+                fetchAppointments(ac.signal);
+              }}
+            />
+          </SideDrawer>
+        )}
+
+        {openWaitlist && (
+          <SideDrawer title="Lista de Espera" onClose={() => setOpenWaitlist(false)}>
+            <WaitlistContent
+              items={waitlist}
+              loading={waitlistLoading}
+              onRefresh={() => {
+                const ac = new AbortController();
+                fetchWaitlist(ac.signal);
+              }}
+              onAgendar={handleWaitlistAgendar}
+            />
+          </SideDrawer>
+        )}
+
+        {openBlockTime && (
+          <BaseModal onClose={() => setOpenBlockTime(false)} title="Bloquear horário">
+            <BlockTimeForm
+              date={date}
+              proId={selectedPro}
+              onCancel={() => setOpenBlockTime(false)}
+              onSubmit={async (payload) => {
+                try {
+                  await api.post("/agenda/blocks", {
+                    professionalId: payload.professionalId || null,
+                    date: payload.date,
+                    startTime: payload.start,
+                    endTime: payload.end,
+                    reason: payload.reason || "",
+                  });
+                  toast.success("Bloqueio criado com sucesso!");
+                  setOpenBlockTime(false);
+                  const ac = new AbortController();
+                  fetchBlocks(ac.signal);
+                } catch (err) {
+                  console.error(err);
+                  toast.error("Erro ao criar bloqueio.");
+                }
+              }}
+            />
+          </BaseModal>
+        )}
+      </div>
+    );
+  }
+
+  // ====== LAYOUT DESKTOP (mantém sua estrutura) ======
   return (
-    <div className="relative animate-fade-in-up p-4 max-w-7xl mx-auto">
-      {/* Toolbar */}
+    <div className="relative p-4 max-w-7xl mx-auto">
+      {/* toolbar */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
         <div className="flex items-center gap-2">
           <ProfessionalsSelect
@@ -506,15 +676,13 @@ const Schedule = () => {
         </div>
       </div>
 
-      {/* Cabeçalho de data */}
+      {/* header data */}
       <div className="w-full bg-white border rounded px-4 py-2 text-sm md:text-base flex items-center justify-between mb-4">
         <span className="font-medium capitalize">{pageTitle}</span>
-        <span className="text-gray-500">
-          {staff?.find((p) => p.id === selectedPro)?.name ?? ""}
-        </span>
+        <span className="text-gray-500">{staff?.find((p) => p.id === selectedPro)?.name ?? ""}</span>
       </div>
 
-      {/* Grid */}
+      {/* grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[70vh]">
         <div className="lg:col-span-8 xl:col-span-9 bg-white border rounded overflow-hidden">
           {loading ? (
@@ -607,18 +775,12 @@ const Schedule = () => {
 
             <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
               <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Buscar produto/serviço"
-                  className="border rounded px-2 py-1.5 text-sm w-full"
-                />
+                <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
                 <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
                   {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
                     <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
                       <span>{item}</span>
-                      <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">
-                        Adicionar
-                      </button>
+                      <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
                     </div>
                   ))}
                 </div>
@@ -632,16 +794,14 @@ const Schedule = () => {
         </aside>
       </div>
 
-      {/* FAB novo agendamento */}
       <button
         onClick={openEmptyModal}
-        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition btn-animated"
+        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition"
         title="Novo agendamento"
       >
         <PlusCircle size={28} />
       </button>
 
-      {/* Modais/Drawers */}
       {isModalOpen && (
         <AppointmentModal
           isOpen={isModalOpen}
@@ -653,9 +813,9 @@ const Schedule = () => {
           staff={staff}
           onSave={handleSave}
           onDelete={handleDelete}
-          fetchAppointments={() => {
+          fetchAppointments={(...args) => {
             const ac = new AbortController();
-            fetchAppointments(ac.signal);
+            fetchAppointments(ac.signal, ...args);
           }}
         />
       )}
@@ -732,25 +892,60 @@ const Schedule = () => {
       )}
     </div>
   );
-};
+}
 
-/* ======= UI auxiliares (componentes internos) ======= */
+/* ===== Auxiliares ===== */
+function isAbort(err) {
+  return err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled";
+}
+function formatDateInput(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function startOfWeek(d) {
+  const copy = new Date(d);
+  const day = copy.getDay();
+  const diff = (day + 6) % 7;
+  copy.setDate(copy.getDate() - diff);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+function endOfWeek(d) {
+  const s = startOfWeek(d);
+  const e = new Date(s);
+  e.setDate(s.getDate() + 6);
+  e.setHours(23, 59, 59, 999);
+  return e;
+}
+function startOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
+function endOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+function toYMD(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/* ====== UI auxiliares (Accordion, etc.) ===== */
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="hidden md:block text-sm text-gray-600">Profissionais:</span>
-      <select
-        className="border rounded px-2 py-1.5 text-sm"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {(options || []).map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-    </div>
+    <select
+      className="border rounded px-2 py-1.5 text-sm"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {(options || []).map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.name}
+        </option>
+      ))}
+    </select>
   );
 }
 function ViewToggle({ value, onChange }) {
@@ -760,13 +955,13 @@ function ViewToggle({ value, onChange }) {
     { id: "month", label: "Mês" },
   ];
   return (
-    <div className="flex items-center rounded overflow-hidden border bg-white">
+    <div className="inline-flex items-center rounded overflow-hidden border bg-white">
       {opts.map((opt) => (
         <button
           key={opt.id}
           onClick={() => onChange(opt.id)}
           className={`px-3 py-1.5 text-sm ${
-            value === opt.id ? "bg-gray-900 text-white" : "hover:bg-gray-50"
+            value === opt.id ? "bg-purple-600 text-white" : "hover:bg-gray-50"
           }`}
         >
           {opt.label}
@@ -788,11 +983,7 @@ function Accordion({ title, open, onToggle, children }) {
 }
 function ChevronRightIcon({ open }) {
   return (
-    <svg
-      className={`w-4 h-4 transition-transform ${open ? "rotate-90" : ""}`}
-      viewBox="0 0 20 20"
-      fill="currentColor"
-    >
+    <svg className={`w-4 h-4 transition-transform ${open ? "rotate-90" : ""}`} viewBox="0 0 20 20" fill="currentColor">
       <path
         fillRule="evenodd"
         d="M7.293 14.707a1 1 0 0 1 0-1.414L10.586 10 7.293 6.707a1 1 0 0 1 1.414-1.414l4 4a1 1 0 0 1 0 1.414l-4 4a1 1 0 0 1-1.414 0z"
@@ -858,17 +1049,9 @@ function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick 
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600">
-          {new Intl.DateTimeFormat("pt-BR", {
-            weekday: "long",
-            day: "2-digit",
-            month: "long",
-          }).format(date)}
+          {new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(date)}
         </div>
-        <button
-          onClick={onReload}
-          className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
-          title="Recarregar"
-        >
+        <button onClick={onReload} className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50" title="Recarregar">
           Recarregar
         </button>
       </div>
@@ -879,19 +1062,13 @@ function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick 
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {slots.map((s) => (
-            <button
-              key={s}
-              onClick={() => onPick(s)}
-              className="px-3 py-2 rounded border bg-white hover:bg-gray-50"
-            >
+            <button key={s} onClick={() => onPick(s)} className="px-3 py-2 rounded border bg-white hover:bg-gray-50">
               {s}
             </button>
           ))}
         </div>
       )}
-      <div className="text-xs text-gray-500">
-        Profissional: <span className="font-medium">{proId || "—"}</span>
-      </div>
+      <div className="text-xs text-gray-500">Profissional: <span className="font-medium">{proId || "—"}</span></div>
     </div>
   );
 }
@@ -911,24 +1088,14 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <button
-          className="px-2 py-1.5 border rounded hover:bg-gray-50"
-          onClick={onRefresh}
-          title="Recarregar"
-        >
+        <button className="px-2 py-1.5 border rounded hover:bg-gray-50" onClick={onRefresh} title="Recarregar">
           <Filter className="w-4 h-4" />
         </button>
       </div>
       <div className="divide-y border rounded">
-        {filtered.length === 0 && (
-          <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>
-        )}
+        {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
         {filtered.map((ev) => (
-          <button
-            key={ev.id}
-            onClick={() => onOpen?.(ev.id)}
-            className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50"
-          >
+          <button key={ev.id} onClick={() => onOpen?.(ev.id)} className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50">
             <div className="text-sm">
               <div className="font-medium">{ev.title}</div>
               <div className="text-gray-500">
@@ -936,9 +1103,7 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
                 {ev.end?.toLocaleTimeString?.([], { hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
-            <span className="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700">
-              Abrir
-            </span>
+            <span className="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700">Abrir</span>
           </button>
         ))}
       </div>
@@ -950,11 +1115,7 @@ function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="font-medium">Pessoas na espera</div>
-        <button
-          className="px-2 py-1.5 border rounded hover:bg-gray-50"
-          onClick={onRefresh}
-          title="Recarregar"
-        >
+        <button className="px-2 py-1.5 border rounded hover:bg-gray-50" onClick={onRefresh} title="Recarregar">
           Recarregar
         </button>
       </div>
@@ -966,18 +1127,12 @@ function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
         <div className="divide-y border rounded">
           {items.map((it) => (
             <div key={it.id} className="p-3">
-              <div className="text-sm font-medium">
-                {it.client?.name ?? it.clientName ?? "Cliente"}
-              </div>
+              <div className="text-sm font-medium">{it.client?.name ?? it.clientName ?? "Cliente"}</div>
               <div className="text-xs text-gray-500">
-                {(it.client?.phone ?? it.phone) || ""}{" "}
-                {it.pref ? `• Preferência: ${it.pref}` : ""}
+                {(it.client?.phone ?? it.phone) || ""} {it.pref ? `• Preferência: ${it.pref}` : ""}
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <button
-                  className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700"
-                  onClick={onAgendar}
-                >
+                <button className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700" onClick={onAgendar}>
                   Agendar
                 </button>
               </div>
@@ -1009,56 +1164,26 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-gray-600">Data</label>
-          <input
-            type="date"
-            className="border rounded px-2 py-1.5 text-sm w-full"
-            value={formatDateInput(date)}
-            readOnly
-          />
+          <input type="date" className="border rounded px-2 py-1.5 text-sm w-full" value={formatDateInput(date)} readOnly />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-xs text-gray-600">Início</label>
-            <input
-              type="time"
-              className="border rounded px-2 py-1.5 text-sm w-full"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-            />
+            <input type="time" className="border rounded px-2 py-1.5 text-sm w-full" value={start} onChange={(e) => setStart(e.target.value)} />
           </div>
           <div>
             <label className="text-xs text-gray-600">Término</label>
-            <input
-              type="time"
-              className="border rounded px-2 py-1.5 text-sm w-full"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-            />
+            <input type="time" className="border rounded px-2 py-1.5 text-sm w-full" value={end} onChange={(e) => setEnd(e.target.value)} />
           </div>
         </div>
       </div>
       <div>
         <label className="text-xs text-gray-600">Motivo (opcional)</label>
-        <input
-          type="text"
-          className="border rounded px-2 py-1.5 text-sm w-full"
-          placeholder="Ex.: Reunião, almoço..."
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
+        <input type="text" className="border rounded px-2 py-1.5 text-sm w-full" placeholder="Ex.: Reunião, almoço..." value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black flex items-center gap-2"
-        >
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">Cancelar</button>
+        <button type="submit" className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           Confirmar bloqueio
         </button>
@@ -1066,5 +1191,3 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
     </form>
   );
 }
-
-export default Schedule;
