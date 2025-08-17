@@ -1,8 +1,5 @@
-import toast from 'react-hot-toast';
-import { CheckCircle2, Download, Edit3, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
-import api from '../services/api';
-import AdminLayout from '../components/layouts/AdminLayout';
-// ✅ ARQUIVO: src/pages/Schedule.jsx (corrigido)
+// src/pages/Schedule.jsx
+// ✅ Corrigido: imports deduplicados, cleanup de efeitos arrumado e sem AdminLayout aqui.
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
@@ -69,6 +66,7 @@ const Schedule = () => {
   const [openLegend, setOpenLegend] = useState(true);
 
   // slots & waitlist
+  the
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]); // ["07:00",...]
   const [waitlist, setWaitlist] = useState([]);
@@ -160,7 +158,6 @@ const Schedule = () => {
         setSlotsLoading(true);
 
         const baseParams = { date: toYMD(targetDate) };
-        // público espera staffId (conforme seus logs)
         if (proId) baseParams.staffId = proId;
 
         // 1ª tentativa: duration
@@ -229,11 +226,7 @@ const Schedule = () => {
       }
     })();
 
-    return (
-  <AdminLayout>
-) => ac.abort(
-  </AdminLayout>
-);
+    return () => ac.abort();
   }, [loadShared]);
 
   // 2) quando staff carregar, define profissional padrão
@@ -298,7 +291,6 @@ const Schedule = () => {
             .delete(`/agenda/blocks/${data.id}`)
             .then(() => {
               toast.success("Bloqueio removido.");
-              // refetch apenas de blocks
               const ac = new AbortController();
               fetchBlocks(ac.signal);
             })
@@ -324,7 +316,6 @@ const Schedule = () => {
     toast.promise(p, {
       loading: "Salvando agendamento...",
       success: () => {
-        // refetch apenas de appointments
         const ac = new AbortController();
         fetchAppointments(ac.signal);
         setIsModalOpen(false);
@@ -763,7 +754,9 @@ function ProfessionalsSelect({ value, onChange, options }) {
       <span className="hidden md:block text-sm text-gray-600">Profissionais:</span>
       <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
         {(options || []).map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
         ))}
       </select>
     </div>
@@ -887,7 +880,9 @@ function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick 
           ))}
         </div>
       )}
-      <div className="text-xs text-gray-500">Profissional: <span className="font-medium">{proId || "—"}</span></div>
+      <div className="text-xs text-gray-500">
+        Profissional: <span className="font-medium">{proId || "—"}</span>
+      </div>
     </div>
   );
 }
@@ -914,7 +909,11 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
       <div className="divide-y border rounded">
         {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
         {filtered.map((ev) => (
-          <button key={ev.id} onClick={() => onOpen?.(ev.id)} className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50">
+          <button
+            key={ev.id}
+            onClick={() => onOpen?.(ev.id)}
+            className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50"
+          >
             <div className="text-sm">
               <div className="font-medium">{ev.title}</div>
               <div className="text-gray-500">
@@ -998,10 +997,18 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
       </div>
       <div>
         <label className="text-xs text-gray-600">Motivo (opcional)</label>
-        <input type="text" className="border rounded px-2 py-1.5 text-sm w-full" placeholder="Ex.: Reunião, almoço..." value={reason} onChange={(e) => setReason(e.target.value)} />
+        <input
+          type="text"
+          className="border rounded px-2 py-1.5 text-sm w-full"
+          placeholder="Ex.: Reunião, almoço..."
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
       </div>
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">Cancelar</button>
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">
+          Cancelar
+        </button>
         <button type="submit" className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           Confirmar bloqueio
