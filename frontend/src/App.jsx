@@ -89,97 +89,68 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/agendar/:companyId" element={<BookingPage />} />
 
-            {/* --- Portal do Cliente --- */}
-            <Route
-              path="/portal"
-              element={
-                <ClientProtectedRoute>
-                  <ClientLayout />
-                </ClientProtectedRoute>
-              }
-            >
-              <Route index element={<ClientDashboardPage />} />
-              <Route path="agenda" element={<ClientDashboardPage />} />
-              <Route path="perfil" element={<ClientProfilePage />} />
-              <Route path="pacotes" element={<ClientPackagesPage />} />
-              <Route path="historico" element={<ClientHistoryPage />} />
-              <Route path="notificacoes" element={<ClientNoticesPage />} />
+            {/* --- Portal do Cliente (wrapper protegido) --- */}
+            <Route element={<ClientProtectedRoute />}>
+              <Route path="/portal" element={<ClientLayout />}>
+                <Route index element={<ClientDashboardPage />} />
+                <Route path="agenda" element={<ClientDashboardPage />} />
+                <Route path="perfil" element={<ClientProfilePage />} />
+                <Route path="pacotes" element={<ClientPackagesPage />} />
+                <Route path="historico" element={<ClientHistoryPage />} />
+                <Route path="notificacoes" element={<ClientNoticesPage />} />
+              </Route>
             </Route>
-            <Route
-              path="/portal/login/:companyId"
-              element={<ClientLoginPage />}
-            />
-            <Route
-              path="/portal/register/:companyId"
-              element={<ClientRegisterPage />}
-            />
+            <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
+            <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
 
-            {/* --- Painel Admin --- */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  {isMobile ? <MobileShell /> : <AdminLayout />}
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Dashboard />} />
-              <Route path="clients" element={<Clients />} />
-              <Route path="clients/new" element={<ClientForm />} />
-              <Route path="clients/:id/edit" element={<ClientForm />} />
-              <Route path="schedule" element={<Schedule />} />
-              <Route path="waitlist" element={<WaitlistPage />} />
-              <Route path="staff" element={<Staff />} />
-              <Route path="services" element={<Services />} />
-              <Route path="orders" element={<Orders />} />
-              <Route path="cashier" element={<Cashier />} />
-              <Route path="subscription" element={<SubscriptionPage />} />
-              <Route path="reports" element={<ReportsPage />} />
+            {/* --- Painel Admin (wrapper protegido) --- */}
+            <Route element={<ProtectedRoute />}>
+              {/* Aqui escolhemos o layout dinamicamente */}
               <Route
-                path="reports/birthdays"
-                element={<BirthdaysReportPage />}
-              />
-              <Route
-                path="reports/cashflow"
-                element={<CashflowReportPage />}
-              />
-              <Route path="goals" element={<GoalsPage />} />
-              <Route path="anamnesis" element={<AnamnesisPage />} />
-              <Route path="packages" element={<PackagesPage />} />
-              <Route path="products" element={<ProductsPage />} />
-              <Route path="categories" element={<CategoriesPage />} />
-              <Route path="brands" element={<BrandsPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="commissions" element={<CommissionsPage />} />
+                path="/dashboard"
+                element={isMobile ? <MobileShell /> : <AdminLayout />}
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="clients" element={<Clients />} />
+                <Route path="clients/new" element={<ClientForm />} />
+                <Route path="clients/:id/edit" element={<ClientForm />} />
+                <Route path="schedule" element={<Schedule />} />
+                <Route path="waitlist" element={<WaitlistPage />} />
+                <Route path="staff" element={<Staff />} />
+                <Route path="services" element={<Services />} />
+                <Route path="orders" element={<Orders />} />
+                <Route path="cashier" element={<Cashier />} />
+                <Route path="subscription" element={<SubscriptionPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="reports/birthdays" element={<BirthdaysReportPage />} />
+                <Route path="reports/cashflow" element={<CashflowReportPage />} />
+                <Route path="goals" element={<GoalsPage />} />
+                <Route path="anamnesis" element={<AnamnesisPage />} />
+                <Route path="packages" element={<PackagesPage />} />
+                <Route path="products" element={<ProductsPage />} />
+                <Route path="categories" element={<CategoriesPage />} />
+                <Route path="brands" element={<BrandsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="commissions" element={<CommissionsPage />} />
 
-              {/* --- Financeiro --- */}
-              <Route path="payables" element={<PayablesPage />} />
-              <Route path="receivables" element={<ReceivablesPage />} />
-              <Route
-                path="finance-categories"
-                element={<FinanceCategoriesPage />}
-              />
-              <Route path="suppliers" element={<SuppliersPage />} />
-              <Route path="payment-methods" element={<PaymentMethodsPage />} />
+                {/* Financeiro */}
+                <Route path="payables" element={<PayablesPage />} />
+                <Route path="receivables" element={<ReceivablesPage />} />
+                <Route path="finance-categories" element={<FinanceCategoriesPage />} />
+                <Route path="suppliers" element={<SuppliersPage />} />
+                <Route path="payment-methods" element={<PaymentMethodsPage />} />
+                {/* Configurações extras */}
+                <Route path="cancellation-reasons" element={<CancellationReasonsPage />} />
+                <Route path="client-origins" element={<ClientOriginsPage />} />
+              </Route>
 
-              {/* --- Configurações --- */}
+              {/* Ajuste Google OAuth: /settings direto também protegido */}
               <Route
-                path="cancellation-reasons"
-                element={<CancellationReasonsPage />}
-              />
-              <Route path="client-origins" element={<ClientOriginsPage />} />
-            </Route>
-
-            {/* --- Ajuste Google OAuth retorno /settings --- */}
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  {isMobile ? <MobileShell /> : <AdminLayout />}
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<SettingsPage />} />
+                path="/settings"
+                element={isMobile ? <MobileShell /> : <AdminLayout />}
+              >
+                <Route index element={<SettingsPage />} />
+              </Route>
             </Route>
           </Routes>
         </Suspense>
