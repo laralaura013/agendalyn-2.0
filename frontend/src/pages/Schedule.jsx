@@ -1,4 +1,3 @@
-// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
@@ -13,12 +12,17 @@ import {
   Filter,
   X,
   CheckCircle2,
+  CalendarDays,
+  Link2,
+  FileText,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import useAppShellMode from "../hooks/useAppShellMode";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
+import FloatingActions from "../components/mobile/FloatingActions";
 
 /**
  * Endpoints esperados:
@@ -39,6 +43,7 @@ const DEFAULT_SLOT_MINUTES = 30;
 
 export default function Schedule() {
   const { isMobile } = useAppShellMode();
+  const navigate = useNavigate();
 
   // estado principal
   const [events, setEvents] = useState([]);
@@ -69,6 +74,7 @@ export default function Schedule() {
   const [openLegend, setOpenLegend] = useState(true);
 
   // slots & waitlist
+  the: null
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]); // ["07:00", ...]
   const [waitlist, setWaitlist] = useState([]);
@@ -81,7 +87,8 @@ export default function Schedule() {
   const buildRangeParams = useCallback(
     (baseDate) => {
       const params = {};
-      if (view === "day") {
+      if (view === "day" || isMobile) {
+        // no mobile forçamos day (para o visual “app”)
         params.date = toYMD(baseDate);
       } else if (view === "week") {
         params.date_from = toYMD(startOfWeek(baseDate));
@@ -93,7 +100,7 @@ export default function Schedule() {
       if (selectedPro) params.professionalId = selectedPro;
       return params;
     },
-    [view, selectedPro]
+    [view, selectedPro, isMobile]
   );
 
   /** ------- LOADERS ------- */
@@ -249,7 +256,7 @@ export default function Schedule() {
     })();
 
     return () => ac.abort();
-  }, [view, date, selectedPro, fetchAppointments, fetchBlocks]);
+  }, [view, date, selectedPro, fetchAppointments, fetchBlocks, isMobile]);
 
   /** ------- HANDLERS ------- */
 
@@ -365,6 +372,17 @@ export default function Schedule() {
     setDate(d);
   };
 
+  const goPrevWeekMobile = () => {
+    const d = new Date(date);
+    d.setDate(d.getDate() - 7);
+    setDate(d);
+  };
+  const goNextWeekMobile = () => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + 7);
+    setDate(d);
+  };
+
   const pageTitle = useMemo(() => {
     const formatter =
       view === "month"
@@ -442,40 +460,27 @@ export default function Schedule() {
     // ====== LAYOUT MOBILE ======
     return (
       <div className="relative p-3 max-w-md mx-auto">
-        {/* Cabeçalho leve */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-[26px] font-bold leading-none">Agenda</h1>
-            <div className="text-sm text-gray-600">• hoje ▸</div>
-          </div>
+        {/* Esconde toolbar do react-big-calendar no mobile */}
+        <style>{`@media (max-width:767px){ .rbc-toolbar{display:none!important} }`}</style>
 
-          <div className="mt-2 flex items-center gap-2">
-            <button onClick={goPrev} className="px-2 py-1 border rounded hover:bg-gray-50" title="Anterior">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button onClick={goToday} className="px-3 py-1.5 border rounded hover:bg-gray-50">
-              Hoje
-            </button>
-            <button onClick={goNext} className="px-2 py-1 border rounded hover:bg-gray-50" title="Próximo">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            <div className="ml-auto">
-              <ProfessionalsSelect
-                value={selectedPro || ""}
-                onChange={setSelectedPro}
-                options={staff?.map((s) => ({ id: s.id, name: s.name })) || []}
-              />
-            </div>
+        {/* Cabeçalho estilo app (Mês/Ano + setas) */}
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={goPrevWeekMobile} className="px-2 py-1 border rounded hover:bg-gray-50" aria-label="Semana anterior">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="font-semibold text-lg capitalize">
+            {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date)}
           </div>
-
-          <div className="mt-2">
-            <ViewToggle value={view} onChange={setView} />
-          </div>
+          <button onClick={goNextWeekMobile} className="px-2 py-1 border rounded hover:bg-gray-50" aria-label="Próxima semana">
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Calendário */}
-        <div className="bg-white border rounded overflow-hidden">
+        {/* Tira de dias (Dom..Sáb) */}
+        <DayStrip date={date} onPick={(d) => setDate(d)} />
+
+        {/* Calendário (forçado "day") */}
+        <div className="bg-white border rounded overflow-hidden mt-2">
           {loading ? (
             <p className="text-sm text-gray-500 p-4">Carregando agenda...</p>
           ) : (
@@ -483,15 +488,15 @@ export default function Schedule() {
               events={combinedEvents}
               onSelectSlot={handleSelectSlot}
               onSelectEvent={handleSelectEvent}
-              view={view}
+              view="day"
               date={date}
-              onView={(v) => setView(v)}
+              onView={() => {}}
               onNavigate={(d) => setDate(d)}
             />
           )}
         </div>
 
-        {/* Ações rápidas (slots / lista / espera) */}
+        {/* Ações rápidas acima do FAB */}
         <div className="mt-3 grid grid-cols-3 gap-2">
           <button
             onClick={() => {
@@ -526,14 +531,54 @@ export default function Schedule() {
           </button>
         </div>
 
-        {/* FAB mobile */}
-        <button
-          onClick={openEmptyModal}
-          className="fixed bottom-24 right-6 bg-purple-600 text-white rounded-full p-3 shadow-lg hover:bg-purple-700"
-          title="Novo agendamento"
-        >
-          <PlusCircle size={28} />
-        </button>
+        {/* SpeedDial (FAB) */}
+        <FloatingActions
+          hideOn={[]} // mostrar também na schedule
+          actions={[
+            {
+              id: "agendar",
+              label: "Agendar horário",
+              icon: <CalendarDays className="w-5 h-5" />,
+              run: () => openEmptyModal(),
+            },
+            {
+              id: "link",
+              label: "Link de agendamento",
+              icon: <Link2 className="w-5 h-5" />,
+              run: async () => {
+                const url = `${window.location.origin}/agendar/`;
+                try {
+                  await navigator.clipboard.writeText(url);
+                  toast.success("Link copiado!");
+                } catch {
+                  toast.error("Não consegui copiar o link.");
+                }
+              },
+            },
+            {
+              id: "comanda",
+              label: "Abrir comanda",
+              icon: <FileText className="w-5 h-5" />,
+              run: () => navigate("/dashboard/orders"),
+            },
+            {
+              id: "espera",
+              label: "Lista de espera",
+              icon: <List className="w-5 h-5" />,
+              run: () => {
+                setOpenWaitlist(true);
+                const ac = new AbortController();
+                fetchWaitlist(ac.signal);
+              },
+            },
+            {
+              id: "bloquear",
+              label: "Bloquear horário",
+              icon: <Lock className="w-5 h-5" />,
+              run: () => setOpenBlockTime(true),
+            },
+          ]}
+        />
 
         {/* Modais */}
         {isModalOpen && (
@@ -628,7 +673,7 @@ export default function Schedule() {
     );
   }
 
-  // ====== LAYOUT DESKTOP (mantém sua estrutura) ======
+  // ====== LAYOUT DESKTOP ======
   return (
     <div className="relative p-4 max-w-7xl mx-auto">
       {/* toolbar */}
@@ -907,7 +952,7 @@ function formatDateInput(d) {
 function startOfWeek(d) {
   const copy = new Date(d);
   const day = copy.getDay();
-  const diff = (day + 6) % 7;
+  const diff = (day + 6) % 7; // segunda como primeiro dia
   copy.setDate(copy.getDate() - diff);
   copy.setHours(0, 0, 0, 0);
   return copy;
@@ -1068,7 +1113,9 @@ function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick 
           ))}
         </div>
       )}
-      <div className="text-xs text-gray-500">Profissional: <span className="font-medium">{proId || "—"}</span></div>
+      <div className="text-xs text-gray-500">
+        Profissional: <span className="font-medium">{proId || "—"}</span>
+      </div>
     </div>
   );
 }
@@ -1095,7 +1142,11 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
       <div className="divide-y border rounded">
         {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
         {filtered.map((ev) => (
-          <button key={ev.id} onClick={() => onOpen?.(ev.id)} className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50">
+          <button
+            key={ev.id}
+            onClick={() => onOpen?.(ev.id)}
+            className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50"
+          >
             <div className="text-sm">
               <div className="font-medium">{ev.title}</div>
               <div className="text-gray-500">
@@ -1179,15 +1230,74 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
       </div>
       <div>
         <label className="text-xs text-gray-600">Motivo (opcional)</label>
-        <input type="text" className="border rounded px-2 py-1.5 text-sm w-full" placeholder="Ex.: Reunião, almoço..." value={reason} onChange={(e) => setReason(e.target.value)} />
+        <input
+          type="text"
+          className="border rounded px-2 py-1.5 text-sm w-full"
+          placeholder="Ex.: Reunião, almoço..."
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
       </div>
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">Cancelar</button>
+        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">
+          Cancelar
+        </button>
         <button type="submit" className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           Confirmar bloqueio
         </button>
       </div>
     </form>
+  );
+}
+
+/* ======= Subcomponente: tira de dias (mobile) ======= */
+function DayStrip({ date, onPick }) {
+  // domingo como início da semana
+  const start = (() => {
+    const d = new Date(date);
+    const diff = d.getDay(); // 0..6 (domingo=0)
+    d.setDate(d.getDate() - diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+
+  const days = [...Array(7)].map((_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+
+  const wd = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+  const isSameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  return (
+    <div className="grid grid-cols-7 gap-1 mb-2">
+      {days.map((d, i) => {
+        const active = isSameDay(d, date);
+        return (
+          <button
+            key={i}
+            onClick={() => onPick(d)}
+            className={`flex flex-col items-center py-1 rounded-lg border ${
+              active ? "border-gray-300 bg-gray-100" : "border-transparent"
+            }`}
+          >
+            <span className="text-[11px] text-gray-500">{wd[i]}</span>
+            <span
+              className={`mt-0.5 inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-semibold ${
+                active ? "bg-[#0f2233] text-white" : "text-gray-900"
+              }`}
+            >
+              {new Intl.DateTimeFormat("pt-BR", { day: "numeric" }).format(d)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

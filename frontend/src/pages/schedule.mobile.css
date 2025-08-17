@@ -1,0 +1,105 @@
+/* src/pages/schedule.mobile.css */
+
+/* container do mobile */
+.agenda-mobile {
+  position: relative;
+  min-height: calc(100vh - 56px); /* deixa espaço para a bottom bar */
+  background: #fff;
+}
+
+/* cabeçalho (mês/ano + setas) */
+.agenda-mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.agenda-mobile-header .hdr-title {
+  font-weight: 600;
+  font-size: 18px;
+  text-transform: capitalize; /* "agosto 2025" */
+}
+
+.agenda-mobile-header .hdr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+/* tira de dias */
+.agenda-daystrip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 10px 10px 6px;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.daychip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid transparent;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.daychip .dow { font-size: 11px; }
+.daychip .dnum {
+  width: 28px; height: 28px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.daychip.active {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+}
+.daychip.active .dnum {
+  background: #0f2233;  /* tom escuro (bate com seu bottom atual) */
+  color: #fff;
+}
+
+/* área do calendário (day view) */
+.agenda-mobile-calendar {
+  padding: 6px 6px 90px; /* espaço para bottom + fab */
+}
+
+/* Esconde toolbar (react-big-calendar) no mobile */
+@media (max-width: 767px) {
+  .rbc-toolbar { display: none !important; }
+}
+
+/* FAB azul de novo agendamento */
+.agenda-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(76px + 16px); /* acima da bottom bar */
+  width: 62px; height: 62px;
+  border-radius: 999px;
+  border: none;
+  outline: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  background: #1976d2; /* azul do seu print */
+  color: #fff;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+}
+
+/* Ajustes rápidos do time grid (opcional) */
+.rbc-time-content { font-size: 12px; }
+.rbc-time-gutter .rbc-timeslot-group { min-height: 48px; }
