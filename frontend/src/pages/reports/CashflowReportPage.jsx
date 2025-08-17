@@ -1,5 +1,5 @@
 // frontend/src/pages/reports/CashflowReportPage.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { RefreshCw, Download, CalendarDays } from 'lucide-react';
@@ -14,6 +14,7 @@ const todayKey = () => {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 };
+
 const addDays = (dateStr, delta) => {
   const d = new Date(`${dateStr}T12:00:00`);
   d.setDate(d.getDate() + delta);
@@ -22,6 +23,7 @@ const addDays = (dateStr, delta) => {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 };
+
 const monthRange = (date = new Date()) => {
   const y = date.getFullYear();
   const m = date.getMonth();
@@ -30,6 +32,34 @@ const monthRange = (date = new Date()) => {
   const f = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
   const t = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`;
   return { f, t };
+};
+
+// --- Normalizadores defensivos ---
+const normalizeMethods = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.items)) return raw.items;
+  return [];
+};
+
+const normalizeCashflow = (raw) => {
+  const d = raw || {};
+  // dias pode vir como d.days, d.data, ou até já ser um array
+  const days =
+    Array.isArray(d.days) ? d.days :
+    Array.isArray(d.data) ? d.data :
+    (Array.isArray(d) ? d : []);
+  const totalsRaw = (d.totals && typeof d.totals === 'object') ? d.totals : {};
+  const income = Number(totalsRaw.income || 0);
+  const expense = Number(totalsRaw.expense || 0);
+  const net = ('net' in totalsRaw) ? Number(totalsRaw.net || 0) : (income - expense);
+  const closingBalance = Number(totalsRaw.closingBalance || 0);
+
+  return {
+    range: d.range ?? null,
+    openingBalance: Number(d.openingBalance || 0),
+    totals: { income, expense, net, closingBalance },
+    days: Array.isArray(days) ? days : [],
+  };
 };
 
 export default function CashflowReportPage() {
@@ -50,10 +80,14 @@ export default function CashflowReportPage() {
 
   const loadMethods = async () => {
     try {
-      const r = await api.get('/finance/payment-methods');
-      setMethods(r.data || []);
+      // força o back a devolver tudo (se for paginado)
+      const r = await api.get('/finance/payment-methods', {
+        params: { page: 1, pageSize: 999, sortBy: 'name', sortOrder: 'asc' },
+      });
+      setMethods(normalizeMethods(r.data));
     } catch (e) {
-      console.warn(e);
+      console.warn('payment-methods error:', e?.response?.data || e.message);
+      setMethods([]); // garante array
     }
   };
 
@@ -61,9 +95,12 @@ export default function CashflowReportPage() {
     setLoading(true);
     try {
       const r = await api.get('/reports/cashflow', { params: filters });
-      setData(r.data || { days: [], totals: {} });
+      setData(normalizeCashflow(r.data));
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Erro ao carregar fluxo de caixa.');
+      // ainda assim mantém shape válido pra evitar .map em não-array
+      setData({ range: null, openingBalance: 0, totals: { income: 0, expense: 0, net: 0, closingBalance: 0 }, days: [] });
+      console.error('cashflow error:', e);
     } finally {
       setLoading(false);
     }
@@ -88,9 +125,6 @@ export default function CashflowReportPage() {
 
   useEffect(() => {
     loadMethods();
-  }, []);
-
-  useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -125,6 +159,7 @@ export default function CashflowReportPage() {
   };
 
   const totals = data?.totals || { income: 0, expense: 0, net: 0, closingBalance: 0 };
+  const methodOptions = Array.isArray(methods) ? methods : [];
 
   return (
     <div className="space-y-6">
@@ -159,7 +194,7 @@ export default function CashflowReportPage() {
           <select name="paymentMethodId" value={filters.paymentMethodId} onChange={onChangeFilter}
                   className="border rounded px-2 py-2 w-full">
             <option value="">Todas</option>
-            {methods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            {methodOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </div>
         <div>
@@ -194,7 +229,9 @@ export default function CashflowReportPage() {
             }} className="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-2">
               <RefreshCw size={16} /> Limpar
             </button>
-            <button type="submit" className="px-3 py-2 bg-gray-900 text-white rounded hover:bg-black">Aplicar</button>
+            <button type="submit" className="px-3 py-2 bg-gray-900 text-white rounded hover:bg-black" disabled={loading}>
+              {loading ? 'Carregando…' : 'Aplicar'}
+            </button>
           </div>
         </div>
       </form>
@@ -222,7 +259,7 @@ export default function CashflowReportPage() {
       {/* Tabela por dia */}
       <div className="bg-white border rounded overflow-hidden">
         <div className="px-4 py-2 border-b flex justify-between items-center text-sm">
-          <span>{loading ? 'Carregando...' : `${data?.days?.length || 0} dia(s)`}</span>
+          <span>{loading ? 'Carregando...' : `${Array.isArray(data?.days) ? data.days.length : 0} dia(s)`}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -236,7 +273,7 @@ export default function CashflowReportPage() {
               </tr>
             </thead>
             <tbody>
-              {(data?.days || []).map((d) => (
+              {(Array.isArray(data?.days) ? data.days : []).map((d) => (
                 <tr key={d.date} className="border-t">
                   <td className="p-2">{new Date(`${d.date}T12:00:00`).toLocaleDateString()}</td>
                   <td className="p-2 text-right">{currency(d.income)}</td>
@@ -245,7 +282,7 @@ export default function CashflowReportPage() {
                   <td className="p-2 text-right font-medium">{currency(d.balance)}</td>
                 </tr>
               ))}
-              {!loading && (!data?.days || data.days.length === 0) && (
+              {!loading && (!Array.isArray(data?.days) || data.days.length === 0) && (
                 <tr><td colSpan="5" className="p-4 text-center text-gray-500">Sem movimentações no período.</td></tr>
               )}
             </tbody>
