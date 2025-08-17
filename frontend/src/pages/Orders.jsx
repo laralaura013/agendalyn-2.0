@@ -1,10 +1,9 @@
-import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
+import { CheckCircle, CheckCircle2, Download, Edit3, FileText, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Modal from '../components/dashboard/Modal';
 import OrderForm from '../components/forms/OrderForm';
 import api from '../services/api';
-import { FileText, CheckCircle, XCircle } from 'lucide-react';
 // import AdminLayout from '../components/layouts/AdminLayout'; // REMOVIDO
 
 const statusMap = {

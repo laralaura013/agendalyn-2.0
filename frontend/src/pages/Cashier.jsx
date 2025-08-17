@@ -1,6 +1,3 @@
-import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
-import toast from 'react-hot-toast';
-import AdminLayout from '../components/layouts/AdminLayout';
 // src/pages/Cashier.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
@@ -73,7 +70,6 @@ const Cashier = () => {
   const fetchCashierStatus = useCallback(async () => {
     setLoading(true);
     try {
-      // Backend pode estar montado com prefixo /api no api.js; aqui usamos só o path curto:
       const res = await api.get('/cashier/status');
       setView(normalizeStatus(res.data || {}));
     } catch (error) {
@@ -92,11 +88,7 @@ const Cashier = () => {
   useEffect(() => {
     const handler = () => fetchCashierStatus();
     window.addEventListener('cashier:refresh', handler);
-    return (
-  <AdminLayout>
-) => window.removeEventListener('cashier:refresh', handler
-  </AdminLayout>
-);
+    return () => window.removeEventListener('cashier:refresh', handler);
   }, [fetchCashierStatus]);
 
   const handleOpenCashier = async () => {
@@ -109,7 +101,6 @@ const Cashier = () => {
     try {
       const payload = { openingAmount: parseFloat(openingBalance) };
       const res = await api.post('/cashier/open', payload);
-      // Algumas versões retornam { cashier, status }. Em qualquer caso, refetch garante consistência.
       if (res?.data?.status) {
         setView(normalizeStatus(res.data.status));
       } else {
@@ -209,11 +200,7 @@ const Cashier = () => {
                 Saldo {view.openingBalance !== null ? 'do Caixa' : 'do Dia'}
               </p>
               <p className="text-2xl font-bold">
-                {fmtBRL(
-                  view.openingBalance !== null
-                    ? view.balance // legacy: opening + income - expense
-                    : view.balance // new: balance já vem calculado (income - expense)
-                )}
+                {fmtBRL(view.balance)}
               </p>
             </div>
           </div>

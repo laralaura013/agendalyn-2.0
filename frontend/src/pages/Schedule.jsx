@@ -1,5 +1,5 @@
-import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { CheckCircle2, Download, Edit3, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import api from '../services/api';
 import AdminLayout from '../components/layouts/AdminLayout';
 // ✅ ARQUIVO: src/pages/Schedule.jsx (corrigido)

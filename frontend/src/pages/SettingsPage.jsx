@@ -1,9 +1,8 @@
-import { Plus, Download, RefreshCw, CheckCircle2, XCircle, Edit3, Trash2 } from 'lucide-react';
 import AdminLayout from '../components/layouts/AdminLayout';
+import { CheckCircle2, Copy, Download, Edit3, Link, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import { Link, Copy } from 'lucide-react';
 import GoogleConnectButton from '../components/integrations/GoogleConnectButton';
 
 // Parse seguro do localStorage para evitar crash/tela branca
