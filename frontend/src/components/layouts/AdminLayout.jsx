@@ -1,7 +1,10 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, LogOut } from 'lucide-react';
 import Sidebar from '../dashboard/Sidebar';
+
+// Contexto para detectar renderização aninhada
+const LayoutContext = createContext(false);
 
 /** Título dinâmico por rota */
 function usePageTitle() {
@@ -50,6 +53,7 @@ function usePageTitle() {
 }
 
 export default function AdminLayout() {
+  const isNested = useContext(LayoutContext);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const title = usePageTitle();
@@ -66,53 +70,58 @@ export default function AdminLayout() {
     navigate('/portal/login/cmdep95530000pspaolfy7dod');
   }, [navigate]);
 
+  // Se o componente detectar que está dentro de outro AdminLayout,
+  // ele renderiza apenas o conteúdo para quebrar o loop.
+  if (isNested) {
+    return <Outlet />;
+  }
+
+  // Renderização normal do layout, com o provedor de contexto
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-gray-50">
-      {/* Overlay para fechar a sidebar no mobile */}
-      {isMobileMenuOpen && (
-        <button
-          aria-label="Fechar menu"
-          onClick={() => setIsMobileMenuOpen(false)}
-          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+    <LayoutContext.Provider value={true}>
+      <div className="flex h-screen w-full overflow-hidden bg-gray-50">
+        {/* Overlay para fechar a sidebar no mobile */}
+        {isMobileMenuOpen && (
+          <button
+            aria-label="Fechar menu"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          />
+        )}
+
+        <Sidebar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
         />
-      )}
 
-      {/* Sidebar fixa (desktop) / deslizante (mobile) */}
-      <Sidebar
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
-      />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6">
+            <button
+              onClick={() => setIsMobileMenuOpen((v) => !v)}
+              className="md:hidden text-gray-600"
+              aria-label="Abrir menu"
+            >
+              <Menu size={22} />
+            </button>
 
-      {/* Conteúdo */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Header único e fixo */}
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6">
-          <button
-            onClick={() => setIsMobileMenuOpen((v) => !v)}
-            className="md:hidden text-gray-600"
-            aria-label="Abrir menu"
-          >
-            <Menu size={22} />
-          </button>
+            <h1 className="truncate text-base sm:text-lg font-semibold text-gray-800">
+              {title}
+            </h1>
 
-          <h1 className="truncate text-base sm:text-lg font-semibold text-gray-800">
-            {title}
-          </h1>
+            <button
+              onClick={handleLogout}
+              className="flex items-center text-gray-600 hover:text-gray-800"
+            >
+              <LogOut size={18} className="mr-1" />
+              Sair
+            </button>
+          </header>
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center text-gray-600 hover:text-gray-800"
-          >
-            <LogOut size={18} className="mr-1" />
-            Sair
-          </button>
-        </header>
-
-        {/* Área das páginas: um único scroll vertical */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
             <Outlet />
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
+    </LayoutContext.Provider>
   );
 }
