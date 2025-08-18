@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, CheckCircle2, Download, Edit3, FileText, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
+import { FileText, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Modal from '../components/dashboard/Modal';
 import OrderForm from '../components/forms/OrderForm';
 import api from '../services/api';
-// // REMOVIDO
 
 const statusMap = {
   OPEN: { text: 'ABERTA', style: 'bg-yellow-100 text-yellow-800' },
@@ -19,8 +18,6 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
   };
 
   return (
-  
-
     <div className="bg-white p-5 rounded-2xl shadow hover:shadow-lg transition-all border flex flex-col justify-between">
       <div className="flex justify-between items-center mb-2">
         <h3 className="font-semibold text-lg">#{order.id.slice(0, 8)}</h3>
@@ -58,9 +55,7 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
         )}
       </div>
     </div>
-  
-  
-);
+  );
 };
 
 const Orders = () => {

@@ -2,6 +2,27 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, LogOut } from 'lucide-react';
 import Sidebar from '../dashboard/Sidebar';
+import MobileShell from '../mobile/MobileShell';
+
+/** Detecta viewport móvel (<= 767px) */
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener?.('change', onChange);
+    // fallback antigo
+    mq.addListener?.(onChange);
+    return () => {
+      mq.removeEventListener?.('change', onChange);
+      mq.removeListener?.(onChange);
+    };
+  }, []);
+  return isMobile;
+}
 
 /** Título dinâmico por rota */
 function usePageTitle() {
@@ -25,11 +46,11 @@ function usePageTitle() {
       { re: /^\/dashboard\/packages/, label: 'Pacotes' },
       { re: /^\/dashboard\/waitlist/, label: 'Lista de Espera' },
 
-      // Relatórios (ordem específica antes do genérico)
+      // Relatórios
       { re: /^\/dashboard\/reports\/birthdays/, label: 'Aniversariantes' },
       { re: /^\/dashboard\/reports/, label: 'Relatórios' },
 
-      // 🆕 Financeiro/Configurações Sprint 1
+      // Financeiro/Config Sprint 1
       { re: /^\/dashboard\/payables/, label: 'Contas a Pagar' },
       { re: /^\/dashboard\/receivables/, label: 'Contas a Receber' },
       { re: /^\/dashboard\/finance-categories/, label: 'Categorias Financeiras' },
@@ -41,7 +62,7 @@ function usePageTitle() {
       // Configurações
       { re: /^\/dashboard\/settings/, label: 'Configurações' },
 
-      // ✅ rota direta fora do /dashboard (usada no retorno do Google)
+      // rota direta fora do /dashboard
       { re: /^\/settings$/, label: 'Configurações' },
     ];
 
@@ -56,6 +77,7 @@ const AdminLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const title = usePageTitle();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     document.title = `${title} · Agendalyn`;
@@ -64,15 +86,24 @@ const AdminLayout = () => {
   const handleLogout = useCallback(() => {
     try {
       localStorage.removeItem('token');       // admin
-      localStorage.removeItem('clientToken'); // por segurança
+      localStorage.removeItem('clientToken'); // segurança
     } catch (_) {}
-    // Se seu fluxo de admin usa /login, mude aqui.
     navigate('/portal/login/cmdep95530000pspaolfy7dod');
   }, [navigate]);
 
+  /** 
+   * ✅ No MOBILE usamos o MobileShell:
+   * - Remove completamente header/“tarja/ícone roxo”
+   * - Garante BottomTabs e FAB central onde aplicável
+   */
+  if (isMobile) {
+    return <MobileShell />;
+  }
+
+  // ===== Desktop =====
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Overlay para fechar a sidebar no mobile */}
+      {/* Overlay para fechar a sidebar no mobile (não usado no desktop, mas mantido) */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-20 md:hidden"
@@ -88,7 +119,7 @@ const AdminLayout = () => {
 
       {/* Conteúdo principal */}
       <div className="flex-1 flex flex-col ml-0 md:ml-64">
-        {/* Header */}
+        {/* Header (apenas desktop) */}
         <header className="flex items-center justify-between bg-white border-b border-gray-200 h-16 px-4 sm:px-6">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

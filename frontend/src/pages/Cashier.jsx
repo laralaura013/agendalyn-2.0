@@ -1,4 +1,3 @@
-// src/pages/Cashier.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
@@ -14,7 +13,6 @@ const fmtBRL = (n) =>
 function normalizeStatus(data) {
   const isOpen = !!data?.isOpen;
 
-  // LEGADO (tem session)
   if (data?.session) {
     const opening = Number(data.session.openingBalance || 0);
     const income = (data.session.transactions || [])
@@ -38,7 +36,6 @@ function normalizeStatus(data) {
     };
   }
 
-  // NOVO (sem session, usa totalsToday)
   const t = data?.totalsToday || { income: 0, expense: 0, balance: 0 };
   const income = Number(t.income || 0);
   const expense = Number(t.expense || 0);
@@ -47,7 +44,7 @@ function normalizeStatus(data) {
   return {
     isOpen,
     mode: 'new',
-    openingBalance: null, // não disponível no endpoint novo
+    openingBalance: null,
     income,
     expense,
     balance,
@@ -58,8 +55,8 @@ function normalizeStatus(data) {
 const Cashier = () => {
   const [view, setView] = useState({
     isOpen: false,
-    mode: 'legacy',        // 'legacy' | 'new'
-    openingBalance: null,  // number | null
+    mode: 'legacy',
+    openingBalance: null,
     income: 0,
     expense: 0,
     balance: 0,
@@ -84,7 +81,6 @@ const Cashier = () => {
     fetchCashierStatus();
   }, [fetchCashierStatus]);
 
-  // Atualiza automaticamente quando Pagar/Receber dispararem o evento
   useEffect(() => {
     const handler = () => fetchCashierStatus();
     window.addEventListener('cashier:refresh', handler);
@@ -92,14 +88,21 @@ const Cashier = () => {
   }, [fetchCashierStatus]);
 
   const handleOpenCashier = async () => {
-    const openingBalance = prompt(
+    const initial = (view.openingBalance ?? 0);
+    const openingBalanceStr = prompt(
       'Digite o valor de abertura do caixa (fundo de troco):',
-      (view.openingBalance ?? 0).toFixed(2)
+      Number(initial).toFixed(2)
     );
-    if (openingBalance === null) return;
+    if (openingBalanceStr === null) return;
+
+    const opening = parseFloat(String(openingBalanceStr).replace(',', '.'));
+    if (Number.isNaN(opening)) {
+      alert('Valor inválido.');
+      return;
+    }
 
     try {
-      const payload = { openingAmount: parseFloat(openingBalance) };
+      const payload = { openingAmount: opening };
       const res = await api.post('/cashier/open', payload);
       if (res?.data?.status) {
         setView(normalizeStatus(res.data.status));
