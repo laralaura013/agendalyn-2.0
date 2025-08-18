@@ -1,3 +1,4 @@
+// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
@@ -74,7 +75,6 @@ export default function Schedule() {
   const [openLegend, setOpenLegend] = useState(true);
 
   // slots & waitlist
-  the: null
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]); // ["07:00", ...]
   const [waitlist, setWaitlist] = useState([]);
@@ -313,9 +313,7 @@ export default function Schedule() {
 
   const handleSave = async (payload) => {
     const isEditing = !!(selectedEvent && selectedEvent.id);
-    const p = isEditing
-      ? api.put(`/appointments/${selectedEvent.id}`, payload)
-      : api.post("/appointments", payload);
+    const p = isEditing ? api.put(`/appointments/${selectedEvent.id}`, payload) : api.post("/appointments", payload);
 
     toast.promise(p, {
       loading: "Salvando agendamento...",
@@ -454,6 +452,55 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
+  // Ações do Speed Dial (mobile + desktop)
+  const speedDialActions = useMemo(
+    () => [
+      {
+        id: "agendar",
+        label: "Agendar horário",
+        icon: <CalendarDays className="w-5 h-5" />,
+        run: () => openEmptyModal(),
+      },
+      {
+        id: "link",
+        label: "Link de agendamento",
+        icon: <Link2 className="w-5 h-5" />,
+        run: async () => {
+          const url = `${window.location.origin}/agendar/`;
+          try {
+            await navigator.clipboard.writeText(url);
+            toast.success("Link copiado!");
+          } catch {
+            toast.error("Não consegui copiar o link.");
+          }
+        },
+      },
+      {
+        id: "comanda",
+        label: "Abrir comanda",
+        icon: <FileText className="w-5 h-5" />,
+        run: () => navigate("/dashboard/orders"),
+      },
+      {
+        id: "espera",
+        label: "Lista de espera",
+        icon: <List className="w-5 h-5" />,
+        run: () => {
+          setOpenWaitlist(true);
+          const ac = new AbortController();
+          fetchWaitlist(ac.signal);
+        },
+      },
+      {
+        id: "bloquear",
+        label: "Bloquear horário",
+        icon: <Lock className="w-5 h-5" />,
+        run: () => setOpenBlockTime(true),
+      },
+    ],
+    [navigate, date, selectedPro, fetchWaitlist] // setStates são estáveis
+  );
+
   /** ------- RENDER ------- */
 
   if (isMobile) {
@@ -532,53 +579,7 @@ export default function Schedule() {
         </div>
 
         {/* SpeedDial (FAB) */}
-        <FloatingActions
-          hideOn={[]} // mostrar também na schedule
-          actions={[
-            {
-              id: "agendar",
-              label: "Agendar horário",
-              icon: <CalendarDays className="w-5 h-5" />,
-              run: () => openEmptyModal(),
-            },
-            {
-              id: "link",
-              label: "Link de agendamento",
-              icon: <Link2 className="w-5 h-5" />,
-              run: async () => {
-                const url = `${window.location.origin}/agendar/`;
-                try {
-                  await navigator.clipboard.writeText(url);
-                  toast.success("Link copiado!");
-                } catch {
-                  toast.error("Não consegui copiar o link.");
-                }
-              },
-            },
-            {
-              id: "comanda",
-              label: "Abrir comanda",
-              icon: <FileText className="w-5 h-5" />,
-              run: () => navigate("/dashboard/orders"),
-            },
-            {
-              id: "espera",
-              label: "Lista de espera",
-              icon: <List className="w-5 h-5" />,
-              run: () => {
-                setOpenWaitlist(true);
-                const ac = new AbortController();
-                fetchWaitlist(ac.signal);
-              },
-            },
-            {
-              id: "bloquear",
-              label: "Bloquear horário",
-              icon: <Lock className="w-5 h-5" />,
-              run: () => setOpenBlockTime(true),
-            },
-          ]}
-        />
+        <FloatingActions hideOn={[]} actions={speedDialActions} />
 
         {/* Modais */}
         {isModalOpen && (
@@ -839,13 +840,8 @@ export default function Schedule() {
         </aside>
       </div>
 
-      <button
-        onClick={openEmptyModal}
-        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition"
-        title="Novo agendamento"
-      >
-        <PlusCircle size={28} />
-      </button>
+      {/* sem botão roxo — usamos o SpeedDial também no desktop */}
+      <FloatingActions hideOn={[]} actions={speedDialActions} />
 
       {isModalOpen && (
         <AppointmentModal
@@ -980,11 +976,7 @@ function toYMD(dateObj) {
 /* ====== UI auxiliares (Accordion, etc.) ===== */
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
-    <select
-      className="border rounded px-2 py-1.5 text-sm"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
+    <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
       {(options || []).map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
@@ -1005,9 +997,7 @@ function ViewToggle({ value, onChange }) {
         <button
           key={opt.id}
           onClick={() => onChange(opt.id)}
-          className={`px-3 py-1.5 text-sm ${
-            value === opt.id ? "bg-purple-600 text-white" : "hover:bg-gray-50"
-          }`}
+          className={`px-3 py-1.5 text-sm ${value === opt.id ? "bg-gray-900 text-white" : "hover:bg-gray-50"}`}
         >
           {opt.label}
         </button>
@@ -1142,11 +1132,7 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
       <div className="divide-y border rounded">
         {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
         {filtered.map((ev) => (
-          <button
-            key={ev.id}
-            onClick={() => onOpen?.(ev.id)}
-            className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50"
-          >
+          <button key={ev.id} onClick={() => onOpen?.(ev.id)} className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50">
             <div className="text-sm">
               <div className="font-medium">{ev.title}</div>
               <div className="text-gray-500">
@@ -1271,9 +1257,7 @@ function DayStrip({ date, onPick }) {
   const wd = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   const isSameDay = (a, b) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
   return (
     <div className="grid grid-cols-7 gap-1 mb-2">
@@ -1283,9 +1267,7 @@ function DayStrip({ date, onPick }) {
           <button
             key={i}
             onClick={() => onPick(d)}
-            className={`flex flex-col items-center py-1 rounded-lg border ${
-              active ? "border-gray-300 bg-gray-100" : "border-transparent"
-            }`}
+            className={`flex flex-col items-center py-1 rounded-lg border ${active ? "border-gray-300 bg-gray-100" : "border-transparent"}`}
           >
             <span className="text-[11px] text-gray-500">{wd[i]}</span>
             <span
