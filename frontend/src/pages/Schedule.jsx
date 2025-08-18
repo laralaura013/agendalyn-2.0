@@ -459,11 +459,6 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  // ------- ESTRUTURA DE RENDERIZAÇÃO CORRIGIDA -------
-  // Envolvemos o retorno em um Fragmento <> para ter um elemento pai único.
-  // Primeiro, renderizamos o layout principal (mobile ou desktop).
-  // Depois, FORA dessa lógica, renderizamos a seção de modais.
-  // Assim, os modais são compartilhados e não duplicados.
   return (
     <>
       {isMobile ? (
@@ -471,7 +466,6 @@ export default function Schedule() {
         <div className="relative p-3 pb-[104px] max-w-md mx-auto">
           <style>{`@media (max-width:767px){ .rbc-toolbar{display:none!important} }`}</style>
           
-          {/* Cabeçalho estilo app */}
           <div className="flex items-center justify-between mb-2">
             <button onClick={goPrevWeekMobile} className="px-2 py-1 border rounded hover:bg-gray-50" aria-label="Semana anterior">
               <ChevronLeft className="w-4 h-4" />
@@ -640,92 +634,95 @@ export default function Schedule() {
               )}
             </div>
 
-            <aside className="col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 space-y-4">
-              <div className="flex items-start justify-between">
-                <label className="flex items-center gap-2 select-none">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={blockEnabled}
-                    onChange={(e) => setBlockEnabled(e.target.checked)}
-                  />
-                  <span className="text-sm font-medium">Bloquear horário</span>
-                </label>
-                <button
-                  onClick={() => setOpenBlockTime(true)}
-                  disabled={!blockEnabled}
-                  className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black disabled:opacity-40 flex items-center gap-2"
-                  title="Bloquear intervalo"
-                >
-                  <Lock className="w-4 h-4" /> Bloquear
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    className="border rounded px-2 py-1.5 text-sm w-full"
-                    value={formatDateInput(date)}
-                    onChange={(e) => {
-                      const d = e.target.value ? new Date(e.target.valueAsNumber) : new Date();
-                      setDate(d);
-                    }}
-                  />
-                  <button className="px-3 py-1.5 border rounded hover:bg-gray-50" onClick={goToday} title="Ir para hoje">
-                    Hoje
+            {/* A Barra Lateral Direita foi modificada aqui */}
+            <aside className="col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 flex flex-col">
+              <div className="overflow-y-auto space-y-4 pr-2">
+                <div className="flex items-start justify-between">
+                  <label className="flex items-center gap-2 select-none">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={blockEnabled}
+                      onChange={(e) => setBlockEnabled(e.target.checked)}
+                    />
+                    <span className="text-sm font-medium">Bloquear horário</span>
+                  </label>
+                  <button
+                    onClick={() => setOpenBlockTime(true)}
+                    disabled={!blockEnabled}
+                    className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black disabled:opacity-40 flex items-center gap-2"
+                    title="Bloquear intervalo"
+                  >
+                    <Lock className="w-4 h-4" /> Bloquear
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    onClick={() => {
-                      setOpenSlots(true);
-                      const ac = new AbortController();
-                      fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
-                    }}
-                    className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-                  >
-                    <CalendarIcon className="w-4 h-4" />
-                    Horários disponíveis
-                  </button>
-                  <button
-                    onClick={() => setOpenApptList(true)}
-                    className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-                  >
-                    <ClipboardList className="w-4 h-4" />
-                    Lista de Agendamentos
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOpenWaitlist(true);
-                      const ac = new AbortController();
-                      fetchWaitlist(ac.signal);
-                    }}
-                    className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
-                  >
-                    <List className="w-4 h-4" />
-                    Lista de Espera
-                  </button>
-                </div>
-              </div>
-
-              <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
                 <div className="space-y-2">
-                  <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
-                  <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
-                    {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
-                      <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
-                        <span>{item}</span>
-                        <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
-                      </div>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      className="border rounded px-2 py-1.5 text-sm w-full"
+                      value={formatDateInput(date)}
+                      onChange={(e) => {
+                        const d = e.target.value ? new Date(e.target.valueAsNumber) : new Date();
+                        setDate(d);
+                      }}
+                    />
+                    <button className="px-3 py-1.5 border rounded hover:bg-gray-50" onClick={goToday} title="Ir para hoje">
+                      Hoje
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    <button
+                      onClick={() => {
+                        setOpenSlots(true);
+                        const ac = new AbortController();
+                        fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
+                      }}
+                      className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+                    >
+                      <CalendarIcon className="w-4 h-4" />
+                      Horários disponíveis
+                    </button>
+                    <button
+                      onClick={() => setOpenApptList(true)}
+                      className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      Lista de Agendamentos
+                    </button>
+                    <button
+                      onClick={() => {
+                        setOpenWaitlist(true);
+                        const ac = new AbortController();
+                        fetchWaitlist(ac.signal);
+                      }}
+                      className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
+                    >
+                      <List className="w-4 h-4" />
+                      Lista de Espera
+                    </button>
                   </div>
                 </div>
-              </Accordion>
-              <Accordion title="Legenda" open={openLegend} onToggle={() => setOpenLegend((v) => !v)}>
-                <Legend />
-              </Accordion>
+
+                <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
+                  <div className="space-y-2">
+                    <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
+                    <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
+                      {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
+                        <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
+                          <span>{item}</span>
+                          <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Accordion>
+                <Accordion title="Legenda" open={openLegend} onToggle={() => setOpenLegend((v) => !v)}>
+                  <Legend />
+                </Accordion>
+              </div>
             </aside>
           </div>
 
@@ -740,7 +737,6 @@ export default function Schedule() {
       )}
 
       {/* ====== SEÇÃO DE MODAIS COMPARTILHADA ====== */}
-      {/* Estes componentes agora são renderizados fora da lógica mobile/desktop, evitando duplicação. */}
       {isModalOpen && (
         <AppointmentModal
           isOpen={isModalOpen}
