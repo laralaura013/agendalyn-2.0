@@ -1,138 +1,124 @@
-import React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import {
-  LayoutDashboard, Calendar, ClipboardList, Users, UserCog, Settings,
-  Package, Tag, ShoppingCart, Boxes, DollarSign, Wallet, CreditCard,
-  Landmark, Truck, FileBarChart, BarChart3, Target, ListChecks
-} from "lucide-react";
+import React, { useMemo, useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, LogOut } from 'lucide-react';
+import Sidebar from '../dashboard/Sidebar';
 
-/** Sidebar: fixo no desktop, drawer no mobile */
-export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
+// Contexto para detectar renderização aninhada
+const LayoutContext = createContext(false);
+
+/** Título dinâmico por rota */
+function usePageTitle() {
+  const { pathname } = useLocation();
+
+  const title = useMemo(() => {
+    const table = [
+      // Core
+      { re: /^\/dashboard$/, label: 'Dashboard' },
+      { re: /^\/dashboard\/schedule/, label: 'Agenda' },
+      { re: /^\/dashboard\/orders/, label: 'Comandas' },
+      { re: /^\/dashboard\/clients(\/|$)/, label: 'Clientes' },
+      { re: /^\/dashboard\/cashier/, label: 'Caixa' },
+
+      // Cadastros
+      { re: /^\/dashboard\/staff/, label: 'Colaboradores' },
+      { re: /^\/dashboard\/services/, label: 'Serviços' },
+      { re: /^\/dashboard\/products/, label: 'Produtos' },
+      { re: /^\/dashboard\/categories/, label: 'Categorias' },
+      { re: /^\/dashboard\/brands/, label: 'Marcas' },
+
+      // Outras áreas
+      { re: /^\/dashboard\/packages/, label: 'Pacotes' },
+      { re: /^\/dashboard\/anamnesis/, label: 'Anamneses' },
+      { re: /^\/dashboard\/waitlist/, label: 'Lista de Espera' },
+      { re: /^\/dashboard\/reports\/birthdays/, label: 'Aniversariantes' },
+      { re: /^\/dashboard\/reports/, label: 'Relatórios' },
+
+      // Financeiro
+      { re: /^\/dashboard\/payables/, label: 'Contas a Pagar' },
+      { re: /^\/dashboard\/receivables/, label: 'Contas a Receber' },
+      { re: /^\/dashboard\/finance-categories/, label: 'Categorias Financeiras' },
+      { re: /^\/dashboard\/suppliers/, label: 'Fornecedores' },
+      { re: /^\/dashboard\/payment-methods/, label: 'Formas de Pagamento' },
+
+      // Settings
+      { re: /^\/dashboard\/settings/, label: 'Configurações' },
+      { re: /^\/settings$/, label: 'Configurações' },
+    ];
+
+    const found = table.find((t) => t.re.test(pathname));
+    return found ? found.label : 'Dashboard';
+  }, [pathname]);
+
+  return title;
+}
+
+export default function AdminLayout() {
+  const isNested = useContext(LayoutContext);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const closeIfMobile = () => setIsMobileMenuOpen?.(false);
+  const title = usePageTitle();
 
-  const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition
-     ${isActive ? "bg-slate-800 text-white" : "text-slate-200 hover:bg-slate-800/60"}`;
+  useEffect(() => {
+    document.title = `${title} · Agendalyn`;
+  }, [title]);
 
-  const Section = ({ title, children }) => (
-    <div className="mt-4">
-      <div className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-        {title}
-      </div>
-      <div className="px-2 space-y-1">{children}</div>
-    </div>
-  );
+  const handleLogout = useCallback(() => {
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('clientToken');
+    } catch {}
+    navigate('/portal/login/cmdep95530000pspaolfy7dod');
+  }, [navigate]);
+
+  if (isNested) {
+    return <Outlet />;
+  }
 
   return (
-    <aside
-      className={[
-        "fixed inset-y-0 left-0 z-30 w-64",
-        "bg-slate-900 text-slate-100 border-r border-slate-800",
-        "transform transition-transform duration-200",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-        "md:translate-x-0"
-      ].join(" ")}
-      aria-label="Menu lateral"
-    >
-      {/* Brand */}
-      <div className="h-16 flex items-center px-4 border-b border-slate-800">
-        <button
-          onClick={() => { navigate("/dashboard"); closeIfMobile(); }}
-          className="flex items-center gap-2"
-          aria-label="Ir para Dashboard"
-        >
-          <div className="h-8 w-8 rounded-lg bg-purple-600" />
-          <span className="text-base font-bold text-white">Agendalyn</span>
-        </button>
+    <LayoutContext.Provider value={true}>
+      <div className="relative min-h-screen md:flex">
+        <Sidebar
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+        />
+
+        {/* CORREÇÃO FINAL: Adicionado md:ml-64 para empurrar o conteúdo */}
+        <div className="flex-1 flex flex-col md:ml-64">
+          <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 md:justify-end">
+            {/* Botão de menu só aparece no mobile */}
+            <button
+              onClick={() => setIsMobileMenuOpen((v) => !v)}
+              className="md:hidden text-gray-600"
+              aria-label="Abrir menu"
+            >
+              <Menu size={22} />
+            </button>
+            
+            {/* Título agora fica escondido no mobile e aparece no header */}
+            <h1 className="truncate text-base sm:text-lg font-semibold text-gray-800 md:hidden">
+              {title}
+            </h1>
+
+            <button
+              onClick={handleLogout}
+              className="flex items-center text-gray-600 hover:text-gray-800"
+            >
+              <LogOut size={18} className="mr-1" />
+              Sair
+            </button>
+          </header>
+
+          <main className="flex-1 overflow-y-auto bg-gray-50">
+             {/* Título da página para Desktop */}
+            <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6">
+                <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+            </div>
+            <div className="p-4 sm:p-6">
+                <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
-
-      {/* Navegação */}
-      <nav className="h-[calc(100vh-4rem)] overflow-y-auto py-3">
-        <Section title="Principal">
-          <NavLink to="/dashboard" className={linkClass} onClick={closeIfMobile}>
-            <LayoutDashboard size={18} /> Dashboard
-          </NavLink>
-          <NavLink to="/dashboard/schedule" className={linkClass} onClick={closeIfMobile}>
-            <Calendar size={18} /> Agenda
-          </NavLink>
-          <NavLink to="/dashboard/orders" className={linkClass} onClick={closeIfMobile}>
-            <ClipboardList size={18} /> Comandas
-          </NavLink>
-          <NavLink to="/dashboard/clients" className={linkClass} onClick={closeIfMobile}>
-            <Users size={18} /> Clientes
-          </NavLink>
-          <NavLink to="/dashboard/cashier" className={linkClass} onClick={closeIfMobile}>
-            <DollarSign size={18} /> Caixa
-          </NavLink>
-        </Section>
-
-        <Section title="Cadastros">
-          <NavLink to="/dashboard/staff" className={linkClass} onClick={closeIfMobile}>
-            <UserCog size={18} /> Colaboradores
-          </NavLink>
-          <NavLink to="/dashboard/services" className={linkClass} onClick={closeIfMobile}>
-            <ListChecks size={18} /> Serviços
-          </NavLink>
-          <NavLink to="/dashboard/products" className={linkClass} onClick={closeIfMobile}>
-            <ShoppingCart size={18} /> Produtos
-          </NavLink>
-          <NavLink to="/dashboard/categories" className={linkClass} onClick={closeIfMobile}>
-            <Tag size={18} /> Categorias
-          </NavLink>
-          <NavLink to="/dashboard/brands" className={linkClass} onClick={closeIfMobile}>
-            <Boxes size={18} /> Marcas
-          </NavLink>
-          <NavLink to="/dashboard/packages" className={linkClass} onClick={closeIfMobile}>
-            <Package size={18} /> Pacotes
-          </NavLink>
-          <NavLink to="/dashboard/anamnesis" className={linkClass} onClick={closeIfMobile}>
-            <ListChecks size={18} /> Anamneses
-          </NavLink>
-          <NavLink to="/dashboard/waitlist" className={linkClass} onClick={closeIfMobile}>
-            <Users size={18} /> Lista de Espera
-          </NavLink>
-        </Section>
-
-        <Section title="Financeiro">
-          <NavLink to="/dashboard/payables" className={linkClass} onClick={closeIfMobile}>
-            <Wallet size={18} /> Contas a Pagar
-          </NavLink>
-          <NavLink to="/dashboard/receivables" className={linkClass} onClick={closeIfMobile}>
-            <CreditCard size={18} /> Contas a Receber
-          </NavLink>
-          <NavLink to="/dashboard/finance-categories" className={linkClass} onClick={closeIfMobile}>
-            <Landmark size={18} /> Categorias Financeiras
-          </NavLink>
-          <NavLink to="/dashboard/suppliers" className={linkClass} onClick={closeIfMobile}>
-            <Truck size={18} /> Fornecedores
-          </NavLink>
-          <NavLink to="/dashboard/payment-methods" className={linkClass} onClick={closeIfMobile}>
-            <CreditCard size={18} /> Formas de Pagamento
-          </NavLink>
-        </Section>
-
-        <Section title="Relatórios">
-          <NavLink to="/dashboard/reports" className={linkClass} onClick={closeIfMobile}>
-            <FileBarChart size={18} /> Relatórios
-          </NavLink>
-          <NavLink to="/dashboard/reports/birthdays" className={linkClass} onClick={closeIfMobile}>
-            <BarChart3 size={18} /> Aniversariantes
-          </NavLink>
-          <NavLink to="/dashboard/reports/cashflow" className={linkClass} onClick={closeIfMobile}>
-            <BarChart3 size={18} /> Fluxo de Caixa
-          </NavLink>
-          <NavLink to="/dashboard/goals" className={linkClass} onClick={closeIfMobile}>
-            <Target size={18} /> Metas
-          </NavLink>
-        </Section>
-
-        <Section title="Configurações">
-          <NavLink to="/dashboard/settings" className={linkClass} onClick={closeIfMobile}>
-            <Settings size={18} /> Configurações
-          </NavLink>
-        </Section>
-      </nav>
-    </aside>
+    </LayoutContext.Provider>
   );
 }
