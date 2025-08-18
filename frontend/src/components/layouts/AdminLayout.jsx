@@ -108,11 +108,9 @@ export default function AdminLayout() {
           </button>
         </header>
 
-        {/* Área das páginas: um único scroll vertical, sem scroll horizontal */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6 py-6">
+        {/* Área das páginas: um único scroll vertical */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
             <Outlet />
-          </div>
         </main>
       </div>
     </div>

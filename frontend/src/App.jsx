@@ -53,7 +53,7 @@ import SettingsPage from "./pages/SettingsPage";
 import CommissionsPage from "./pages/CommissionsPage";
 import WaitlistPage from "./pages/WaitlistPage";
 
-// 🆕 Sprint 1 (Financeiro/Configurações/Relatório)
+// Financeiro e Configurações
 import PayablesPage from "./pages/finance/PayablesPage";
 import ReceivablesPage from "./pages/finance/ReceivablesPage";
 import FinanceCategoriesPage from "./pages/finance/FinanceCategoriesPage";
@@ -62,13 +62,15 @@ import PaymentMethodsPage from "./pages/finance/PaymentMethodsPage";
 import CancellationReasonsPage from "./pages/settings/CancellationReasonsPage";
 import ClientOriginsPage from "./pages/settings/ClientOriginsPage";
 import BirthdaysReportPage from "./pages/reports/BirthdaysReportPage";
-
-// 🆕 Relatório: Fluxo de Caixa
 import CashflowReportPage from "./pages/reports/CashflowReportPage";
 
-function App() {
+// Componente Wrapper para o Layout do Admin
+function AdminLayoutWrapper() {
   const { isMobile } = useAppShellMode();
+  return isMobile ? <MobileShell /> : <AdminLayout />;
+}
 
+function App() {
   return (
     <>
       <Toaster
@@ -89,7 +91,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/agendar/:companyId" element={<BookingPage />} />
 
-            {/* --- Portal do Cliente (wrapper protegido) --- */}
+            {/* --- Portal do Cliente --- */}
             <Route element={<ClientProtectedRoute />}>
               <Route path="/portal" element={<ClientLayout />}>
                 <Route index element={<ClientDashboardPage />} />
@@ -103,13 +105,9 @@ function App() {
             <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
             <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
 
-            {/* --- Painel Admin (wrapper protegido) --- */}
+            {/* --- Painel Admin (Estrutura Corrigida) --- */}
             <Route element={<ProtectedRoute />}>
-              {/* Layout dinâmico por device */}
-              <Route
-                path="/dashboard"
-                element={isMobile ? <MobileShell /> : <AdminLayout />}
-              >
+              <Route path="/dashboard" element={<AdminLayoutWrapper />}>
                 <Route index element={<Dashboard />} />
                 <Route path="clients" element={<Clients />} />
                 <Route path="clients/new" element={<ClientForm />} />
@@ -132,25 +130,18 @@ function App() {
                 <Route path="brands" element={<BrandsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="commissions" element={<CommissionsPage />} />
-
-                {/* Financeiro */}
                 <Route path="payables" element={<PayablesPage />} />
                 <Route path="receivables" element={<ReceivablesPage />} />
                 <Route path="finance-categories" element={<FinanceCategoriesPage />} />
                 <Route path="suppliers" element={<SuppliersPage />} />
                 <Route path="payment-methods" element={<PaymentMethodsPage />} />
-                {/* Configurações extras */}
                 <Route path="cancellation-reasons" element={<CancellationReasonsPage />} />
                 <Route path="client-origins" element={<ClientOriginsPage />} />
               </Route>
-
-              {/* Ajuste Google OAuth: /settings direto também protegido */}
-              <Route
-                path="/settings"
-                element={isMobile ? <MobileShell /> : <AdminLayout />}
-              >
-                <Route index element={<SettingsPage />} />
-              </Route>
+              {/* A rota /settings agora é parte do /dashboard */}
+               <Route path="/settings" element={<AdminLayoutWrapper />}>
+                  <Route index element={<SettingsPage />} />
+               </Route>
             </Route>
           </Routes>
         </Suspense>
