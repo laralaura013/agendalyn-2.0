@@ -14,8 +14,7 @@ function useIsMobile() {
     const mq = window.matchMedia('(max-width: 767px)');
     const onChange = () => setIsMobile(mq.matches);
     mq.addEventListener?.('change', onChange);
-    // fallback antigo
-    mq.addListener?.(onChange);
+    mq.addListener?.(onChange); // fallback
     return () => {
       mq.removeEventListener?.('change', onChange);
       mq.removeListener?.(onChange);
@@ -85,25 +84,21 @@ const AdminLayout = () => {
 
   const handleLogout = useCallback(() => {
     try {
-      localStorage.removeItem('token');       // admin
-      localStorage.removeItem('clientToken'); // segurança
+      localStorage.removeItem('token');
+      localStorage.removeItem('clientToken');
     } catch (_) {}
     navigate('/portal/login/cmdep95530000pspaolfy7dod');
   }, [navigate]);
 
-  /** 
-   * ✅ No MOBILE usamos o MobileShell:
-   * - Remove completamente header/“tarja/ícone roxo”
-   * - Garante BottomTabs e FAB central onde aplicável
-   */
+  /** MOBILE => MobileShell (sem header/“tarja”) */
   if (isMobile) {
     return <MobileShell />;
   }
 
-  // ===== Desktop =====
+  // DESKTOP
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Overlay para fechar a sidebar no mobile (não usado no desktop, mas mantido) */}
+      {/* Overlay para fechar a sidebar no mobile (mantido) */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-20 md:hidden"
@@ -119,7 +114,7 @@ const AdminLayout = () => {
 
       {/* Conteúdo principal */}
       <div className="flex-1 flex flex-col ml-0 md:ml-64">
-        {/* Header (apenas desktop) */}
+        {/* Header (desktop) */}
         <header className="flex items-center justify-between bg-white border-b border-gray-200 h-16 px-4 sm:px-6">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -141,9 +136,12 @@ const AdminLayout = () => {
           </button>
         </header>
 
-        {/* Área das rotas */}
+        {/* Área das rotas
+            👉 Removido o max-w fixo para usar LARGURA CHEIA no desktop.
+            Se quiser limitar em telas gigantes, use: xl:max-w-[1600px] 2xl:max-w-[1800px]
+        */}
         <main className="flex-1 overflow-y-auto py-6">
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="w-full px-4 sm:px-6 xl:px-8">
             <Outlet />
           </div>
         </main>
