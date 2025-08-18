@@ -14,34 +14,31 @@ function usePageTitle() {
       { re: /^\/dashboard\/schedule/, label: 'Agenda' },
       { re: /^\/dashboard\/orders/, label: 'Comandas' },
       { re: /^\/dashboard\/clients(\/|$)/, label: 'Clientes' },
+      { re: /^\/dashboard\/cashier/, label: 'Caixa' },
+
+      // Cadastros
       { re: /^\/dashboard\/staff/, label: 'Colaboradores' },
       { re: /^\/dashboard\/services/, label: 'Serviços' },
       { re: /^\/dashboard\/products/, label: 'Produtos' },
       { re: /^\/dashboard\/categories/, label: 'Categorias' },
       { re: /^\/dashboard\/brands/, label: 'Marcas' },
-      { re: /^\/dashboard\/cashier/, label: 'Caixa' },
-      { re: /^\/dashboard\/goals/, label: 'Metas' },
-      { re: /^\/dashboard\/anamnesis/, label: 'Anamneses' },
-      { re: /^\/dashboard\/packages/, label: 'Pacotes' },
-      { re: /^\/dashboard\/waitlist/, label: 'Lista de Espera' },
 
-      // Relatórios
+      // Outras áreas
+      { re: /^\/dashboard\/packages/, label: 'Pacotes' },
+      { re: /^\/dashboard\/anamnesis/, label: 'Anamneses' },
+      { re: /^\/dashboard\/waitlist/, label: 'Lista de Espera' },
       { re: /^\/dashboard\/reports\/birthdays/, label: 'Aniversariantes' },
       { re: /^\/dashboard\/reports/, label: 'Relatórios' },
 
-      // Financeiro/Configurações
+      // Financeiro
       { re: /^\/dashboard\/payables/, label: 'Contas a Pagar' },
       { re: /^\/dashboard\/receivables/, label: 'Contas a Receber' },
       { re: /^\/dashboard\/finance-categories/, label: 'Categorias Financeiras' },
       { re: /^\/dashboard\/suppliers/, label: 'Fornecedores' },
       { re: /^\/dashboard\/payment-methods/, label: 'Formas de Pagamento' },
-      { re: /^\/dashboard\/cancellation-reasons/, label: 'Motivos de Cancelamento' },
-      { re: /^\/dashboard\/client-origins/, label: 'Origens de Cliente' },
 
-      // Configurações
+      // Settings
       { re: /^\/dashboard\/settings/, label: 'Configurações' },
-
-      // rota direta fora do /dashboard (retorno Google)
       { re: /^\/settings$/, label: 'Configurações' },
     ];
 
@@ -52,7 +49,7 @@ function usePageTitle() {
   return title;
 }
 
-const AdminLayout = () => {
+export default function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const title = usePageTitle();
@@ -63,60 +60,61 @@ const AdminLayout = () => {
 
   const handleLogout = useCallback(() => {
     try {
-      localStorage.removeItem('token');       // admin
-      localStorage.removeItem('clientToken'); // segurança
-    } catch (_) {}
+      localStorage.removeItem('token');
+      localStorage.removeItem('clientToken');
+    } catch {}
     navigate('/portal/login/cmdep95530000pspaolfy7dod');
   }, [navigate]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
+    <div className="flex h-screen w-full overflow-hidden bg-gray-50">
       {/* Overlay para fechar a sidebar no mobile */}
       {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-20 md:hidden"
+        <button
+          aria-label="Fechar menu"
           onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
         />
       )}
 
-      {/* Sidebar fixa à esquerda */}
+      {/* Sidebar fixa (desktop) / deslizante (mobile) */}
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      {/* Conteúdo principal */}
-      <div className="flex-1 flex flex-col ml-0 md:ml-64 min-w-0">
-        {/* Header fixo (um só) */}
-        <header className="sticky top-0 z-10 flex items-center justify-between bg-white border-b border-gray-200 h-16 px-4 sm:px-6">
+      {/* Conteúdo */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Header único e fixo */}
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6">
           <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-gray-600 focus:outline-none md:hidden"
+            onClick={() => setIsMobileMenuOpen((v) => !v)}
+            className="md:hidden text-gray-600"
             aria-label="Abrir menu"
           >
-            <Menu size={24} />
+            <Menu size={22} />
           </button>
 
-          <h1 className="text-lg sm:text-xl font-semibold text-gray-800 truncate">{title}</h1>
+          <h1 className="truncate text-base sm:text-lg font-semibold text-gray-800">
+            {title}
+          </h1>
 
           <button
             onClick={handleLogout}
             className="flex items-center text-gray-600 hover:text-gray-800"
           >
-            <LogOut size={20} className="mr-1" /> Sair
+            <LogOut size={18} className="mr-1" />
+            Sair
           </button>
         </header>
 
-        {/* Área das rotas */}
-        <main className="flex-1 overflow-y-auto">
-          {/* Container centralizado e largo; sem overflow-x */}
-          <div className="w-full max-w-[1500px] mx-auto px-4 lg:px-6 2xl:px-8 py-6">
+        {/* Área das páginas: um único scroll vertical, sem scroll horizontal */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6 py-6">
             <Outlet />
           </div>
         </main>
       </div>
     </div>
   );
-};
-
-export default AdminLayout;
+}

@@ -24,20 +24,19 @@ import {
 } from "lucide-react";
 
 /**
- * Sidebar fixo no desktop (w-64) e drawer no mobile.
- * - COMPATÍVEL com AdminLayout que usa md:ml-64 no conteúdo.
- * - Tema escuro.
+ * Sidebar:
+ * - No MOBILE: drawer fixo (abre/fecha com translate-x)
+ * - No DESKTOP: coluna estática (sem position: fixed) — evita scroll duplicado
  */
-export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
+export default function Sidebar({ isMobileMenuOpen = false, setIsMobileMenuOpen = () => {} }) {
   const navigate = useNavigate();
-
-  const closeIfMobile = () => setIsMobileMenuOpen?.(false);
+  const closeIfMobile = () => setIsMobileMenuOpen(false);
 
   const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition
-     ${isActive
-       ? "bg-slate-800 text-white"
-       : "text-slate-200 hover:bg-slate-800/60"}`;
+    [
+      "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition",
+      isActive ? "bg-white/10 text-white font-semibold" : "text-slate-200 hover:bg-white/10",
+    ].join(" ");
 
   const Section = ({ title, children }) => (
     <div className="mt-4">
@@ -50,20 +49,19 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
 
   return (
     <aside
-      className={[
-        // base drawer
-        "fixed inset-y-0 left-0 z-30 w-64",
-        "bg-slate-900 text-slate-100 border-r border-slate-800",
-        "transform transition-transform duration-200",
-        // mobile abre/fecha
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-        // desktop sempre visível e fixo
-        "md:translate-x-0",
-      ].join(" ")}
       aria-label="Menu lateral"
+      className={[
+        // base visual
+        "bg-[#0b1324] text-white w-64 shrink-0 border-r border-white/10",
+        // MOBILE: drawer
+        "fixed inset-y-0 left-0 z-40 transform transition-transform duration-200",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+        // DESKTOP: coluna estática (sem fixed)
+        "md:static md:translate-x-0 md:transform-none",
+      ].join(" ")}
     >
-      {/* Brand / cabeçalho */}
-      <div className="h-16 flex items-center px-4 border-b border-slate-800">
+      {/* Brand */}
+      <div className="h-16 flex items-center px-4 border-b border-white/10">
         <button
           onClick={() => {
             navigate("/dashboard");
@@ -73,30 +71,26 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
           aria-label="Ir para Dashboard"
         >
           <div className="h-8 w-8 rounded-lg bg-purple-600" />
-          <span className="text-base font-bold text-white">Agendalyn</span>
+          <span className="text-base font-bold">Agendalyn</span>
         </button>
       </div>
 
-      {/* Navegação */}
-      <nav className="h-[calc(100vh-4rem)] overflow-y-auto py-3">
+      {/* Navegação: rola só aqui dentro */}
+      <nav className="h-[calc(100vh-64px)] overflow-y-auto py-3">
         {/* PRINCIPAL */}
         <Section title="Principal">
           <NavLink to="/dashboard" className={linkClass} onClick={closeIfMobile}>
             <LayoutDashboard size={18} /> Dashboard
           </NavLink>
-
           <NavLink to="/dashboard/schedule" className={linkClass} onClick={closeIfMobile}>
             <Calendar size={18} /> Agenda
           </NavLink>
-
           <NavLink to="/dashboard/orders" className={linkClass} onClick={closeIfMobile}>
             <ClipboardList size={18} /> Comandas
           </NavLink>
-
           <NavLink to="/dashboard/clients" className={linkClass} onClick={closeIfMobile}>
             <Users size={18} /> Clientes
           </NavLink>
-
           <NavLink to="/dashboard/cashier" className={linkClass} onClick={closeIfMobile}>
             <DollarSign size={18} /> Caixa
           </NavLink>
@@ -107,31 +101,24 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
           <NavLink to="/dashboard/staff" className={linkClass} onClick={closeIfMobile}>
             <UserCog size={18} /> Colaboradores
           </NavLink>
-
           <NavLink to="/dashboard/services" className={linkClass} onClick={closeIfMobile}>
             <ListChecks size={18} /> Serviços
           </NavLink>
-
           <NavLink to="/dashboard/products" className={linkClass} onClick={closeIfMobile}>
             <ShoppingCart size={18} /> Produtos
           </NavLink>
-
           <NavLink to="/dashboard/categories" className={linkClass} onClick={closeIfMobile}>
             <Tag size={18} /> Categorias
           </NavLink>
-
           <NavLink to="/dashboard/brands" className={linkClass} onClick={closeIfMobile}>
             <Boxes size={18} /> Marcas
           </NavLink>
-
           <NavLink to="/dashboard/packages" className={linkClass} onClick={closeIfMobile}>
             <Package size={18} /> Pacotes
           </NavLink>
-
           <NavLink to="/dashboard/anamnesis" className={linkClass} onClick={closeIfMobile}>
             <ListChecks size={18} /> Anamneses
           </NavLink>
-
           <NavLink to="/dashboard/waitlist" className={linkClass} onClick={closeIfMobile}>
             <Users size={18} /> Lista de Espera
           </NavLink>
@@ -142,19 +129,15 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
           <NavLink to="/dashboard/payables" className={linkClass} onClick={closeIfMobile}>
             <Wallet size={18} /> Contas a Pagar
           </NavLink>
-
           <NavLink to="/dashboard/receivables" className={linkClass} onClick={closeIfMobile}>
             <CreditCard size={18} /> Contas a Receber
           </NavLink>
-
           <NavLink to="/dashboard/finance-categories" className={linkClass} onClick={closeIfMobile}>
             <Landmark size={18} /> Categorias Financeiras
           </NavLink>
-
           <NavLink to="/dashboard/suppliers" className={linkClass} onClick={closeIfMobile}>
             <Truck size={18} /> Fornecedores
           </NavLink>
-
           <NavLink to="/dashboard/payment-methods" className={linkClass} onClick={closeIfMobile}>
             <CreditCard size={18} /> Formas de Pagamento
           </NavLink>
@@ -165,15 +148,12 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
           <NavLink to="/dashboard/reports" className={linkClass} onClick={closeIfMobile}>
             <FileBarChart size={18} /> Relatórios
           </NavLink>
-
           <NavLink to="/dashboard/reports/birthdays" className={linkClass} onClick={closeIfMobile}>
             <BarChart3 size={18} /> Aniversariantes
           </NavLink>
-
           <NavLink to="/dashboard/reports/cashflow" className={linkClass} onClick={closeIfMobile}>
             <BarChart3 size={18} /> Fluxo de Caixa
           </NavLink>
-
           <NavLink to="/dashboard/goals" className={linkClass} onClick={closeIfMobile}>
             <Target size={18} /> Metas
           </NavLink>
