@@ -25,10 +25,46 @@ import AppointmentModal from "../components/schedule/AppointmentModal";
 import FloatingActions from "../components/mobile/FloatingActions";
 import BottomTabs from "../components/mobile/BottomTabs";
 
-/**
- * Endpoints esperados…
- */
 const DEFAULT_SLOT_MINUTES = 30;
+
+// Funções auxiliares movidas para o topo para melhor organização
+function isAbort(err) {
+  return err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled";
+}
+function formatDateInput(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function startOfWeek(d) {
+  const copy = new Date(d);
+  const day = copy.getDay();
+  const diff = (day + 6) % 7; // Ajuste para a semana começar na segunda-feira, se necessário
+  copy.setDate(copy.getDate() - diff);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+function endOfWeek(d) {
+  const s = startOfWeek(d);
+  const e = new Date(s);
+  e.setDate(s.getDate() + 6);
+  e.setHours(23, 59, 59, 999);
+  return e;
+}
+function startOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
+function endOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+function toYMD(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 
 export default function Schedule() {
   const { isMobile } = useAppShellMode();
@@ -194,7 +230,7 @@ export default function Schedule() {
     }
   }, []);
 
-  // efeitos
+  // Efeitos
   useEffect(() => {
     if (loadedOnceRef.current) return;
     loadedOnceRef.current = true;
@@ -234,7 +270,7 @@ export default function Schedule() {
     return () => ac.abort();
   }, [view, date, selectedPro, fetchAppointments, fetchBlocks, isMobile]);
 
-  // handlers
+  // Handlers
   const handleSelectSlot = useCallback(
     (slotInfo) => {
       const { start, end } = slotInfo;
@@ -423,377 +459,288 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  /** ------- RENDER ------- */
-  if (isMobile) {
-    return (
-      <div className="relative p-3 pb-[104px] max-w-md mx-auto">
-        <style>{`@media (max-width:767px){ .rbc-toolbar{display:none!important} }`}</style>
-
-        {/* Cabeçalho estilo app */}
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={goPrevWeekMobile} className="px-2 py-1 border rounded hover:bg-gray-50" aria-label="Semana anterior">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <div className="font-semibold text-lg capitalize">
-            {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date)}
-          </div>
-          <button onClick={goNextWeekMobile} className="px-2 py-1 border rounded hover:bg-gray-50" aria-label="Próxima semana">
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        <DayStrip date={date} onPick={(d) => setDate(d)} />
-
-        <div className="bg-white border rounded overflow-hidden mt-2">
-          {loading ? (
-            <p className="text-sm text-gray-500 p-4">Carregando agenda...</p>
-          ) : (
-            <Calendar
-              events={combinedEvents}
-              onSelectSlot={handleSelectSlot}
-              onSelectEvent={handleSelectEvent}
-              view="day"
-              date={date}
-              onView={() => {}}
-              onNavigate={(d) => setDate(d)}
-            />
-          )}
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <button
-            onClick={() => {
-              setOpenSlots(true);
-              const ac = new AbortController();
-              fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
-            }}
-            className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-          >
-            <CalendarIcon className="w-4 h-4" />
-            Horários
-          </button>
-
-          <button
-            onClick={() => setOpenApptList(true)}
-            className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-          >
-            <ClipboardList className="w-4 h-4" />
-            Agendamentos
-          </button>
-
-          <button
-            onClick={() => {
-              setOpenWaitlist(true);
-              const ac = new AbortController();
-              fetchWaitlist(ac.signal);
-            }}
-            className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-          >
-            <List className="w-4 h-4" />
-            Espera
-          </button>
-        </div>
-
-        <FloatingActions
-          hideOn={[]}
-          actions={[
-            { id: "agendar", label: "Agendar horário", icon: <CalendarDays className="w-5 h-5" />, run: () => openEmptyModal() },
-            {
-              id: "link",
-              label: "Link de agendamento",
-              icon: <Link2 className="w-5 h-5" />,
-              run: async () => {
-                const url = `${window.location.origin}/agendar/`;
-                try {
-                  await navigator.clipboard.writeText(url);
-                  toast.success("Link copiado!");
-                } catch {
-                  toast.error("Não consegui copiar o link.");
-                }
-              },
-            },
-            { id: "comanda", label: "Abrir comanda", icon: <FileText className="w-5 h-5" />, run: () => navigate("/dashboard/orders") },
-            {
-              id: "espera",
-              label: "Lista de espera",
-              icon: <List className="w-5 h-5" />,
-              run: () => {
-                setOpenWaitlist(true);
-                const ac = new AbortController();
-                fetchWaitlist(ac.signal);
-              },
-            },
-            { id: "bloquear", label: "Bloquear horário", icon: <Lock className="w-5 h-5" />, run: () => setOpenBlockTime(true) },
-          ]}
-        />
-
-        {/* Modais e drawers */}
-        {isModalOpen && (
-          <AppointmentModal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            event={selectedEvent}
-            slot={selectedSlot}
-            clients={clients}
-            services={services}
-            staff={staff}
-            onSave={handleSave}
-            onDelete={handleDelete}
-            fetchAppointments={(...args) => {
-              const ac = new AbortController();
-              fetchAppointments(ac.signal, ...args);
-            }}
-          />
-        )}
-
-        {openSlots && (
-          <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
-            <SlotsModalContent
-              date={date}
-              proId={selectedPro}
-              loading={slotsLoading}
-              slots={availableSlots}
-              onReload={() => {
-                const ac = new AbortController();
-                fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
-              }}
-              onPick={handlePickAvailableSlot}
-            />
-          </BaseModal>
-        )}
-
-        {openApptList && (
-          <SideDrawer title="Agendamentos" onClose={() => setOpenApptList(false)}>
-            <AppointmentsListContent
-              events={events}
-              onOpen={handleOpenEventFromList}
-              onRefresh={() => {
-                const ac = new AbortController();
-                fetchAppointments(ac.signal);
-              }}
-            />
-          </SideDrawer>
-        )}
-
-        {openWaitlist && (
-          <SideDrawer title="Lista de Espera" onClose={() => setOpenWaitlist(false)}>
-            <WaitlistContent
-              items={waitlist}
-              loading={waitlistLoading}
-              onRefresh={() => {
-                const ac = new AbortController();
-                fetchWaitlist(ac.signal);
-              }}
-              onAgendar={handleWaitlistAgendar}
-            />
-          </SideDrawer>
-        )}
-
-        {openBlockTime && (
-          <BaseModal onClose={() => setOpenBlockTime(false)} title="Bloquear horário">
-            <BlockTimeForm
-              date={date}
-              proId={selectedPro}
-              onCancel={() => setOpenBlockTime(false)}
-              onSubmit={async (payload) => {
-                try {
-                  await api.post("/agenda/blocks", {
-                    professionalId: payload.professionalId || null,
-                    date: payload.date,
-                    startTime: payload.start,
-                    endTime: payload.end,
-                    reason: payload.reason || "",
-                  });
-                  toast.success("Bloqueio criado com sucesso!");
-                  setOpenBlockTime(false);
-                  const ac = new AbortController();
-                  fetchBlocks(ac.signal);
-                } catch (err) {
-                  console.error(err);
-                  toast.error("Erro ao criar bloqueio.");
-                }
-              }}
-            />
-          </BaseModal>
-        )}
-
-        <BottomTabs area="admin" />
-      </div>
-    );
-  }
-
-  // ====== LAYOUT DESKTOP (FULL-WIDTH) ======
+  // ------- ESTRUTURA DE RENDERIZAÇÃO CORRIGIDA -------
+  // Envolvemos o retorno em um Fragmento <> para ter um elemento pai único.
+  // Primeiro, renderizamos o layout principal (mobile ou desktop).
+  // Depois, FORA dessa lógica, renderizamos a seção de modais.
+  // Assim, os modais são compartilhados e não duplicados.
   return (
-    <div className="relative w-full p-4 xl:p-6">
-      {/* toolbar */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <ProfessionalsSelect
-            value={selectedPro || ""}
-            onChange={setSelectedPro}
-            options={staff?.map((s) => ({ id: s.id, name: s.name })) || []}
-          />
-          <div className="flex items-center gap-1">
-            <button onClick={goPrev} className="px-2 py-1.5 border rounded hover:bg-gray-50" title="Anterior">
+    <>
+      {isMobile ? (
+        // ====== LAYOUT MOBILE ======
+        <div className="relative p-3 pb-[104px] max-w-md mx-auto">
+          <style>{`@media (max-width:767px){ .rbc-toolbar{display:none!important} }`}</style>
+          
+          {/* Cabeçalho estilo app */}
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={goPrevWeekMobile} className="px-2 py-1 border rounded hover:bg-gray-50" aria-label="Semana anterior">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button onClick={goToday} className="px-3 py-1.5 border rounded hover:bg-gray-50">
-              Hoje
-            </button>
-            <button onClick={goNext} className="px-2 py-1.5 border rounded hover:bg-gray-50" title="Próximo">
+            <div className="font-semibold text-lg capitalize">
+              {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date)}
+            </div>
+            <button onClick={goNextWeekMobile} className="px-2 py-1 border rounded hover:bg-gray-50" aria-label="Próxima semana">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <ViewToggle value={view} onChange={setView} />
-          <button
-            onClick={() => {
-              setOpenSlots(true);
-              const ac = new AbortController();
-              fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
-            }}
-            className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center gap-2"
-            title="Horários disponíveis"
-          >
-            <CalendarIcon className="w-4 h-4" />
-            Horários
-          </button>
-          <button
-            onClick={openEmptyModal}
-            className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
-          >
-            <PlusCircle className="w-4 h-4" />
-            Encaixe
-          </button>
-        </div>
-      </div>
+          <DayStrip date={date} onPick={(d) => setDate(d)} />
 
-      {/* header data */}
-      <div className="w-full bg-white border rounded px-4 py-2 text-sm md:text-base flex items-center justify-between mb-4">
-        <span className="font-medium capitalize">{pageTitle}</span>
-        <span className="text-gray-500">{staff?.find((p) => p.id === selectedPro)?.name ?? ""}</span>
-      </div>
-
-      {/* grade 12 col — agenda ocupa 9–10, aside 3–2 (preenche a largura) */}
-      <div className="grid grid-cols-12 gap-4 min-h-[70vh]">
-        <div className="col-span-12 xl:col-span-9 2xl:col-span-10 bg-white border rounded overflow-hidden">
-          {loading ? (
-            <p className="text-sm text-gray-500 p-4">Carregando dados da agenda...</p>
-          ) : (
-            <Calendar
-              events={combinedEvents}
-              onSelectSlot={handleSelectSlot}
-              onSelectEvent={handleSelectEvent}
-              view={view}
-              date={date}
-              onView={(v) => setView(v)}
-              onNavigate={(d) => setDate(d)}
-            />
-          )}
-        </div>
-
-        <aside className="col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 space-y-4">
-          <div className="flex items-start justify-between">
-            <label className="flex items-center gap-2 select-none">
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={blockEnabled}
-                onChange={(e) => setBlockEnabled(e.target.checked)}
+          <div className="bg-white border rounded overflow-hidden mt-2">
+            {loading ? (
+              <p className="text-sm text-gray-500 p-4">Carregando agenda...</p>
+            ) : (
+              <Calendar
+                events={combinedEvents}
+                onSelectSlot={handleSelectSlot}
+                onSelectEvent={handleSelectEvent}
+                view="day"
+                date={date}
+                onView={() => {}}
+                onNavigate={(d) => setDate(d)}
               />
-              <span className="text-sm font-medium">Bloquear horário</span>
-            </label>
+            )}
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
             <button
-              onClick={() => setOpenBlockTime(true)}
-              disabled={!blockEnabled}
-              className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black disabled:opacity-40 flex items-center gap-2"
-              title="Bloquear intervalo"
+              onClick={() => {
+                setOpenSlots(true);
+                const ac = new AbortController();
+                fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
+              }}
+              className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
             >
-              <Lock className="w-4 h-4" /> Bloquear
+              <CalendarIcon className="w-4 h-4" />
+              Horários
+            </button>
+            <button
+              onClick={() => setOpenApptList(true)}
+              className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+            >
+              <ClipboardList className="w-4 h-4" />
+              Agendamentos
+            </button>
+            <button
+              onClick={() => {
+                setOpenWaitlist(true);
+                const ac = new AbortController();
+                fetchWaitlist(ac.signal);
+              }}
+              className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+            >
+              <List className="w-4 h-4" />
+              Espera
             </button>
           </div>
 
-          <div className="space-y-2">
+          <FloatingActions
+            hideOn={[]}
+            actions={[
+              { id: "agendar", label: "Agendar horário", icon: <CalendarDays className="w-5 h-5" />, run: () => openEmptyModal() },
+              {
+                id: "link",
+                label: "Link de agendamento",
+                icon: <Link2 className="w-5 h-5" />,
+                run: async () => {
+                  const url = `${window.location.origin}/agendar/`;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    toast.success("Link copiado!");
+                  } catch {
+                    toast.error("Não consegui copiar o link.");
+                  }
+                },
+              },
+              { id: "comanda", label: "Abrir comanda", icon: <FileText className="w-5 h-5" />, run: () => navigate("/dashboard/orders") },
+              {
+                id: "espera",
+                label: "Lista de espera",
+                icon: <List className="w-5 h-5" />,
+                run: () => {
+                  setOpenWaitlist(true);
+                  const ac = new AbortController();
+                  fetchWaitlist(ac.signal);
+                },
+              },
+              { id: "bloquear", label: "Bloquear horário", icon: <Lock className="w-5 h-5" />, run: () => setOpenBlockTime(true) },
+            ]}
+          />
+          <BottomTabs area="admin" />
+        </div>
+      ) : (
+        // ====== LAYOUT DESKTOP (FULL-WIDTH) ======
+        <div className="relative w-full p-4 xl:p-6">
+          {/* toolbar */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
             <div className="flex items-center gap-2">
-              <input
-                type="date"
-                className="border rounded px-2 py-1.5 text-sm w-full"
-                value={formatDateInput(date)}
-                onChange={(e) => {
-                  const d = e.target.value ? new Date(e.target.value) : new Date();
-                  setDate(d);
-                }}
+              <ProfessionalsSelect
+                value={selectedPro || ""}
+                onChange={setSelectedPro}
+                options={staff?.map((s) => ({ id: s.id, name: s.name })) || []}
               />
-              <button className="px-3 py-1.5 border rounded hover:bg-gray-50" onClick={goToday} title="Ir para hoje">
-                Hoje
-              </button>
+              <div className="flex items-center gap-1">
+                <button onClick={goPrev} className="px-2 py-1.5 border rounded hover:bg-gray-50" title="Anterior">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button onClick={goToday} className="px-3 py-1.5 border rounded hover:bg-gray-50">
+                  Hoje
+                </button>
+                <button onClick={goNext} className="px-2 py-1.5 border rounded hover:bg-gray-50" title="Próximo">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-2">
+            <div className="flex items-center gap-2">
+              <ViewToggle value={view} onChange={setView} />
               <button
                 onClick={() => {
                   setOpenSlots(true);
                   const ac = new AbortController();
                   fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
                 }}
-                className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+                className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center gap-2"
+                title="Horários disponíveis"
               >
                 <CalendarIcon className="w-4 h-4" />
-                Horários disponíveis
+                Horários
               </button>
-
               <button
-                onClick={() => setOpenApptList(true)}
-                className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+                onClick={openEmptyModal}
+                className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
               >
-                <ClipboardList className="w-4 h-4" />
-                Lista de Agendamentos
-              </button>
-
-              <button
-                onClick={() => {
-                  setOpenWaitlist(true);
-                  const ac = new AbortController();
-                  fetchWaitlist(ac.signal);
-                }}
-                className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
-              >
-                <List className="w-4 h-4" />
-                Lista de Espera
+                <PlusCircle className="w-4 h-4" />
+                Encaixe
               </button>
             </div>
           </div>
 
-          <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
-            <div className="space-y-2">
-              <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
-              <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
-                {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
-                  <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
-                    <span>{item}</span>
-                    <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
-                  </div>
-                ))}
-              </div>
+          {/* header data */}
+          <div className="w-full bg-white border rounded px-4 py-2 text-sm md:text-base flex items-center justify-between mb-4">
+            <span className="font-medium capitalize">{pageTitle}</span>
+            <span className="text-gray-500">{staff?.find((p) => p.id === selectedPro)?.name ?? ""}</span>
+          </div>
+
+          {/* grade 12 col — agenda ocupa 9–10, aside 3–2 (preenche a largura) */}
+          <div className="grid grid-cols-12 gap-4 min-h-[70vh]">
+            <div className="col-span-12 xl:col-span-9 2xl:col-span-10 bg-white border rounded overflow-hidden">
+              {loading ? (
+                <p className="text-sm text-gray-500 p-4">Carregando dados da agenda...</p>
+              ) : (
+                <Calendar
+                  events={combinedEvents}
+                  onSelectSlot={handleSelectSlot}
+                  onSelectEvent={handleSelectEvent}
+                  view={view}
+                  date={date}
+                  onView={(v) => setView(v)}
+                  onNavigate={(d) => setDate(d)}
+                />
+              )}
             </div>
-          </Accordion>
 
-          <Accordion title="Legenda" open={openLegend} onToggle={() => setOpenLegend((v) => !v)}>
-            <Legend />
-          </Accordion>
-        </aside>
-      </div>
+            <aside className="col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 space-y-4">
+              <div className="flex items-start justify-between">
+                <label className="flex items-center gap-2 select-none">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={blockEnabled}
+                    onChange={(e) => setBlockEnabled(e.target.checked)}
+                  />
+                  <span className="text-sm font-medium">Bloquear horário</span>
+                </label>
+                <button
+                  onClick={() => setOpenBlockTime(true)}
+                  disabled={!blockEnabled}
+                  className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black disabled:opacity-40 flex items-center gap-2"
+                  title="Bloquear intervalo"
+                >
+                  <Lock className="w-4 h-4" /> Bloquear
+                </button>
+              </div>
 
-      <button
-        onClick={openEmptyModal}
-        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition"
-        title="Novo agendamento"
-      >
-        <PlusCircle size={28} />
-      </button>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    className="border rounded px-2 py-1.5 text-sm w-full"
+                    value={formatDateInput(date)}
+                    onChange={(e) => {
+                      const d = e.target.value ? new Date(e.target.valueAsNumber) : new Date();
+                      setDate(d);
+                    }}
+                  />
+                  <button className="px-3 py-1.5 border rounded hover:bg-gray-50" onClick={goToday} title="Ir para hoje">
+                    Hoje
+                  </button>
+                </div>
 
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    onClick={() => {
+                      setOpenSlots(true);
+                      const ac = new AbortController();
+                      fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
+                    }}
+                    className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+                  >
+                    <CalendarIcon className="w-4 h-4" />
+                    Horários disponíveis
+                  </button>
+                  <button
+                    onClick={() => setOpenApptList(true)}
+                    className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+                  >
+                    <ClipboardList className="w-4 h-4" />
+                    Lista de Agendamentos
+                  </button>
+                  <button
+                    onClick={() => {
+                      setOpenWaitlist(true);
+                      const ac = new AbortController();
+                      fetchWaitlist(ac.signal);
+                    }}
+                    className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
+                  >
+                    <List className="w-4 h-4" />
+                    Lista de Espera
+                  </button>
+                </div>
+              </div>
+
+              <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
+                <div className="space-y-2">
+                  <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
+                  <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
+                    {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
+                      <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
+                        <span>{item}</span>
+                        <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Accordion>
+              <Accordion title="Legenda" open={openLegend} onToggle={() => setOpenLegend((v) => !v)}>
+                <Legend />
+              </Accordion>
+            </aside>
+          </div>
+
+          <button
+            onClick={openEmptyModal}
+            className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition"
+            title="Novo agendamento"
+          >
+            <PlusCircle size={28} />
+          </button>
+        </div>
+      )}
+
+      {/* ====== SEÇÃO DE MODAIS COMPARTILHADA ====== */}
+      {/* Estes componentes agora são renderizados fora da lógica mobile/desktop, evitando duplicação. */}
       {isModalOpen && (
         <AppointmentModal
           isOpen={isModalOpen}
@@ -882,49 +829,11 @@ export default function Schedule() {
           />
         </BaseModal>
       )}
-    </div>
+    </>
   );
 }
 
-/* ===== Auxiliares ===== */
-function isAbort(err) {
-  return err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled";
-}
-function formatDateInput(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-function startOfWeek(d) {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const diff = (day + 6) % 7;
-  copy.setDate(copy.getDate() - diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-function endOfWeek(d) {
-  const s = startOfWeek(d);
-  const e = new Date(s);
-  e.setDate(s.getDate() + 6);
-  e.setHours(23, 59, 59, 999);
-  return e;
-}
-function startOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
-}
-function endOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-function toYMD(dateObj) {
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const day = String(dateObj.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/* ====== UI auxiliares ===== */
+/* ====== UI auxiliares (Subcomponentes) ===== */
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
     <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
@@ -1192,8 +1101,8 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
 function DayStrip({ date, onPick }) {
   const start = (() => {
     const d = new Date(date);
-    const diff = d.getDay(); // 0..6 (domingo=0)
-    d.setDate(d.getDate() - diff);
+    const dayOfWeek = d.getDay(); // 0 (Sun) to 6 (Sat)
+    d.setDate(d.getDate() - dayOfWeek);
     d.setHours(0, 0, 0, 0);
     return d;
   })();
