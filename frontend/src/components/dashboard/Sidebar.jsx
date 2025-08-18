@@ -38,11 +38,13 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
 
       <aside
         className={[
+          // Mobile: Fixo, desliza para dentro/fora
           "fixed inset-y-0 left-0 z-30 w-64",
           "bg-slate-900 text-slate-100 border-r border-slate-800",
           "transform transition-transform duration-300 ease-in-out",
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full", // Controla o slide no mobile
-          "md:translate-x-0", // Fixo e visível no desktop
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+          // Desktop: Relativo, sempre visível e parte do fluxo
+          "md:relative md:translate-x-0 md:flex-shrink-0"
         ].join(" ")}
         aria-label="Menu lateral"
       >
