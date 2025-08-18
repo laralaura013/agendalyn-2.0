@@ -1,42 +1,19 @@
-// src/components/dashboard/Sidebar.jsx
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Calendar,
-  ClipboardList,
-  Users,
-  UserCog,
-  Settings,
-  Package,
-  Tag,
-  ShoppingCart,
-  Boxes,
-  DollarSign,
-  Wallet,
-  CreditCard,
-  Landmark,
-  Truck,
-  FileBarChart,
-  BarChart3,
-  Target,
-  ListChecks,
+  LayoutDashboard, Calendar, ClipboardList, Users, UserCog, Settings,
+  Package, Tag, ShoppingCart, Boxes, DollarSign, Wallet, CreditCard,
+  Landmark, Truck, FileBarChart, BarChart3, Target, ListChecks
 } from "lucide-react";
 
-/**
- * Sidebar:
- * - No MOBILE: drawer fixo (abre/fecha com translate-x)
- * - No DESKTOP: coluna estática (sem position: fixed) — evita scroll duplicado
- */
-export default function Sidebar({ isMobileMenuOpen = false, setIsMobileMenuOpen = () => {} }) {
+/** Sidebar: fixo no desktop, drawer no mobile */
+export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const navigate = useNavigate();
-  const closeIfMobile = () => setIsMobileMenuOpen(false);
+  const closeIfMobile = () => setIsMobileMenuOpen?.(false);
 
   const linkClass = ({ isActive }) =>
-    [
-      "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition",
-      isActive ? "bg-white/10 text-white font-semibold" : "text-slate-200 hover:bg-white/10",
-    ].join(" ");
+    `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition
+     ${isActive ? "bg-slate-800 text-white" : "text-slate-200 hover:bg-slate-800/60"}`;
 
   const Section = ({ title, children }) => (
     <div className="mt-4">
@@ -49,35 +26,29 @@ export default function Sidebar({ isMobileMenuOpen = false, setIsMobileMenuOpen 
 
   return (
     <aside
-      aria-label="Menu lateral"
       className={[
-        // base visual
-        "bg-[#0b1324] text-white w-64 shrink-0 border-r border-white/10",
-        // MOBILE: drawer
-        "fixed inset-y-0 left-0 z-40 transform transition-transform duration-200",
+        "fixed inset-y-0 left-0 z-30 w-64",
+        "bg-slate-900 text-slate-100 border-r border-slate-800",
+        "transform transition-transform duration-200",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-        // DESKTOP: coluna estática (sem fixed)
-        "md:static md:translate-x-0 md:transform-none",
+        "md:translate-x-0"
       ].join(" ")}
+      aria-label="Menu lateral"
     >
       {/* Brand */}
-      <div className="h-16 flex items-center px-4 border-b border-white/10">
+      <div className="h-16 flex items-center px-4 border-b border-slate-800">
         <button
-          onClick={() => {
-            navigate("/dashboard");
-            closeIfMobile();
-          }}
+          onClick={() => { navigate("/dashboard"); closeIfMobile(); }}
           className="flex items-center gap-2"
           aria-label="Ir para Dashboard"
         >
           <div className="h-8 w-8 rounded-lg bg-purple-600" />
-          <span className="text-base font-bold">Agendalyn</span>
+          <span className="text-base font-bold text-white">Agendalyn</span>
         </button>
       </div>
 
-      {/* Navegação: rola só aqui dentro */}
-      <nav className="h-[calc(100vh-64px)] overflow-y-auto py-3">
-        {/* PRINCIPAL */}
+      {/* Navegação */}
+      <nav className="h-[calc(100vh-4rem)] overflow-y-auto py-3">
         <Section title="Principal">
           <NavLink to="/dashboard" className={linkClass} onClick={closeIfMobile}>
             <LayoutDashboard size={18} /> Dashboard
@@ -96,7 +67,6 @@ export default function Sidebar({ isMobileMenuOpen = false, setIsMobileMenuOpen 
           </NavLink>
         </Section>
 
-        {/* CADASTROS */}
         <Section title="Cadastros">
           <NavLink to="/dashboard/staff" className={linkClass} onClick={closeIfMobile}>
             <UserCog size={18} /> Colaboradores
@@ -124,7 +94,6 @@ export default function Sidebar({ isMobileMenuOpen = false, setIsMobileMenuOpen 
           </NavLink>
         </Section>
 
-        {/* FINANCEIRO */}
         <Section title="Financeiro">
           <NavLink to="/dashboard/payables" className={linkClass} onClick={closeIfMobile}>
             <Wallet size={18} /> Contas a Pagar
@@ -143,7 +112,6 @@ export default function Sidebar({ isMobileMenuOpen = false, setIsMobileMenuOpen 
           </NavLink>
         </Section>
 
-        {/* RELATÓRIOS / METAS */}
         <Section title="Relatórios">
           <NavLink to="/dashboard/reports" className={linkClass} onClick={closeIfMobile}>
             <FileBarChart size={18} /> Relatórios
@@ -159,7 +127,6 @@ export default function Sidebar({ isMobileMenuOpen = false, setIsMobileMenuOpen 
           </NavLink>
         </Section>
 
-        {/* CONFIGURAÇÕES */}
         <Section title="Configurações">
           <NavLink to="/dashboard/settings" className={linkClass} onClick={closeIfMobile}>
             <Settings size={18} /> Configurações
