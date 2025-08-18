@@ -117,7 +117,8 @@ export default function AdminLayout() {
             </button>
           </header>
 
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* CORREÇÃO: Removido o padding (p-4 sm:p-6) daqui */}
+          <main className="flex-1 overflow-y-auto">
             <Outlet />
           </main>
         </div>
