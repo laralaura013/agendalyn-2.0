@@ -1,47 +1,52 @@
 import React from "react";
-import { NavLink, useLocation } from "react-router-dom";
-import { CalendarDays, Receipt, Users, Layers, Home, Bell, User } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { DollarSign, ClipboardList, Calendar, Users, Menu } from "lucide-react";
+import useAppShellMode from "../../hooks/useAppShellMode";
 import "./bottom-tabs.css";
 
-/** Tabs para admin (/dashboard) e cliente (/portal) */
-const adminTabs = [
-  { to: "/dashboard/cashier",  icon: <Receipt size={20} />,       label: "Caixa" },
-  { to: "/dashboard/orders",   icon: <Layers size={20} />,        label: "Comandas" },
-  { to: "/dashboard/schedule", icon: <CalendarDays size={21} />,  label: "Agenda", center: true },
-  { to: "/dashboard/clients",  icon: <Users size={20} />,         label: "Clientes" },
-  { to: "/dashboard/settings", icon: <User size={20} />,          label: "Menu" },
-];
-
-const clientTabs = [
-  { to: "/portal/agenda",        icon: <Home size={20} />,         label: "Agenda" },
-  { to: "/portal/pacotes",       icon: <Layers size={20} />,       label: "Pacotes" },
-  { to: "/portal/historico",     icon: <CalendarDays size={21} />, label: "Histórico", center: true },
-  { to: "/portal/notificacoes",  icon: <Bell size={20} />,         label: "Avisos" },
-  { to: "/portal/perfil",        icon: <User size={20} />,         label: "Perfil" },
-];
-
+/**
+ * Barra inferior (apenas MOBILE).
+ * No desktop não renderiza nada — evita “bolinha roxa” perdida.
+ */
 export default function BottomTabs({ area = "admin" }) {
+  const { isMobile } = useAppShellMode();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
-  const tabs = area === "admin" ? adminTabs : clientTabs;
+
+  if (!isMobile) return null;
+
+  const isAgenda = pathname.startsWith("/dashboard/schedule");
 
   return (
-    <nav className="mobile-tabs">
-      <div className="tabs-bg" />
-      <div className="tabs-row">
-        {tabs.map((t) => (
-          <NavLink
-            key={t.to}
-            to={t.to}
-            className={({ isActive }) =>
-              `tab-link ${isActive ? "active" : ""} ${t.center ? "center" : ""}`
-            }
-            aria-label={t.label}
-          >
-            {t.icon}
-            {!t.center && <span className="tab-label">{t.label}</span>}
-          </NavLink>
-        ))}
-      </div>
+    <nav className="btabs" role="navigation" aria-label="Navegação">
+      <NavLink to="/dashboard/cash" className="btabs-item">
+        <DollarSign className="w-5 h-5" />
+        <span>Caixa</span>
+      </NavLink>
+
+      <NavLink to="/dashboard/orders" className="btabs-item">
+        <ClipboardList className="w-5 h-5" />
+        <span>Comandas</span>
+      </NavLink>
+
+      {/* Botão central */}
+      <button
+        className={`btabs-center ${isAgenda ? "active" : ""}`}
+        onClick={() => navigate("/dashboard/schedule")}
+        aria-label="Ir para Agenda"
+      >
+        <Calendar className="w-6 h-6" />
+      </button>
+
+      <NavLink to="/dashboard/clients" className="btabs-item">
+        <Users className="w-5 h-5" />
+        <span>Clientes</span>
+      </NavLink>
+
+      <NavLink to="/dashboard/menu" className="btabs-item">
+        <Menu className="w-5 h-5" />
+        <span>Menu</span>
+      </NavLink>
     </nav>
   );
 }

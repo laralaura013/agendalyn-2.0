@@ -24,6 +24,7 @@ import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
 import FloatingActions from "../components/mobile/FloatingActions";
+import BottomTabs from "../components/mobile/BottomTabs";
 
 /**
  * Endpoints esperados:
@@ -313,7 +314,9 @@ export default function Schedule() {
 
   const handleSave = async (payload) => {
     const isEditing = !!(selectedEvent && selectedEvent.id);
-    const p = isEditing ? api.put(`/appointments/${selectedEvent.id}`, payload) : api.post("/appointments", payload);
+    const p = isEditing
+      ? api.put(`/appointments/${selectedEvent.id}`, payload)
+      : api.post("/appointments", payload);
 
     toast.promise(p, {
       loading: "Salvando agendamento...",
@@ -452,61 +455,12 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  // Ações do Speed Dial (mobile + desktop)
-  const speedDialActions = useMemo(
-    () => [
-      {
-        id: "agendar",
-        label: "Agendar horário",
-        icon: <CalendarDays className="w-5 h-5" />,
-        run: () => openEmptyModal(),
-      },
-      {
-        id: "link",
-        label: "Link de agendamento",
-        icon: <Link2 className="w-5 h-5" />,
-        run: async () => {
-          const url = `${window.location.origin}/agendar/`;
-          try {
-            await navigator.clipboard.writeText(url);
-            toast.success("Link copiado!");
-          } catch {
-            toast.error("Não consegui copiar o link.");
-          }
-        },
-      },
-      {
-        id: "comanda",
-        label: "Abrir comanda",
-        icon: <FileText className="w-5 h-5" />,
-        run: () => navigate("/dashboard/orders"),
-      },
-      {
-        id: "espera",
-        label: "Lista de espera",
-        icon: <List className="w-5 h-5" />,
-        run: () => {
-          setOpenWaitlist(true);
-          const ac = new AbortController();
-          fetchWaitlist(ac.signal);
-        },
-      },
-      {
-        id: "bloquear",
-        label: "Bloquear horário",
-        icon: <Lock className="w-5 h-5" />,
-        run: () => setOpenBlockTime(true),
-      },
-    ],
-    [navigate, date, selectedPro, fetchWaitlist] // setStates são estáveis
-  );
-
   /** ------- RENDER ------- */
 
   if (isMobile) {
     // ====== LAYOUT MOBILE ======
     return (
-      <div className="relative p-3 max-w-md mx-auto">
+      <div className="relative p-3 pb-[104px] max-w-md mx-auto">
         {/* Esconde toolbar do react-big-calendar no mobile */}
         <style>{`@media (max-width:767px){ .rbc-toolbar{display:none!important} }`}</style>
 
@@ -579,7 +533,53 @@ export default function Schedule() {
         </div>
 
         {/* SpeedDial (FAB) */}
-        <FloatingActions hideOn={[]} actions={speedDialActions} />
+        <FloatingActions
+          hideOn={[]} // mostrar também na schedule
+          actions={[
+            {
+              id: "agendar",
+              label: "Agendar horário",
+              icon: <CalendarDays className="w-5 h-5" />,
+              run: () => openEmptyModal(),
+            },
+            {
+              id: "link",
+              label: "Link de agendamento",
+              icon: <Link2 className="w-5 h-5" />,
+              run: async () => {
+                const url = `${window.location.origin}/agendar/`;
+                try {
+                  await navigator.clipboard.writeText(url);
+                  toast.success("Link copiado!");
+                } catch {
+                  toast.error("Não consegui copiar o link.");
+                }
+              },
+            },
+            {
+              id: "comanda",
+              label: "Abrir comanda",
+              icon: <FileText className="w-5 h-5" />,
+              run: () => navigate("/dashboard/orders"),
+            },
+            {
+              id: "espera",
+              label: "Lista de espera",
+              icon: <List className="w-5 h-5" />,
+              run: () => {
+                setOpenWaitlist(true);
+                const ac = new AbortController();
+                fetchWaitlist(ac.signal);
+              },
+            },
+            {
+              id: "bloquear",
+              label: "Bloquear horário",
+              icon: <Lock className="w-5 h-5" />,
+              run: () => setOpenBlockTime(true),
+            },
+          ]}
+        />
 
         {/* Modais */}
         {isModalOpen && (
@@ -670,6 +670,9 @@ export default function Schedule() {
             />
           </BaseModal>
         )}
+
+        {/* Abas inferiores fixas (mobile) */}
+        <BottomTabs area="admin" />
       </div>
     );
   }
@@ -840,8 +843,13 @@ export default function Schedule() {
         </aside>
       </div>
 
-      {/* sem botão roxo — usamos o SpeedDial também no desktop */}
-      <FloatingActions hideOn={[]} actions={speedDialActions} />
+      <button
+        onClick={openEmptyModal}
+        className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition"
+        title="Novo agendamento"
+      >
+        <PlusCircle size={28} />
+      </button>
 
       {isModalOpen && (
         <AppointmentModal
@@ -997,7 +1005,7 @@ function ViewToggle({ value, onChange }) {
         <button
           key={opt.id}
           onClick={() => onChange(opt.id)}
-          className={`px-3 py-1.5 text-sm ${value === opt.id ? "bg-gray-900 text-white" : "hover:bg-gray-50"}`}
+          className={`px-3 py-1.5 text-sm ${value === opt.id ? "bg-purple-600 text-white" : "hover:bg-gray-50"}`}
         >
           {opt.label}
         </button>
