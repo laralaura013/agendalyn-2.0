@@ -1,144 +1,203 @@
-// frontend/src/components/dashboard/Sidebar.jsx
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+// src/components/dashboard/Sidebar.jsx
+import React from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, CalendarDays, ClipboardList, Package, Users, UserCog,
-  Scissors, Box, Folder, Bookmark, Truck, BarChart3, ArrowRightLeft,
-  Wallet, Target, FileText, CreditCard, Settings, X
-} from 'lucide-react';
+  LayoutDashboard,
+  Calendar,
+  ClipboardList,
+  Users,
+  UserCog,
+  Settings,
+  Package,
+  Tag,
+  ShoppingCart,
+  Boxes,
+  DollarSign,
+  Wallet,
+  CreditCard,
+  Landmark,
+  Truck,
+  FileBarChart,
+  BarChart3,
+  Target,
+  ClipboardCheck,
+  ListChecks,
+} from "lucide-react";
 
-const menuGroups = [
-  {
-    title: 'PRINCIPAL',
-    items: [
-      { name: 'Painel', icon: <LayoutDashboard size={18} />, path: '/dashboard' },
-      { name: 'Agenda', icon: <CalendarDays size={18} />, path: '/dashboard/schedule' },
-      { name: 'Comandas', icon: <ClipboardList size={18} />, path: '/dashboard/orders' },
-      { name: 'Pacotes', icon: <Package size={18} />, path: '/dashboard/packages' },
-      // { name: 'Lista de Espera', icon: <CalendarDays size={18} />, path: '/dashboard/waitlist' },
-    ],
-  },
-  {
-    title: 'CADASTROS',
-    items: [
-      { name: 'Clientes', icon: <Users size={18} />, path: '/dashboard/clients' },
-      { name: 'Colaboradores', icon: <UserCog size={18} />, path: '/dashboard/staff' },
-      { name: 'Serviços', icon: <Scissors size={18} />, path: '/dashboard/services' },
-      { name: 'Produtos', icon: <Box size={18} />, path: '/dashboard/products' },
-      { name: 'Categorias', icon: <Folder size={18} />, path: '/dashboard/categories' },
-      { name: 'Marcas', icon: <Bookmark size={18} />, path: '/dashboard/brands' },
+/**
+ * Sidebar responsivo:
+ * - Mobile: drawer deslizante controlado por isMobileMenuOpen
+ * - Desktop (md+): fixo à esquerda com w-64
+ *
+ * Props esperadas (vindas do AdminLayout):
+ *  - isMobileMenuOpen: boolean
+ *  - setIsMobileMenuOpen: fn
+ */
+export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
+  const navigate = useNavigate();
 
-      // Cadastros financeiros (OWNER)
-      { name: 'Fornecedores', icon: <Truck size={18} />, path: '/dashboard/suppliers', allowedRoles: ['OWNER'] },
-      { name: 'Formas de Pagamento', icon: <CreditCard size={18} />, path: '/dashboard/payment-methods', allowedRoles: ['OWNER'] },
-      { name: 'Categorias Financeiras', icon: <BarChart3 size={18} />, path: '/dashboard/finance-categories', allowedRoles: ['OWNER'] },
-    ],
-  },
-  {
-    title: 'FINANCEIRO',
-    items: [
-      // Operação liberada para STAFF também (delete segue OWNER no backend)
-      { name: 'Pagar', icon: <Wallet size={18} />, path: '/dashboard/payables' },
-      { name: 'Receber', icon: <Wallet size={18} />, path: '/dashboard/receivables' },
-
-      // Relatórios
-      { name: 'Relatórios', icon: <BarChart3 size={18} />, path: '/dashboard/reports', allowedRoles: ['OWNER'] },
-      { name: 'Fluxo de Caixa', icon: <BarChart3 size={18} />, path: '/dashboard/reports/cashflow', allowedRoles: ['OWNER'] },
-
-      { name: 'Comissões', icon: <ArrowRightLeft size={18} />, path: '/dashboard/commissions', allowedRoles: ['OWNER'] },
-      { name: 'Caixa', icon: <Wallet size={18} />, path: '/dashboard/cashier' },
-    ],
-  },
-  {
-    title: 'CONTROLE',
-    items: [
-      { name: 'Metas', icon: <Target size={18} />, path: '/dashboard/goals', allowedRoles: ['OWNER'] },
-      { name: 'Anamneses', icon: <FileText size={18} />, path: '/dashboard/anamnesis' },
-      // { name: 'Compras', icon: <ShoppingCart size={18} />, path: '/dashboard/purchases' }, // adicionar quando a rota existir
-    ],
-  },
-  {
-    title: 'CONTA',
-    items: [
-      { name: 'Assinatura', icon: <CreditCard size={18} />, path: '/dashboard/subscription', allowedRoles: ['OWNER'] },
-    ]
-  },
-  {
-    title: 'CONFIGURAÇÕES',
-    items: [
-      { name: 'Motivos de Cancelamento', icon: <Settings size={18} />, path: '/dashboard/cancellation-reasons', allowedRoles: ['OWNER'] },
-      { name: 'Origens de Cliente', icon: <Settings size={18} />, path: '/dashboard/client-origins', allowedRoles: ['OWNER'] },
-      { name: 'Empresa', icon: <Settings size={18} />, path: '/dashboard/settings', allowedRoles: ['OWNER'] },
-    ]
-  }
-];
-
-const NavItem = ({ item, onNavigate }) => (
-  <NavLink
-    to={item.path}
-    end={item.path === '/dashboard'}
-    onClick={onNavigate}
-    className={({ isActive }) =>
-      [
-        'relative flex items-center px-4 py-2.5 text-sm font-medium rounded-md transition-colors duration-200',
-        isActive
-          ? 'bg-gray-900 text-white border-l-4 border-indigo-400'
-          : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-      ].join(' ')
-    }
-  >
-    <span className="mr-3">{item.icon}</span>
-    {item.name}
-  </NavLink>
-);
-
-const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
-  const { user } = useAuth();
-
-  const handleNavigate = () => {
-    // fecha o menu no mobile após clicar em um item
-    if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+  const closeIfMobile = () => {
+    if (setIsMobileMenuOpen) setIsMobileMenuOpen(false);
   };
 
-  return (
-    <aside
-      className={`fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-gray-800 text-white transform transition-transform duration-300 ease-in-out
-      ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
-      aria-label="Menu lateral"
-    >
-      {/* Header da sidebar */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-700 shrink-0">
-        <span className="text-xl font-bold">Agendalyn</span>
-        <button
-          onClick={() => setIsMobileMenuOpen(false)}
-          className="md:hidden text-gray-400 hover:text-white"
-          aria-label="Fechar menu"
-        >
-          <X size={20} />
-        </button>
+  const linkClass = ({ isActive }) =>
+    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition
+     ${isActive ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700 hover:bg-gray-50"}`;
+
+  const Section = ({ title, children }) => (
+    <div className="mt-4">
+      <div className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        {title}
       </div>
-
-      {/* Menu scrollável */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {menuGroups.map((group) => (
-          <div key={group.title} className="mb-6">
-            <h3 className="px-4 mb-2 text-xs font-semibold tracking-wider text-gray-400 uppercase">
-              {group.title}
-            </h3>
-            <div className="space-y-1">
-              {group.items.map((item) => {
-                const isAllowed = !item.allowedRoles || item.allowedRoles.includes(user?.role);
-                return isAllowed ? (
-                  <NavItem key={item.name} item={item} onNavigate={handleNavigate} />
-                ) : null;
-              })}
-            </div>
-          </div>
-        ))}
-      </nav>
-    </aside>
+      <div className="px-2 space-y-1">{children}</div>
+    </div>
   );
-};
 
-export default Sidebar;
+  return (
+    <>
+      {/* Contêiner do drawer (mobile) / barra fixa (desktop) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r shadow-sm transform transition-transform
+                    md:translate-x-0 md:static md:inset-auto
+                    ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        aria-label="Menu lateral"
+      >
+        {/* Cabeçalho do brand */}
+        <div className="h-16 flex items-center px-4 border-b">
+          <button
+            onClick={() => {
+              navigate("/dashboard");
+              closeIfMobile();
+            }}
+            className="flex items-center gap-2"
+            aria-label="Ir para Dashboard"
+          >
+            <div className="h-8 w-8 rounded-lg bg-purple-700" />
+            <span className="text-base font-bold text-gray-900">Agendalyn</span>
+          </button>
+        </div>
+
+        {/* Navegação */}
+        <nav className="h-[calc(100vh-4rem)] overflow-y-auto py-3">
+          {/* PRINCIPAL */}
+          <Section title="Principal">
+            <NavLink to="/dashboard" className={linkClass} onClick={closeIfMobile}>
+              <LayoutDashboard size={18} /> Dashboard
+            </NavLink>
+
+            <NavLink to="/dashboard/schedule" className={linkClass} onClick={closeIfMobile}>
+              <Calendar size={18} /> Agenda
+            </NavLink>
+
+            <NavLink to="/dashboard/orders" className={linkClass} onClick={closeIfMobile}>
+              <ClipboardList size={18} /> Comandas
+            </NavLink>
+
+            <NavLink to="/dashboard/clients" className={linkClass} onClick={closeIfMobile}>
+              <Users size={18} /> Clientes
+            </NavLink>
+
+            <NavLink to="/dashboard/cashier" className={linkClass} onClick={closeIfMobile}>
+              <DollarSign size={18} /> Caixa
+            </NavLink>
+          </Section>
+
+          {/* CADASTROS */}
+          <Section title="Cadastros">
+            <NavLink to="/dashboard/staff" className={linkClass} onClick={closeIfMobile}>
+              <UserCog size={18} /> Colaboradores
+            </NavLink>
+
+            <NavLink to="/dashboard/services" className={linkClass} onClick={closeIfMobile}>
+              <ClipboardCheck size={18} /> Serviços
+            </NavLink>
+
+            <NavLink to="/dashboard/products" className={linkClass} onClick={closeIfMobile}>
+              <ShoppingCart size={18} /> Produtos
+            </NavLink>
+
+            <NavLink to="/dashboard/categories" className={linkClass} onClick={closeIfMobile}>
+              <Tag size={18} /> Categorias
+            </NavLink>
+
+            <NavLink to="/dashboard/brands" className={linkClass} onClick={closeIfMobile}>
+              <Boxes size={18} /> Marcas
+            </NavLink>
+
+            <NavLink to="/dashboard/packages" className={linkClass} onClick={closeIfMobile}>
+              <Package size={18} /> Pacotes
+            </NavLink>
+
+            <NavLink to="/dashboard/anamnesis" className={linkClass} onClick={closeIfMobile}>
+              <ListChecks size={18} /> Anamneses
+            </NavLink>
+
+            <NavLink to="/dashboard/waitlist" className={linkClass} onClick={closeIfMobile}>
+              <Users size={18} /> Lista de Espera
+            </NavLink>
+          </Section>
+
+          {/* FINANCEIRO */}
+          <Section title="Financeiro">
+            <NavLink to="/dashboard/payables" className={linkClass} onClick={closeIfMobile}>
+              <Wallet size={18} /> Contas a Pagar
+            </NavLink>
+
+            <NavLink to="/dashboard/receivables" className={linkClass} onClick={closeIfMobile}>
+              <CreditCard size={18} /> Contas a Receber
+            </NavLink>
+
+            <NavLink to="/dashboard/finance-categories" className={linkClass} onClick={closeIfMobile}>
+              <Landmark size={18} /> Categorias Financeiras
+            </NavLink>
+
+            <NavLink to="/dashboard/suppliers" className={linkClass} onClick={closeIfMobile}>
+              <Truck size={18} /> Fornecedores
+            </NavLink>
+
+            <NavLink to="/dashboard/payment-methods" className={linkClass} onClick={closeIfMobile}>
+              <CreditCard size={18} /> Formas de Pagamento
+            </NavLink>
+          </Section>
+
+          {/* RELATÓRIOS / METAS */}
+          <Section title="Relatórios">
+            <NavLink to="/dashboard/reports" className={linkClass} onClick={closeIfMobile}>
+              <FileBarChart size={18} /> Relatórios
+            </NavLink>
+
+            <NavLink to="/dashboard/reports/birthdays" className={linkClass} onClick={closeIfMobile}>
+              <BarChart3 size={18} /> Aniversariantes
+            </NavLink>
+
+            <NavLink to="/dashboard/reports/cashflow" className={linkClass} onClick={closeIfMobile}>
+              <BarChart3 size={18} /> Fluxo de Caixa
+            </NavLink>
+
+            <NavLink to="/dashboard/goals" className={linkClass} onClick={closeIfMobile}>
+              <Target size={18} /> Metas
+            </NavLink>
+          </Section>
+
+          {/* CONFIGURAÇÕES */}
+          <Section title="Configurações">
+            <NavLink to="/dashboard/settings" className={linkClass} onClick={closeIfMobile}>
+              <Settings size={18} /> Configurações
+            </NavLink>
+
+            <NavLink to="/dashboard/cancellation-reasons" className={linkClass} onClick={closeIfMobile}>
+              <ClipboardList size={18} /> Motivos de Cancelamento
+            </NavLink>
+
+            <NavLink to="/dashboard/client-origins" className={linkClass} onClick={closeIfMobile}>
+              <Users size={18} /> Origens de Cliente
+            </NavLink>
+          </Section>
+        </nav>
+      </aside>
+
+      {/* Zona clicável para fechar o drawer no mobile (o overlay já é criado no AdminLayout) */}
+      {/* Mantemos somente o aside aqui. O overlay está no AdminLayout para evitar duplicidade. */}
+    </>
+  );
+}
