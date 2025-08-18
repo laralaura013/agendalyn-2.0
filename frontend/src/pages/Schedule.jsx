@@ -26,20 +26,8 @@ import FloatingActions from "../components/mobile/FloatingActions";
 import BottomTabs from "../components/mobile/BottomTabs";
 
 /**
- * Endpoints esperados:
- *  - GET  /appointments?professionalId&date | date_from&date_to
- *  - POST /appointments
- *  - PUT  /appointments/:id
- *  - DELETE /appointments/:id
- *
- *  - GET  /agenda/blocks?professionalId&date | date_from&date_to
- *  - POST /agenda/blocks  { professionalId, date:'YYYY-MM-DD', startTime:'HH:mm', endTime:'HH:mm', reason }
- *  - DELETE /agenda/blocks/:id
- *
- *  - GET  /public/available-slots?date&serviceId&staffId
- *  - GET  /waitlist
+ * Endpoints esperados…
  */
-
 const DEFAULT_SLOT_MINUTES = 30;
 
 export default function Schedule() {
@@ -76,14 +64,12 @@ export default function Schedule() {
 
   // slots & waitlist
   const [slotsLoading, setSlotsLoading] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState([]); // ["07:00", ...]
+  const [availableSlots, setAvailableSlots] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
   const [waitlistLoading, setWaitlistLoading] = useState(false);
 
-  // evita duplo disparo em StrictMode
   const loadedOnceRef = useRef(false);
 
-  /** ------- HELPERS DE PARAMS (mês/semana/dia) ------- */
   const buildRangeParams = useCallback(
     (baseDate) => {
       const params = {};
@@ -101,8 +87,6 @@ export default function Schedule() {
     },
     [view, selectedPro, isMobile]
   );
-
-  /** ------- LOADERS ------- */
 
   const loadShared = useCallback(async (signal) => {
     const [c, s, st] = await Promise.all([
@@ -162,7 +146,6 @@ export default function Schedule() {
     async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES, signal) => {
       try {
         setSlotsLoading(true);
-
         const baseParams = { date: toYMD(targetDate) };
         if (proId) baseParams.staffId = proId;
 
@@ -211,8 +194,7 @@ export default function Schedule() {
     }
   }, []);
 
-  /** ------- EFEITOS ------- */
-
+  // efeitos
   useEffect(() => {
     if (loadedOnceRef.current) return;
     loadedOnceRef.current = true;
@@ -238,7 +220,6 @@ export default function Schedule() {
 
   useEffect(() => {
     if (!loadedOnceRef.current) return;
-
     const ac = new AbortController();
     (async () => {
       setLoading(true);
@@ -250,16 +231,13 @@ export default function Schedule() {
         setLoading(false);
       }
     })();
-
     return () => ac.abort();
   }, [view, date, selectedPro, fetchAppointments, fetchBlocks, isMobile]);
 
-  /** ------- HANDLERS ------- */
-
+  // handlers
   const handleSelectSlot = useCallback(
     (slotInfo) => {
       const { start, end } = slotInfo;
-
       const conflito = (blocks || []).some((b) => {
         const base = new Date(b.date);
         const [sh, sm] = (b.startTime || "00:00").split(":").map(Number);
@@ -274,7 +252,6 @@ export default function Schedule() {
         toast.error("Horário bloqueado. Escolha outro horário.");
         return;
       }
-
       setSelectedEvent(null);
       setSelectedSlot(slotInfo);
       setIsModalOpen(true);
@@ -285,7 +262,6 @@ export default function Schedule() {
   const handleSelectEvent = useCallback(
     (event) => {
       const data = event.resource;
-
       if (data?.type === "BLOCK") {
         if (window.confirm("Deseja remover este bloqueio?")) {
           api
@@ -299,7 +275,6 @@ export default function Schedule() {
         }
         return;
       }
-
       setSelectedSlot(null);
       setSelectedEvent(data);
       setIsModalOpen(true);
@@ -327,9 +302,7 @@ export default function Schedule() {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir este agendamento?")) return;
-
     setEvents((prev) => prev.filter((ev) => ev.id !== id));
-
     toast.promise(api.delete(`/appointments/${id}`), {
       loading: "Excluindo agendamento...",
       success: () => {
@@ -451,13 +424,12 @@ export default function Schedule() {
   }, [date, selectedPro, fetchAvailableSlots]);
 
   /** ------- RENDER ------- */
-
   if (isMobile) {
-    // ====== LAYOUT MOBILE ======
     return (
       <div className="relative p-3 pb-[104px] max-w-md mx-auto">
         <style>{`@media (max-width:767px){ .rbc-toolbar{display:none!important} }`}</style>
 
+        {/* Cabeçalho estilo app */}
         <div className="flex items-center justify-between mb-2">
           <button onClick={goPrevWeekMobile} className="px-2 py-1 border rounded hover:bg-gray-50" aria-label="Semana anterior">
             <ChevronLeft className="w-4 h-4" />
@@ -525,12 +497,7 @@ export default function Schedule() {
         <FloatingActions
           hideOn={[]}
           actions={[
-            {
-              id: "agendar",
-              label: "Agendar horário",
-              icon: <CalendarDays className="w-5 h-5" />,
-              run: () => openEmptyModal(),
-            },
+            { id: "agendar", label: "Agendar horário", icon: <CalendarDays className="w-5 h-5" />, run: () => openEmptyModal() },
             {
               id: "link",
               label: "Link de agendamento",
@@ -545,12 +512,7 @@ export default function Schedule() {
                 }
               },
             },
-            {
-              id: "comanda",
-              label: "Abrir comanda",
-              icon: <FileText className="w-5 h-5" />,
-              run: () => navigate("/dashboard/orders"),
-            },
+            { id: "comanda", label: "Abrir comanda", icon: <FileText className="w-5 h-5" />, run: () => navigate("/dashboard/orders") },
             {
               id: "espera",
               label: "Lista de espera",
@@ -561,15 +523,11 @@ export default function Schedule() {
                 fetchWaitlist(ac.signal);
               },
             },
-            {
-              id: "bloquear",
-              label: "Bloquear horário",
-              icon: <Lock className="w-5 h-5" />,
-              run: () => setOpenBlockTime(true),
-            },
+            { id: "bloquear", label: "Bloquear horário", icon: <Lock className="w-5 h-5" />, run: () => setOpenBlockTime(true) },
           ]}
         />
 
+        {/* Modais e drawers */}
         {isModalOpen && (
           <AppointmentModal
             isOpen={isModalOpen}
@@ -718,9 +676,9 @@ export default function Schedule() {
         <span className="text-gray-500">{staff?.find((p) => p.id === selectedPro)?.name ?? ""}</span>
       </div>
 
-      {/* grid full-width: coluna da agenda cresce; aside com largura fixa */}
-      <div className="grid grid-cols-1 xl:[grid-template-columns:minmax(700px,1fr)_380px] gap-4 min-h-[70vh]">
-        <div className="bg-white border rounded overflow-hidden">
+      {/* grade 12 col — agenda ocupa 9–10, aside 3–2 (preenche a largura) */}
+      <div className="grid grid-cols-12 gap-4 min-h-[70vh]">
+        <div className="col-span-12 xl:col-span-9 2xl:col-span-10 bg-white border rounded overflow-hidden">
           {loading ? (
             <p className="text-sm text-gray-500 p-4">Carregando dados da agenda...</p>
           ) : (
@@ -736,7 +694,7 @@ export default function Schedule() {
           )}
         </div>
 
-        <aside className="bg-white border rounded p-3 md:p-4 space-y-4">
+        <aside className="col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 space-y-4">
           <div className="flex items-start justify-between">
             <label className="flex items-center gap-2 select-none">
               <input
@@ -941,7 +899,7 @@ function formatDateInput(d) {
 function startOfWeek(d) {
   const copy = new Date(d);
   const day = copy.getDay();
-  const diff = (day + 6) % 7; // segunda como primeiro dia
+  const diff = (day + 6) % 7;
   copy.setDate(copy.getDate() - diff);
   copy.setHours(0, 0, 0, 0);
   return copy;
@@ -966,7 +924,7 @@ function toYMD(dateObj) {
   return `${y}-${m}-${day}`;
 }
 
-/* ====== UI auxiliares (Accordion, etc.) ===== */
+/* ====== UI auxiliares ===== */
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
     <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
@@ -1230,11 +1188,11 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
   );
 }
 
-/* ======= Subcomponente: tira de dias (mobile) ======= */
+/* ======= Tira de dias (mobile) ======= */
 function DayStrip({ date, onPick }) {
   const start = (() => {
     const d = new Date(date);
-    const diff = d.getDay();
+    const diff = d.getDay(); // 0..6 (domingo=0)
     d.setDate(d.getDate() - diff);
     d.setHours(0, 0, 0, 0);
     return d;
@@ -1247,7 +1205,6 @@ function DayStrip({ date, onPick }) {
   });
 
   const wd = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
   const isSameDay = (a, b) =>
     a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 

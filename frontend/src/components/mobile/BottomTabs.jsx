@@ -1,12 +1,11 @@
 import React from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { DollarSign, ClipboardList, Calendar, Users, User } from "lucide-react";
+import { DollarSign, ClipboardList, Calendar, Users, Menu as MenuIcon } from "lucide-react";
 import useAppShellMode from "../../hooks/useAppShellMode";
 import "./bottom-tabs.css";
 
 /**
- * Barra inferior (apenas MOBILE).
- * No desktop não renderiza nada.
+ * Barra inferior — renderiza apenas no MOBILE.
  */
 export default function BottomTabs({ area = "admin" }) {
   const { isMobile } = useAppShellMode();
@@ -19,18 +18,12 @@ export default function BottomTabs({ area = "admin" }) {
 
   return (
     <nav className="btabs" role="navigation" aria-label="Navegação">
-      <NavLink
-        to="/dashboard/cashier"
-        className={({ isActive }) => `btabs-item ${isActive ? "active" : ""}`}
-      >
+      <NavLink to="/dashboard/cashier" className="btabs-item">
         <DollarSign className="w-5 h-5" />
         <span>Caixa</span>
       </NavLink>
 
-      <NavLink
-        to="/dashboard/orders"
-        className={({ isActive }) => `btabs-item ${isActive ? "active" : ""}`}
-      >
+      <NavLink to="/dashboard/orders" className="btabs-item">
         <ClipboardList className="w-5 h-5" />
         <span>Comandas</span>
       </NavLink>
@@ -44,19 +37,13 @@ export default function BottomTabs({ area = "admin" }) {
         <Calendar className="w-6 h-6" />
       </button>
 
-      <NavLink
-        to="/dashboard/clients"
-        className={({ isActive }) => `btabs-item ${isActive ? "active" : ""}`}
-      >
+      <NavLink to="/dashboard/clients" className="btabs-item">
         <Users className="w-5 h-5" />
         <span>Clientes</span>
       </NavLink>
 
-      <NavLink
-        to="/dashboard/settings"
-        className={({ isActive }) => `btabs-item ${isActive ? "active" : ""}`}
-      >
-        <User className="w-5 h-5" />
+      <NavLink to="/dashboard/settings" className="btabs-item">
+        <MenuIcon className="w-5 h-5" />
         <span>Perfil</span>
       </NavLink>
     </nav>
