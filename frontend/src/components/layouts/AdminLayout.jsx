@@ -22,13 +22,9 @@ function usePageTitle() {
       { re: /^\/dashboard\/anamnesis/, label: 'Anamneses' },
       { re: /^\/dashboard\/packages/, label: 'Pacotes' },
       { re: /^\/dashboard\/waitlist/, label: 'Lista de Espera' },
-
-      // Relatórios
       { re: /^\/dashboard\/reports\/birthdays/, label: 'Aniversariantes' },
       { re: /^\/dashboard\/reports\/cashflow/, label: 'Fluxo de Caixa' },
       { re: /^\/dashboard\/reports/, label: 'Relatórios' },
-
-      // Financeiro / Configs
       { re: /^\/dashboard\/payables/, label: 'Contas a Pagar' },
       { re: /^\/dashboard\/receivables/, label: 'Contas a Receber' },
       { re: /^\/dashboard\/finance-categories/, label: 'Categorias Financeiras' },
@@ -36,7 +32,6 @@ function usePageTitle() {
       { re: /^\/dashboard\/payment-methods/, label: 'Formas de Pagamento' },
       { re: /^\/dashboard\/cancellation-reasons/, label: 'Motivos de Cancelamento' },
       { re: /^\/dashboard\/client-origins/, label: 'Origens de Cliente' },
-
       { re: /^\/dashboard\/settings/, label: 'Configurações' },
       { re: /^\/settings$/, label: 'Configurações' },
     ];
@@ -64,8 +59,8 @@ const AdminLayout = () => {
   }, [navigate]);
 
   return (
-    // 100% viewport e sem scroll na janela
-    <div className="h-screen w-screen overflow-hidden bg-gray-100 flex">
+    // ⛔️ tiramos w-screen para evitar overflow; deixamos uma área só de scroll no <main>
+    <div className="min-h-screen w-full overflow-hidden bg-gray-100 flex">
       {/* Overlay mobile */}
       {isMobileMenuOpen && (
         <div
@@ -74,14 +69,14 @@ const AdminLayout = () => {
         />
       )}
 
-      {/* Sidebar (fixo no desktop, drawer no mobile) */}
+      {/* Sidebar fixo (desktop) / drawer (mobile) */}
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      {/* Conteúdo (margem esquerda no desktop para não sobrepor o sidebar) */}
-      <div className="flex-1 flex flex-col md:ml-64 min-h-0">
+      {/* Conteúdo */}
+      <div className="flex-1 flex flex-col md:ml-64 min-h-0 min-w-0">
         {/* Header único */}
         <header className="shrink-0 flex items-center justify-between bg-white border-b border-gray-200 h-16 px-4 sm:px-6">
           <button
@@ -104,8 +99,8 @@ const AdminLayout = () => {
           </button>
         </header>
 
-        {/* Área das rotas — ÚNICA rolagem */}
-        <main className="flex-1 min-h-0 overflow-y-auto py-6">
+        {/* ÚNICA rolagem; sem overflow-x */}
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-6">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6">
             <Outlet />
           </div>
