@@ -1,15 +1,11 @@
-// ✅ ARQUIVO: src/App.jsx
+// ✅ ARQUIIVO: src/App.jsx
 import React, { Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import ReloadPrompt from "./components/pwa/ReloadPrompt";
 import ErrorBoundary from "./components/ErrorBoundary";
 
-// Hook de decisão mobile/desktop
-import useAppShellMode from "./hooks/useAppShellMode";
-
 // Layouts
-import MobileShell from "./components/mobile/MobileShell";
 import AdminLayout from "./components/layouts/AdminLayout";
 import ClientLayout from "./components/layouts/ClientLayout";
 
@@ -67,8 +63,6 @@ import BirthdaysReportPage from "./pages/reports/BirthdaysReportPage";
 import CashflowReportPage from "./pages/reports/CashflowReportPage";
 
 function App() {
-  const { isMobile } = useAppShellMode();
-
   return (
     <>
       <Toaster
@@ -105,11 +99,7 @@ function App() {
 
             {/* --- Painel Admin (wrapper protegido) --- */}
             <Route element={<ProtectedRoute />}>
-              {/* Aqui escolhemos o layout dinamicamente */}
-              <Route
-                path="/dashboard"
-                element={isMobile ? <MobileShell /> : <AdminLayout />}
-              >
+              <Route path="/dashboard" element={<AdminLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="clients" element={<Clients />} />
                 <Route path="clients/new" element={<ClientForm />} />
@@ -139,19 +129,23 @@ function App() {
                 <Route path="finance-categories" element={<FinanceCategoriesPage />} />
                 <Route path="suppliers" element={<SuppliersPage />} />
                 <Route path="payment-methods" element={<PaymentMethodsPage />} />
+
                 {/* Configurações extras */}
                 <Route path="cancellation-reasons" element={<CancellationReasonsPage />} />
                 <Route path="client-origins" element={<ClientOriginsPage />} />
               </Route>
 
               {/* Ajuste Google OAuth: /settings direto também protegido */}
-              <Route
-                path="/settings"
-                element={isMobile ? <MobileShell /> : <AdminLayout />}
-              >
+              <Route path="/settings" element={<AdminLayout />}>
                 <Route index element={<SettingsPage />} />
               </Route>
+
+              {/* Atalho raiz para o dashboard (opcional) */}
+              <Route path="/app" element={<Navigate to="/dashboard" replace />} />
             </Route>
+
+            {/* 404 */}
+            <Route path="*" element={<div className="p-6">Página não encontrada.</div>} />
           </Routes>
         </Suspense>
       </ErrorBoundary>
