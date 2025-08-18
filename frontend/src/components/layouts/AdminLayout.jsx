@@ -6,8 +6,10 @@ import Sidebar from '../dashboard/Sidebar';
 /** Título dinâmico por rota */
 function usePageTitle() {
   const { pathname } = useLocation();
+
   const title = useMemo(() => {
     const table = [
+      // Core
       { re: /^\/dashboard$/, label: 'Dashboard' },
       { re: /^\/dashboard\/schedule/, label: 'Agenda' },
       { re: /^\/dashboard\/orders/, label: 'Comandas' },
@@ -22,9 +24,12 @@ function usePageTitle() {
       { re: /^\/dashboard\/anamnesis/, label: 'Anamneses' },
       { re: /^\/dashboard\/packages/, label: 'Pacotes' },
       { re: /^\/dashboard\/waitlist/, label: 'Lista de Espera' },
+
+      // Relatórios
       { re: /^\/dashboard\/reports\/birthdays/, label: 'Aniversariantes' },
-      { re: /^\/dashboard\/reports\/cashflow/, label: 'Fluxo de Caixa' },
       { re: /^\/dashboard\/reports/, label: 'Relatórios' },
+
+      // Financeiro/Configurações
       { re: /^\/dashboard\/payables/, label: 'Contas a Pagar' },
       { re: /^\/dashboard\/receivables/, label: 'Contas a Receber' },
       { re: /^\/dashboard\/finance-categories/, label: 'Categorias Financeiras' },
@@ -32,12 +37,18 @@ function usePageTitle() {
       { re: /^\/dashboard\/payment-methods/, label: 'Formas de Pagamento' },
       { re: /^\/dashboard\/cancellation-reasons/, label: 'Motivos de Cancelamento' },
       { re: /^\/dashboard\/client-origins/, label: 'Origens de Cliente' },
+
+      // Configurações
       { re: /^\/dashboard\/settings/, label: 'Configurações' },
+
+      // rota direta fora do /dashboard (retorno Google)
       { re: /^\/settings$/, label: 'Configurações' },
     ];
+
     const found = table.find((t) => t.re.test(pathname));
     return found ? found.label : 'Dashboard';
   }, [pathname]);
+
   return title;
 }
 
@@ -52,16 +63,15 @@ const AdminLayout = () => {
 
   const handleLogout = useCallback(() => {
     try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('clientToken');
+      localStorage.removeItem('token');       // admin
+      localStorage.removeItem('clientToken'); // segurança
     } catch (_) {}
     navigate('/portal/login/cmdep95530000pspaolfy7dod');
   }, [navigate]);
 
   return (
-    // ⛔️ tiramos w-screen para evitar overflow; deixamos uma área só de scroll no <main>
-    <div className="min-h-screen w-full overflow-hidden bg-gray-100 flex">
-      {/* Overlay mobile */}
+    <div className="flex h-screen overflow-hidden bg-gray-100">
+      {/* Overlay para fechar a sidebar no mobile */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-20 md:hidden"
@@ -69,27 +79,25 @@ const AdminLayout = () => {
         />
       )}
 
-      {/* Sidebar fixo (desktop) / drawer (mobile) */}
+      {/* Sidebar fixa à esquerda */}
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
-      {/* Conteúdo */}
-      <div className="flex-1 flex flex-col md:ml-64 min-h-0 min-w-0">
-        {/* Header único */}
-        <header className="shrink-0 flex items-center justify-between bg-white border-b border-gray-200 h-16 px-4 sm:px-6">
+      {/* Conteúdo principal */}
+      <div className="flex-1 flex flex-col ml-0 md:ml-64 min-w-0">
+        {/* Header fixo (um só) */}
+        <header className="sticky top-0 z-10 flex items-center justify-between bg-white border-b border-gray-200 h-16 px-4 sm:px-6">
           <button
-            onClick={() => setIsMobileMenuOpen((v) => !v)}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="text-gray-600 focus:outline-none md:hidden"
             aria-label="Abrir menu"
           >
             <Menu size={24} />
           </button>
 
-          <h1 className="text-lg sm:text-xl font-semibold text-gray-800">
-            {title}
-          </h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-800 truncate">{title}</h1>
 
           <button
             onClick={handleLogout}
@@ -99,9 +107,10 @@ const AdminLayout = () => {
           </button>
         </header>
 
-        {/* ÚNICA rolagem; sem overflow-x */}
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-6">
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Área das rotas */}
+        <main className="flex-1 overflow-y-auto">
+          {/* Container centralizado e largo; sem overflow-x */}
+          <div className="w-full max-w-[1500px] mx-auto px-4 lg:px-6 2xl:px-8 py-6">
             <Outlet />
           </div>
         </main>

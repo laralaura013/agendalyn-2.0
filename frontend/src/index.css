@@ -2,6 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===========================
+   BASE / LAYOUT SAFEGUARDS
+   =========================== */
+
+/* Elimina barra horizontal global e garante altura total */
+html, body, #root {
+  height: 100%;
+  overflow-x: hidden; /* <— mata a barra horizontal */
+}
+
+/* Impede que filhos forcem overflow horizontal */
+#root, .app-shell {
+  min-width: 0;
+}
+
+/* Por segurança: filhos diretos de grids não estouram a largura */
+.grid > * {
+  min-width: 0;
+}
+
+/* ===========================
+   REACT-BIG-CALENDAR FIXES
+   =========================== */
+
+/* O RBC às vezes força largura; estas regras evitam overflow */
+.rbc-time-view,
+.rbc-time-content,
+.rbc-time-header {
+  min-width: 0 !important;
+}
+
+/* Em time view, não queremos rolagem horizontal nunca */
+.rbc-time-content {
+  overflow-x: hidden !important;
+}
+
+/* Esconde a toolbar do calendário somente no mobile */
+@media (max-width: 767px) {
+  .rbc-toolbar { display: none !important; }
+}
+
+/* ===========================
+   ANIMAÇÕES (SEUS ORIGINAIS)
+   =========================== */
+
 /* 🔽 Fade-in para entradas suaves (já existia) */
 @keyframes fade-in-up {
   from {
@@ -50,12 +95,8 @@
 }
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* 🔽 Slide para elementos que aparecem da esquerda (ex: sidebar, detalhes) */
