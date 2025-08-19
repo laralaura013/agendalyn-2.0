@@ -1,3 +1,4 @@
+// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
@@ -12,76 +13,56 @@ import {
   Filter,
   X,
   CheckCircle2,
-  CalendarDays,
-  Link2,
-  FileText,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-
-// Supondo que estes componentes existam nos seus caminhos relativos
-// import useAppShellMode from "../hooks/useAppShellMode"; // Removido pois a lógica de layout agora é central
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
-// import FloatingActions from "../components/mobile/FloatingActions"; // Lógica de layout agora é central
-// import BottomTabs from "../components/mobile/BottomTabs"; // Lógica de layout agora é central
 
 const DEFAULT_SLOT_MINUTES = 30;
 
-// Funções auxiliares
-function isAbort(err) {
-  return err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled";
-}
-function formatDateInput(d) {
+/* ====================== Helpers ====================== */
+const isAbort = (err) =>
+  err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled";
+
+const toYMD = (d) => {
+  if (!(d instanceof Date)) return null;
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-function startOfWeek(d) {
+};
+
+const formatDateInput = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(
+    2,
+    "0"
+  )}`;
+
+const startOfWeek = (d) => {
   const copy = new Date(d);
   const day = copy.getDay();
   const diff = (day + 6) % 7;
   copy.setDate(copy.getDate() - diff);
   copy.setHours(0, 0, 0, 0);
   return copy;
-}
-function endOfWeek(d) {
+};
+const endOfWeek = (d) => {
   const s = startOfWeek(d);
   const e = new Date(s);
   e.setDate(s.getDate() + 6);
   e.setHours(23, 59, 59, 999);
   return e;
-}
-function startOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
-}
-function endOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-function toYMD(dateObj) {
-  if (!dateObj || typeof dateObj.getFullYear !== 'function') {
-    return null;
-  }
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const day = String(dateObj.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+};
+const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+const endOfMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
 
-
+/* ====================== Componente ====================== */
 export default function Schedule() {
-  // O hook isMobile não é mais necessário aqui, pois o layout decide o que mostrar.
-  // const { isMobile } = useAppShellMode(); 
-  const navigate = useNavigate();
-
-  // estado principal
   const [events, setEvents] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  // catálogos
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -89,12 +70,10 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true);
   const [blocks, setBlocks] = useState([]);
 
-  // visão e filtros
   const [view, setView] = useState("day");
   const [date, setDate] = useState(() => new Date());
   const [selectedPro, setSelectedPro] = useState(null);
 
-  // UI auxiliares
   const [blockEnabled, setBlockEnabled] = useState(false);
   const [openSlots, setOpenSlots] = useState(false);
   const [openApptList, setOpenApptList] = useState(false);
@@ -103,7 +82,6 @@ export default function Schedule() {
   const [openProducts, setOpenProducts] = useState(true);
   const [openLegend, setOpenLegend] = useState(true);
 
-  // slots & waitlist
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
@@ -111,10 +89,10 @@ export default function Schedule() {
 
   const loadedOnceRef = useRef(false);
 
+  /* --------- Params por visão --------- */
   const buildRangeParams = useCallback(
     (baseDate) => {
       const params = {};
-      // Simplificado: a visão mobile será gerenciada pelo componente MobileShell, não aqui.
       if (view === "day") {
         params.date = toYMD(baseDate);
       } else if (view === "week") {
@@ -130,6 +108,7 @@ export default function Schedule() {
     [view, selectedPro]
   );
 
+  /* --------- Loads --------- */
   const loadShared = useCallback(async (signal) => {
     const [c, s, st] = await Promise.all([
       api.get("/clients", { signal }),
@@ -181,8 +160,7 @@ export default function Schedule() {
     },
     [date, buildRangeParams]
   );
-  
-  // ... (O resto das suas funções de fetch e handlers permanecem as mesmas) ...
+
   const fetchAvailableSlots = useCallback(
     async (targetDate = date, proId = selectedPro, minutes = DEFAULT_SLOT_MINUTES, signal) => {
       try {
@@ -235,7 +213,7 @@ export default function Schedule() {
     }
   }, []);
 
-  // Efeitos
+  /* --------- Effects --------- */
   useEffect(() => {
     if (loadedOnceRef.current) return;
     loadedOnceRef.current = true;
@@ -273,7 +251,7 @@ export default function Schedule() {
     return () => ac.abort();
   }, [view, date, selectedPro, fetchAppointments, fetchBlocks]);
 
-  // Handlers
+  /* --------- Handlers --------- */
   const handleSelectSlot = useCallback(
     (slotInfo) => {
       const { start, end } = slotInfo;
@@ -320,8 +298,8 @@ export default function Schedule() {
     },
     [fetchBlocks]
   );
-  
-    const handleSave = async (payload) => {
+
+  const handleSave = async (payload) => {
     const isEditing = !!(selectedEvent && selectedEvent.id);
     const p = isEditing
       ? api.put(`/appointments/${selectedEvent.id}`, payload)
@@ -405,7 +383,8 @@ export default function Schedule() {
       return {
         id: `block_${b.id}`,
         title: b.reason ? `Bloqueado - ${b.reason}` : "Bloqueado",
-        start, end,
+        start,
+        end,
         resource: { ...b, type: "BLOCK" },
         backgroundColor: "#60a5fa",
         borderColor: "#60a5fa",
@@ -415,7 +394,7 @@ export default function Schedule() {
   }, [blocks]);
 
   const combinedEvents = useMemo(() => [...events, ...blockEvents], [events, blockEvents]);
-  
+
   const handlePickAvailableSlot = useCallback(
     (hhmm) => {
       const [h, m] = String(hhmm).split(":").map(Number);
@@ -447,13 +426,46 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-
-  // O return agora é único e focado apenas no conteúdo da página.
+  /* ====================== UI ====================== */
   return (
     <>
+      {/* CSS específico para mobile e para esconder qualquer FAB/CTA de desktop que vaze no mobile */}
+      <style>{`
+        @media (max-width: 768px) {
+          .desktop-only,
+          .fab-desktop,
+          .desktop-fab,
+          .hide-on-mobile,
+          [data-desktop-only="true"] {
+            display: none !important;
+          }
+          /* Se existir algum botão flutuante roxo legado com essas cores/posições, escondemos no mobile */
+          .fixed[class*="right-6"][class*="bottom-6"][class*="bg-purple"]{
+            display: none !important;
+          }
+        }
+      `}</style>
+
       <div className="relative w-full">
-        {/* toolbar */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+        {/* ====== TOPO MOBILE (estilo do print) ====== */}
+        <div className="md:hidden bg-white border-b">
+          <div className="flex items-center justify-between px-4 py-3">
+            <button onClick={goPrev} className="p-2 rounded hover:bg-gray-50" aria-label="Anterior">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="text-base font-semibold capitalize">
+              {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date)}
+            </div>
+            <button onClick={goNext} className="p-2 rounded hover:bg-gray-50" aria-label="Próximo">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
+          <MobileDaysStrip date={date} onChangeDate={(d) => { setDate(d); setView("day"); }} />
+        </div>
+
+        {/* ====== TOOLBAR DESKTOP ====== */}
+        <div className="hidden md:flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
           <div className="flex items-center gap-2">
             <ProfessionalsSelect
               value={selectedPro || ""}
@@ -489,7 +501,7 @@ export default function Schedule() {
             </button>
             <button
               onClick={openEmptyModal}
-              className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+              className="desktop-only px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
             >
               <PlusCircle className="w-4 h-4" />
               Encaixe
@@ -497,13 +509,15 @@ export default function Schedule() {
           </div>
         </div>
 
-        {/* header data */}
-        <div className="w-full bg-white border rounded px-4 py-2 text-sm md:text-base flex items-center justify-between mb-4">
+        {/* ====== Header data (desktop) ====== */}
+        <div className="hidden md:flex w-full bg-white border rounded px-4 py-2 text-sm md:text-base items-center justify-between mb-4">
           <span className="font-medium capitalize">{pageTitle}</span>
-          <span className="text-gray-500">{staff?.find((p) => p.id === selectedPro)?.name ?? ""}</span>
+          <span className="text-gray-500">
+            {staff?.find((p) => p.id === selectedPro)?.name ?? ""}
+          </span>
         </div>
 
-        {/* grid */}
+        {/* ====== grid ====== */}
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-12 xl:col-span-9 2xl:col-span-10 bg-white border rounded overflow-hidden">
             {loading ? (
@@ -521,107 +535,118 @@ export default function Schedule() {
             )}
           </div>
 
-          <aside className="col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 space-y-4">
-            {/* Conteúdo da sidebar da agenda */}
-             <div className="flex items-start justify-between">
-                <label className="flex items-center gap-2 select-none">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={blockEnabled}
-                    onChange={(e) => setBlockEnabled(e.target.checked)}
-                  />
-                  <span className="text-sm font-medium">Bloquear horário</span>
-                </label>
-                <button
-                  onClick={() => setOpenBlockTime(true)}
-                  disabled={!blockEnabled}
-                  className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black disabled:opacity-40 flex items-center gap-2"
-                  title="Bloquear intervalo"
-                >
-                  <Lock className="w-4 h-4" /> Bloquear
+          {/* Sidebar some desktop only */}
+          <aside className="hidden xl:block col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 space-y-4">
+            <div className="flex items-start justify-between">
+              <label className="flex items-center gap-2 select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={blockEnabled}
+                  onChange={(e) => setBlockEnabled(e.target.checked)}
+                />
+                <span className="text-sm font-medium">Bloquear horário</span>
+              </label>
+              <button
+                onClick={() => setOpenBlockTime(true)}
+                disabled={!blockEnabled}
+                className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black disabled:opacity-40 flex items-center gap-2"
+                title="Bloquear intervalo"
+              >
+                <Lock className="w-4 h-4" /> Bloquear
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="border rounded px-2 py-1.5 text-sm w-full"
+                  value={formatDateInput(date)}
+                  onChange={(e) => {
+                    const d = e.target.value ? new Date(e.target.valueAsNumber) : new Date();
+                    setDate(d);
+                  }}
+                />
+                <button className="px-3 py-1.5 border rounded hover:bg-gray-50" onClick={goToday} title="Ir para hoje">
+                  Hoje
                 </button>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    className="border rounded px-2 py-1.5 text-sm w-full"
-                    value={formatDateInput(date)}
-                    onChange={(e) => {
-                      const d = e.target.value ? new Date(e.target.valueAsNumber) : new Date();
-                      setDate(d);
-                    }}
-                  />
-                  <button className="px-3 py-1.5 border rounded hover:bg-gray-50" onClick={goToday} title="Ir para hoje">
-                    Hoje
-                  </button>
-                </div>
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  onClick={() => {
+                    setOpenSlots(true);
+                    const ac = new AbortController();
+                    fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
+                  }}
+                  className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+                >
+                  <CalendarIcon className="w-4 h-4" />
+                  Horários disponíveis
+                </button>
+                <button
+                  onClick={() => setOpenApptList(true)}
+                  className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  Lista de Agendamentos
+                </button>
+                <button
+                  onClick={() => {
+                    setOpenWaitlist(true);
+                    const ac = new AbortController();
+                    fetchWaitlist(ac.signal);
+                  }}
+                  className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
+                >
+                  <List className="w-4 h-4" />
+                  Lista de Espera
+                </button>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    onClick={() => {
-                      setOpenSlots(true);
-                      const ac = new AbortController();
-                      fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
-                    }}
-                    className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-                  >
-                    <CalendarIcon className="w-4 h-4" />
-                    Horários disponíveis
-                  </button>
-                  <button
-                    onClick={() => setOpenApptList(true)}
-                    className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-                  >
-                    <ClipboardList className="w-4 h-4" />
-                    Lista de Agendamentos
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOpenWaitlist(true);
-                      const ac = new AbortController();
-                      fetchWaitlist(ac.signal);
-                    }}
-                    className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
-                  >
-                    <List className="w-4 h-4" />
-                    Lista de Espera
-                  </button>
+            <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
+              <div className="space-y-2">
+                <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
+                <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
+                  {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
+                    <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
+                      <span>{item}</span>
+                      <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
-                <div className="space-y-2">
-                  <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
-                  <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
-                    {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
-                      <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
-                        <span>{item}</span>
-                        <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Accordion>
-              <Accordion title="Legenda" open={openLegend} onToggle={() => setOpenLegend((v) => !v)}>
-                <Legend />
-              </Accordion>
+            </Accordion>
+            <Accordion title="Legenda" open={openLegend} onToggle={() => setOpenLegend((v) => !v)}>
+              <Legend />
+            </Accordion>
           </aside>
         </div>
 
-        {/* Botão flutuante */}
+        {/* ====== FAB "+": no canto no mobile; no desktop mais afastado ====== */}
         <button
           onClick={openEmptyModal}
-          className="fixed bottom-6 right-6 bg-purple-700 text-white rounded-full p-3 shadow-lg hover:bg-purple-800 transition"
+          className={`
+            z-50 fixed rounded-full shadow-lg transition
+            text-white
+            md:right-6 md:bottom-6
+            right-4
+            /* deixa acima da bottom-nav (aprox 72px) */
+            bottom-24
+            bg-sky-600 hover:bg-sky-700
+          `}
           title="Novo agendamento"
+          aria-label="Novo agendamento"
         >
-          <PlusCircle size={28} />
+          <span className="block p-4">
+            <PlusCircle size={28} />
+          </span>
         </button>
       </div>
 
-      {/* ====== SEÇÃO DE MODAIS ====== */}
+      {/* ====== MODAIS ====== */}
       {isModalOpen && (
         <AppointmentModal
           isOpen={isModalOpen}
@@ -635,6 +660,7 @@ export default function Schedule() {
           onDelete={handleDelete}
         />
       )}
+
       {openSlots && (
         <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
           <SlotsModalContent
@@ -650,6 +676,7 @@ export default function Schedule() {
           />
         </BaseModal>
       )}
+
       {openApptList && (
         <SideDrawer title="Lista de Agendamentos" onClose={() => setOpenApptList(false)}>
           <AppointmentsListContent
@@ -662,6 +689,7 @@ export default function Schedule() {
           />
         </SideDrawer>
       )}
+
       {openWaitlist && (
         <SideDrawer title="Lista de Espera" onClose={() => setOpenWaitlist(false)}>
           <WaitlistContent
@@ -675,6 +703,7 @@ export default function Schedule() {
           />
         </SideDrawer>
       )}
+
       {openBlockTime && (
         <BaseModal onClose={() => setOpenBlockTime(false)} title="Bloquear Horário">
           <BlockTimeForm
@@ -706,8 +735,7 @@ export default function Schedule() {
   );
 }
 
-
-// UI auxiliares (Subcomponentes) que provavelmente estão no mesmo arquivo
+/* =============== Sub-componentes UI =============== */
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
     <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
@@ -811,8 +839,8 @@ function SideDrawer({ title, children, onClose }) {
     </div>
   );
 }
-function SlotsModalContent({ date, proId, loading, slots = [], onReload, onPick }) {
-    return (
+function SlotsModalContent({ date, loading, slots = [], onReload, onPick }) {
+  return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600">
@@ -963,5 +991,42 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
         </button>
       </div>
     </form>
+  );
+}
+
+/* ====== Faixa de dias (mobile) ====== */
+function MobileDaysStrip({ date, onChangeDate }) {
+  const start = startOfWeek(date);
+  const days = [...Array(7)].map((_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+
+  const isSameDay = (a, b) =>
+    a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+
+  return (
+    <div className="border-t">
+      <div className="flex gap-2 px-3 py-2 overflow-x-auto no-scrollbar">
+        {days.map((d) => {
+          const active = isSameDay(d, date);
+          return (
+            <button
+              key={d.toISOString()}
+              onClick={() => onChangeDate?.(d)}
+              className={`flex flex-col items-center justify-center min-w-[44px] px-2 py-1 rounded-2xl border ${
+                active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-800 hover:bg-gray-50"
+              }`}
+            >
+              <span className="text-[11px] uppercase">
+                {new Intl.DateTimeFormat("pt-BR", { weekday: "short" }).format(d)}
+              </span>
+              <span className="text-sm font-semibold">{String(d.getDate()).padStart(2, "0")}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
