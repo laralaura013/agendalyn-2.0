@@ -1,6 +1,7 @@
-// frontend/src/pages/Menu.jsx
+// frontend/src/components/mobile/Menu.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   ChevronRight,
   ChevronDown,
@@ -22,13 +23,42 @@ import {
   BarChart3,
   Gift,
   Settings,
+  LogOut,
+  Layers,
 } from "lucide-react";
 
 /**
  * MENU (MOBILE)
- * Mostra grupos (accordions) com links para as rotas do painel.
+ * - Seções em acordeão com ícones
+ * - Botão de sair abaixo de "Configurações"
+ * - Sem FAB aqui (o FAB ficou no Schedule)
  */
 
+/** Metadados dos grupos (ícone e cores do “avatar”) */
+const GROUP_META = {
+  principal: {
+    Icon: LayoutDashboard,
+    tint: "bg-blue-50 text-blue-600",
+  },
+  cadastros: {
+    Icon: Layers,
+    tint: "bg-emerald-50 text-emerald-600",
+  },
+  financeiro: {
+    Icon: Wallet,
+    tint: "bg-violet-50 text-violet-600",
+  },
+  relatorios: {
+    Icon: BarChart3,
+    tint: "bg-amber-50 text-amber-600",
+  },
+  config: {
+    Icon: Settings,
+    tint: "bg-gray-100 text-gray-700",
+  },
+};
+
+/** Seções e itens */
 const GROUPS = [
   {
     id: "principal",
@@ -79,20 +109,36 @@ const GROUPS = [
     id: "config",
     title: "Configurações",
     items: [
-      { label: "Parâmetros", to: "/dashboard/settings", Icon: Settings },
       { label: "Empresa", to: "/dashboard/settings", Icon: Building2 },
+      { label: "Parâmetros", to: "/dashboard/settings", Icon: Settings },
     ],
   },
 ];
 
 export default function Menu() {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(() => new Set(["principal"]));
+  const [open, setOpen] = useState(() => new Set(["principal"])); // abre "Principal" por padrão
 
   const toggle = (id) => {
     const s = new Set(open);
-    s.has(id) ? s.delete(id) : s.add(id);
+    if (s.has(id)) s.delete(id);
+    else s.add(id);
     setOpen(s);
+  };
+
+  const signOut = () => {
+    try {
+      // Limpa credenciais comuns do projeto
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("companyData");
+      sessionStorage.clear();
+      toast.success("Você saiu da conta.");
+    } catch {
+      // no-op
+    } finally {
+      navigate("/login");
+    }
   };
 
   return (
@@ -104,41 +150,69 @@ export default function Menu() {
 
       {/* Conteúdo */}
       <div className="p-3 space-y-4">
-        {GROUPS.map((group) => (
-          <section key={group.id} className="bg-white border rounded-xl shadow-sm">
-            <button
-              onClick={() => toggle(group.id)}
-              className="w-full flex items-center justify-between px-4 py-3"
-            >
-              <span className="font-medium">{group.title}</span>
-              {open.has(group.id) ? (
-                <ChevronDown className="w-5 h-5 text-gray-500" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-gray-500" />
-              )}
-            </button>
+        {GROUPS.map((group) => {
+          const meta = GROUP_META[group.id] || {};
+          const GroupIcon = meta.Icon || LayoutDashboard;
+          const tint = meta.tint || "bg-gray-100 text-gray-700";
+          const isOpen = open.has(group.id);
 
-            {open.has(group.id) && (
-              <div className="divide-y">
-                {group.items.map(({ label, to, Icon }) => (
-                  <button
-                    key={label}
-                    onClick={() => navigate(to)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gray-100">
-                        <Icon className="w-5 h-5 text-gray-700" />
-                      </span>
-                      <span className="text-[15px]">{label}</span>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-        ))}
+          return (
+            <section key={group.id} className="bg-white border rounded-xl shadow-sm overflow-hidden">
+              {/* Cabeçalho do cartão com ícone */}
+              <button
+                onClick={() => toggle(group.id)}
+                className="w-full flex items-center justify-between px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center justify-center w-9 h-9 rounded-full ${tint}`}>
+                    <GroupIcon className="w-5 h-5" />
+                  </span>
+                  <span className="font-medium">{group.title}</span>
+                </div>
+                {isOpen ? (
+                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
+
+              {/* Lista de itens */}
+              {isOpen && (
+                <div className="divide-y">
+                  {group.items.map(({ label, to, Icon }) => (
+                    <button
+                      key={label}
+                      onClick={() => navigate(to)}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gray-100">
+                          <Icon className="w-5 h-5 text-gray-700" />
+                        </span>
+                        <span className="text-[15px]">{label}</span>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+
+        {/* Botão Sair */}
+        <button
+          onClick={signOut}
+          className="w-full bg-white border rounded-xl shadow-sm px-4 py-3 flex items-center justify-between text-red-600 hover:bg-red-50"
+        >
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-50 text-red-600">
+              <LogOut className="w-5 h-5" />
+            </span>
+            <span className="font-medium">Sair</span>
+          </div>
+          <ChevronRight className="w-5 h-5 text-red-400" />
+        </button>
 
         <div className="h-24" />
       </div>
