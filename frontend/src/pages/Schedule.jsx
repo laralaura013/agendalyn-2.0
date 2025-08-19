@@ -1,4 +1,4 @@
-// frontend/src/pages/Schedule.jsx
+// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
@@ -18,7 +18,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
-import FloatingActions from "../components/mobile/FloatingActions.jsx"; // caminho correto
+import FloatingActions from "../components/mobile/FloatingActions.jsx"; // já corrigido
 
 const DEFAULT_SLOT_MINUTES = 30;
 
@@ -429,13 +429,9 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  /* ---------- Listener para FloatingActions (abrir modal 'Agendar') ---------- */
+  /* --------- Listener para FloatingActions --------- */
   useEffect(() => {
-    const handler = () => {
-      setSelectedEvent(null);
-      setSelectedSlot(null);
-      setIsModalOpen(true);
-    };
+    const handler = () => openEmptyModal();
     window.addEventListener("openEmptyAppointment", handler);
     return () => window.removeEventListener("openEmptyAppointment", handler);
   }, []);
@@ -476,13 +472,7 @@ export default function Schedule() {
             </button>
           </div>
 
-          <MobileDaysStrip
-            date={date}
-            onChangeDate={(d) => {
-              setDate(d);
-              setView("day");
-            }}
-          />
+          <MobileDaysStrip date={date} onChangeDate={(d) => { setDate(d); setView("day"); }} />
         </div>
 
         {/* ====== TOOLBAR DESKTOP ====== */}
@@ -533,7 +523,9 @@ export default function Schedule() {
         {/* ====== Header data (desktop) ====== */}
         <div className="hidden md:flex w-full bg-white border rounded px-4 py-2 text-sm md:text-base items-center justify-between mb-4">
           <span className="font-medium capitalize">{pageTitle}</span>
-          <span className="text-gray-500">{staff?.find((p) => p.id === selectedPro)?.name ?? ""}</span>
+          <span className="text-gray-500">
+            {staff?.find((p) => p.id === selectedPro)?.name ?? ""}
+          </span>
         </div>
 
         {/* ====== grid ====== */}
