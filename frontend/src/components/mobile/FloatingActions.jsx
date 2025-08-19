@@ -5,15 +5,18 @@ import { Plus, CalendarDays, Link as LinkIcon, Receipt, List as ListIcon, X } fr
  * FloatingActions (mobile + desktop)
  *
  * Props:
- * - bottomClass?: string   // distância do FAB azul da borda inferior (default: bottom-24)
- * - hidden?: boolean       // quando true, não renderiza nenhum FAB (ex.: modal/drawer aberto)
+ * - hidden?: boolean                      // força esconder tudo (ex.: quando modal aberto)
  * - onCreateAppointment?: () => void
  * - onOpenOrder?: () => void
  * - onOpenWaitlist?: () => void
  * - onShowBookingLink?: () => Promise<void> | void
+ *
+ * Comportamento:
+ * - MOBILE (md:hidden): um speed-dial no canto inferior direito (acima da bottom-nav).
+ * - DESKTOP (hidden md:inline-flex): um FAB azul no canto inferior direito.
+ * - "Agendar horário" dispara a prop e também o evento global "openEmptyAppointment".
  */
 export default function FloatingActions({
-  bottomClass = "bottom-24",
   hidden = false,
   onCreateAppointment,
   onOpenOrder,
@@ -22,17 +25,11 @@ export default function FloatingActions({
 }) {
   const [open, setOpen] = useState(false);
 
-  if (hidden) return null; // some tudo quando houver modal/drawer aberto
-
   const runCreateAppointment = () => {
-    // chama o handler da página (se existir)
     onCreateAppointment?.();
-    // e também dispara um evento global para máxima compatibilidade
     try {
       window?.dispatchEvent?.(new Event("openEmptyAppointment"));
-    } catch {
-      /* no-op */
-    }
+    } catch { /* no-op */ }
   };
 
   const actions = useMemo(
@@ -52,14 +49,9 @@ export default function FloatingActions({
             await onShowBookingLink();
             return;
           }
-          // fallback simples
           const url = `${window.location.origin}/agendar/`;
-          try {
-            await navigator.clipboard.writeText(url);
-            alert("Link copiado!");
-          } catch {
-            alert(url);
-          }
+          try { await navigator.clipboard.writeText(url); alert("Link copiado!"); }
+          catch { alert(url); }
         },
       },
       {
@@ -78,22 +70,15 @@ export default function FloatingActions({
     [onOpenOrder, onOpenWaitlist, onShowBookingLink]
   );
 
+  const z = "z-[9999]"; // por cima da bottom-nav e do calendário
+
+  if (hidden) return null;
+
   return (
     <>
-      {/* FAB principal (AZUL) – canto inferior direito (desktop + mobile) */}
-      <button
-        type="button"
-        aria-label="Novo agendamento"
-        title="Novo agendamento"
-        onClick={runCreateAppointment}
-        className={`fixed right-4 ${bottomClass} z-40 w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white flex items-center justify-center md:right-6`}
-      >
-        <Plus size={24} />
-      </button>
-
-      {/* Speed-dial (apenas mobile) */}
-      <div className="fixed right-4 bottom-6 z-40 md:hidden">
-        {/* Lista de ações quando aberto */}
+      {/* ===== MOBILE: speed-dial (somente em telas < md) ===== */}
+      <div className={`fixed right-4 bottom-24 md:hidden ${z}`}>
+        {/* Itens quando aberto */}
         <div
           className={`mb-2 flex flex-col items-end gap-2 transition-all duration-200 ${
             open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
@@ -114,7 +99,7 @@ export default function FloatingActions({
           ))}
         </div>
 
-        {/* Botão que abre/fecha o speed-dial (PRETO) */}
+        {/* Toggle do speed-dial */}
         <button
           type="button"
           aria-label={open ? "Fechar ações" : "Ações rápidas"}
@@ -125,6 +110,17 @@ export default function FloatingActions({
           {open ? <X size={20} /> : <Plus size={20} />}
         </button>
       </div>
+
+      {/* ===== DESKTOP: FAB azul (somente em telas >= md) ===== */}
+      <button
+        type="button"
+        aria-label="Novo agendamento"
+        title="Novo agendamento"
+        onClick={runCreateAppointment}
+        className={`hidden md:inline-flex fixed right-6 bottom-6 ${z} w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white items-center justify-center`}
+      >
+        <Plus size={24} />
+      </button>
     </>
   );
 }
