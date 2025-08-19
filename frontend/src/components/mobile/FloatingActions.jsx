@@ -1,12 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Plus, CalendarDays, Link as LinkIcon, Receipt, List as ListIcon, X } from "lucide-react";
 
 /**
- * FloatingActions — FAB exclusivo do MOBILE.
+ * FloatingActions (MOBILE)
  *
  * Props:
- * - hidden?: boolean                // se true, não renderiza (ex.: modal aberto)
- * - bottomOffsetPx?: number         // afastamento da borda inferior (ex.: 96 para ficar acima da bottom-nav)
+ * - hidden?: boolean                  -> se true, não renderiza nada (usado quando modal estiver aberto)
+ * - bottomClass?: string              -> classe para ajustar a distância do fundo (default: bottom-[88px])
  * - onCreateAppointment?: () => void
  * - onOpenOrder?: () => void
  * - onOpenWaitlist?: () => void
@@ -14,28 +14,45 @@ import { Plus, CalendarDays, Link as LinkIcon, Receipt, List as ListIcon, X } fr
  */
 export default function FloatingActions({
   hidden = false,
-  bottomOffsetPx = 96,
+  bottomClass = "bottom-[88px]",
   onCreateAppointment,
   onOpenOrder,
   onOpenWaitlist,
   onShowBookingLink,
 }) {
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
 
-  if (hidden) return null; // não renderiza nada
+  // Fecha o speed-dial clicando fora
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!open) return;
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("click", onDocClick, true);
+    return () => document.removeEventListener("click", onDocClick, true);
+  }, [open]);
 
-  const runCreate = () => {
+  if (hidden) return null; // não renderiza quando houver modal/drawer aberto
+
+  const runCreateAppointment = () => {
     onCreateAppointment?.();
-    // fallback evento global (se alguém escuta no Schedule)
     try {
+      // evento global extra (caso o Schedule esteja escutando)
       window?.dispatchEvent?.(new Event("openEmptyAppointment"));
     } catch {}
-    setOpen(false);
   };
 
   const actions = useMemo(
     () => [
-      { id: "schedule", label: "Agendar horário", icon: <CalendarDays size={16} />, run: runCreate },
+      {
+        id: "schedule",
+        label: "Agendar horário",
+        icon: <CalendarDays size={16} />,
+        run: () => runCreateAppointment(),
+      },
       {
         id: "share-link",
         label: "Link de agendamento",
@@ -43,58 +60,52 @@ export default function FloatingActions({
         run: async () => {
           if (onShowBookingLink) {
             await onShowBookingLink();
-          } else {
-            const url = `${window.location.origin}/agendar/`;
-            try {
-              await navigator.clipboard.writeText(url);
-              alert("Link copiado!");
-            } catch {
-              alert(url);
-            }
+            return;
           }
-          setOpen(false);
+          const url = `${window.location.origin}/agendar/`;
+          try {
+            await navigator.clipboard.writeText(url);
+            alert("Link copiado!");
+          } catch {
+            alert(url);
+          }
         },
       },
       {
         id: "open-order",
         label: "Abrir comanda",
         icon: <Receipt size={16} />,
-        run: () => {
-          onOpenOrder?.();
-          setOpen(false);
-        },
+        run: () => onOpenOrder?.(),
       },
       {
         id: "waitlist",
         label: "Lista de espera",
         icon: <ListIcon size={16} />,
-        run: () => {
-          onOpenWaitlist?.();
-          setOpen(false);
-        },
+        run: () => onOpenWaitlist?.(),
       },
     ],
     [onOpenOrder, onOpenWaitlist, onShowBookingLink]
   );
 
-  // Somente no mobile (esconde em md e acima)
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-[60] md:hidden"
-      style={{ bottom: `calc(${bottomOffsetPx}px + env(safe-area-inset-bottom))` }}
+      ref={wrapRef}
+      className={`fixed right-4 ${bottomClass} z-40 md:hidden`} // SOMENTE MOBILE, canto direito
     >
-      {/* Items do speed-dial */}
+      {/* Itens quando aberto */}
       <div
-        className={`mb-2 flex flex-col items-center gap-2 transition-all duration-200 pointer-events-none ${
-          open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+        className={`mb-2 flex flex-col items-end gap-2 transition-all duration-200 ${
+          open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
         }`}
-        aria-hidden={!open}
       >
         {actions.map((a) => (
           <button
             key={a.id}
-            onClick={a.run}
-            className="pointer-events-auto px-3 py-2 bg-white rounded-full shadow-lg border border-gray-200 text-sm flex items-center gap-2"
+            onClick={() => {
+              setOpen(false);
+              a.run?.();
+            }}
+            className="px-3 py-2 bg-white rounded-full shadow-lg border border-gray-200 text-sm flex items-center gap-2"
           >
             <span>{a.label}</span>
             {a.icon}
