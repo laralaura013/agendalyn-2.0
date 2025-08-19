@@ -17,7 +17,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
-import FloatingActions from "../components/schedule/FloatingActions";
+import FloatingActions from "../components/mobile/FloatingActions.jsx"; // <<< caminho corrigido
 
 const DEFAULT_SLOT_MINUTES = 30;
 
