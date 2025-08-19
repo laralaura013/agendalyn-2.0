@@ -34,10 +34,7 @@ const toYMD = (d) => {
 };
 
 const formatDateInput = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(
-    2,
-    "0"
-  )}`;
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const startOfWeek = (d) => {
   const copy = new Date(d);
@@ -428,7 +425,7 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  /* ---------- Listener para o FAB mobile (fallback global) ---------- */
+  /* ---------- Listener global p/ FAB agendar ---------- */
   useEffect(() => {
     const handler = () => openEmptyModal();
     window.addEventListener("openEmptyAppointment", handler);
@@ -436,6 +433,8 @@ export default function Schedule() {
   }, []);
 
   /* ====================== UI ====================== */
+  const anyOverlayOpen = isModalOpen || openSlots || openApptList || openWaitlist || openBlockTime;
+
   return (
     <>
       <div className="relative w-full">
@@ -453,7 +452,13 @@ export default function Schedule() {
             </button>
           </div>
 
-          <MobileDaysStrip date={date} onChangeDate={(d) => { setDate(d); setView("day"); }} />
+          <MobileDaysStrip
+            date={date}
+            onChangeDate={(d) => {
+              setDate(d);
+              setView("day");
+            }}
+          />
         </div>
 
         {/* ====== TOOLBAR DESKTOP ====== */}
@@ -504,9 +509,7 @@ export default function Schedule() {
         {/* ====== Header data (desktop) ====== */}
         <div className="hidden md:flex w-full bg-white border rounded px-4 py-2 text-sm md:text-base items-center justify-between mb-4">
           <span className="font-medium capitalize">{pageTitle}</span>
-          <span className="text-gray-500">
-            {staff?.find((p) => p.id === selectedPro)?.name ?? ""}
-          </span>
+          <span className="text-gray-500">{staff?.find((p) => p.id === selectedPro)?.name ?? ""}</span>
         </div>
 
         {/* ====== grid ====== */}
@@ -620,6 +623,7 @@ export default function Schedule() {
         {/* FABs (desktop e mobile) */}
         <FloatingActions
           bottomClass="bottom-24"
+          hidden={anyOverlayOpen}           // <— some o FAB quando tiver modal/drawer aberto
           onCreateAppointment={openEmptyModal}
           onOpenOrder={() => navigate("/dashboard/orders/new")}
           onOpenWaitlist={() => navigate("/dashboard/waitlist")}
@@ -883,7 +887,11 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
       <div className="divide-y border rounded max-h-[60vh] overflow-y-auto">
         {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
         {filtered.map((ev) => (
-          <button key={ev.id} onClick={() => onOpen?.(ev.id)} className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50">
+          <button
+            key={ev.id}
+            onClick={() => onOpen?.(ev.id)}
+            className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50"
+          >
             <div className="text-sm">
               <div className="font-medium">{ev.title}</div>
               <div className="text-gray-500">
@@ -997,8 +1005,7 @@ function MobileDaysStrip({ date, onChangeDate }) {
     return d;
   });
 
-  const isSameDay = (a, b) =>
-    a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  const isSameDay = (a, b) => a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
 
   return (
     <div className="border-t">

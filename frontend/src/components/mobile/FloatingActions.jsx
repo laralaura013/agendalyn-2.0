@@ -2,21 +2,19 @@ import React, { useMemo, useState } from "react";
 import { Plus, CalendarDays, Link as LinkIcon, Receipt, List as ListIcon, X } from "lucide-react";
 
 /**
- * FloatingActions (desktop + mobile)
+ * FloatingActions (mobile + desktop)
  *
  * Props:
- * - bottomClass?: string                 // distância do FAB azul (desktop). Ex.: "bottom-24"
+ * - bottomClass?: string   // distância do FAB azul da borda inferior (default: bottom-24)
+ * - hidden?: boolean       // quando true, não renderiza nenhum FAB (ex.: modal/drawer aberto)
  * - onCreateAppointment?: () => void
  * - onOpenOrder?: () => void
  * - onOpenWaitlist?: () => void
  * - onShowBookingLink?: () => Promise<void> | void
- *
- * Regras:
- * - DESKTOP: mostra apenas o FAB azul (novo agendamento).
- * - MOBILE: mostra apenas o FAB preto (abre o speed-dial com as ações).
  */
 export default function FloatingActions({
   bottomClass = "bottom-24",
+  hidden = false,
   onCreateAppointment,
   onOpenOrder,
   onOpenWaitlist,
@@ -24,9 +22,12 @@ export default function FloatingActions({
 }) {
   const [open, setOpen] = useState(false);
 
+  if (hidden) return null; // some tudo quando houver modal/drawer aberto
+
   const runCreateAppointment = () => {
+    // chama o handler da página (se existir)
     onCreateAppointment?.();
-    // fallback para qualquer listener global (Schedule.jsx escuta esse evento)
+    // e também dispara um evento global para máxima compatibilidade
     try {
       window?.dispatchEvent?.(new Event("openEmptyAppointment"));
     } catch {
@@ -51,6 +52,7 @@ export default function FloatingActions({
             await onShowBookingLink();
             return;
           }
+          // fallback simples
           const url = `${window.location.origin}/agendar/`;
           try {
             await navigator.clipboard.writeText(url);
@@ -78,20 +80,20 @@ export default function FloatingActions({
 
   return (
     <>
-      {/* FAB AZUL — SOMENTE DESKTOP */}
+      {/* FAB principal (AZUL) – canto inferior direito (desktop + mobile) */}
       <button
         type="button"
         aria-label="Novo agendamento"
         title="Novo agendamento"
         onClick={runCreateAppointment}
-        className={`fixed right-4 ${bottomClass} z-[60] w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white items-center justify-center hidden md:flex`}
+        className={`fixed right-4 ${bottomClass} z-40 w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white flex items-center justify-center md:right-6`}
       >
         <Plus size={24} />
       </button>
 
-      {/* SPEED-DIAL — SOMENTE MOBILE */}
-      <div className="fixed right-4 bottom-20 z-[70] md:hidden">
-        {/* Itens quando aberto */}
+      {/* Speed-dial (apenas mobile) */}
+      <div className="fixed right-4 bottom-6 z-40 md:hidden">
+        {/* Lista de ações quando aberto */}
         <div
           className={`mb-2 flex flex-col items-end gap-2 transition-all duration-200 ${
             open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
@@ -112,7 +114,7 @@ export default function FloatingActions({
           ))}
         </div>
 
-        {/* Botão que abre/fecha o speed-dial */}
+        {/* Botão que abre/fecha o speed-dial (PRETO) */}
         <button
           type="button"
           aria-label={open ? "Fechar ações" : "Ações rápidas"}
