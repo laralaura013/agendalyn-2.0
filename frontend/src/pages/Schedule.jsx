@@ -1,4 +1,3 @@
-// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
@@ -18,7 +17,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
-import FloatingActions from "../components/mobile/FloatingActions.jsx"; // já corrigido
+import FloatingActions from "../components/mobile/FloatingActions.jsx";
 
 const DEFAULT_SLOT_MINUTES = 30;
 
@@ -429,30 +428,12 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  /* --------- Listener para FloatingActions --------- */
+  /* ---------- Listener para o FAB mobile (fallback global) ---------- */
   useEffect(() => {
     const handler = () => openEmptyModal();
     window.addEventListener("openEmptyAppointment", handler);
     return () => window.removeEventListener("openEmptyAppointment", handler);
   }, []);
-
-  /* ---------- Callbacks do FAB ---------- */
-  const goToNewOrder = () => navigate("/dashboard/orders/new");
-  const goToWaitlist = () => navigate("/dashboard/waitlist");
-  const showBookingLink = async () => {
-    try {
-      const storedCompany =
-        JSON.parse(localStorage.getItem("companyData")) ||
-        JSON.parse(localStorage.getItem("user"))?.company ||
-        {};
-      const companyId = storedCompany?.id || "SEU_COMPANY_ID";
-      const link = `${window.location.origin}/agendar/${companyId}`;
-      await navigator.clipboard?.writeText(link);
-      toast.success("Link de agendamento copiado!");
-    } catch {
-      toast.error("Não foi possível copiar o link.");
-    }
-  };
 
   /* ====================== UI ====================== */
   return (
@@ -640,9 +621,22 @@ export default function Schedule() {
         <FloatingActions
           bottomClass="bottom-24"
           onCreateAppointment={openEmptyModal}
-          onOpenOrder={goToNewOrder}
-          onOpenWaitlist={goToWaitlist}
-          onShowBookingLink={showBookingLink}
+          onOpenOrder={() => navigate("/dashboard/orders/new")}
+          onOpenWaitlist={() => navigate("/dashboard/waitlist")}
+          onShowBookingLink={async () => {
+            try {
+              const storedCompany =
+                JSON.parse(localStorage.getItem("companyData")) ||
+                JSON.parse(localStorage.getItem("user"))?.company ||
+                {};
+              const companyId = storedCompany?.id || "SEU_COMPANY_ID";
+              const link = `${window.location.origin}/agendar/${companyId}`;
+              await navigator.clipboard?.writeText(link);
+              toast.success("Link de agendamento copiado!");
+            } catch {
+              toast.error("Não foi possível copiar o link.");
+            }
+          }}
         />
       </div>
 

@@ -1,15 +1,19 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { Plus, CalendarDays, Link as LinkIcon, Receipt, List as ListIcon, X } from "lucide-react";
 
 /**
- * FloatingActions (mobile + desktop)
+ * FloatingActions (desktop + mobile)
  *
  * Props:
- * - bottomClass?: string
+ * - bottomClass?: string                 // distância do FAB azul (desktop). Ex.: "bottom-24"
  * - onCreateAppointment?: () => void
  * - onOpenOrder?: () => void
  * - onOpenWaitlist?: () => void
  * - onShowBookingLink?: () => Promise<void> | void
+ *
+ * Regras:
+ * - DESKTOP: mostra apenas o FAB azul (novo agendamento).
+ * - MOBILE: mostra apenas o FAB preto (abre o speed-dial com as ações).
  */
 export default function FloatingActions({
   bottomClass = "bottom-24",
@@ -19,31 +23,16 @@ export default function FloatingActions({
   onShowBookingLink,
 }) {
   const [open, setOpen] = useState(false);
-  const isBrowser = typeof window !== "undefined";
 
   const runCreateAppointment = () => {
-    if (onCreateAppointment) {
-      // Preferimos a prop se ela existir
-      onCreateAppointment();
-    } else if (isBrowser) {
-      // Fallback por evento global apenas se não tiver prop
-      try {
-        window.dispatchEvent(new Event("openEmptyAppointment"));
-      } catch {
-        /* no-op */
-      }
+    onCreateAppointment?.();
+    // fallback para qualquer listener global (Schedule.jsx escuta esse evento)
+    try {
+      window?.dispatchEvent?.(new Event("openEmptyAppointment"));
+    } catch {
+      /* no-op */
     }
   };
-
-  // Fecha com ESC quando o menu estiver aberto
-  useEffect(() => {
-    if (!open || !isBrowser) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, isBrowser]);
 
   const actions = useMemo(
     () => [
@@ -51,7 +40,7 @@ export default function FloatingActions({
         id: "schedule",
         label: "Agendar horário",
         icon: <CalendarDays size={16} />,
-        run: runCreateAppointment,
+        run: () => runCreateAppointment(),
       },
       {
         id: "share-link",
@@ -62,8 +51,6 @@ export default function FloatingActions({
             await onShowBookingLink();
             return;
           }
-          // Fallback simples
-          if (!isBrowser) return;
           const url = `${window.location.origin}/agendar/`;
           try {
             await navigator.clipboard.writeText(url);
@@ -86,53 +73,33 @@ export default function FloatingActions({
         run: () => onOpenWaitlist?.(),
       },
     ],
-    [onOpenOrder, onOpenWaitlist, onShowBookingLink, isBrowser]
+    [onOpenOrder, onOpenWaitlist, onShowBookingLink]
   );
 
   return (
     <>
-      {/* FAB principal (sempre visível) */}
+      {/* FAB AZUL — SOMENTE DESKTOP */}
       <button
         type="button"
         aria-label="Novo agendamento"
         title="Novo agendamento"
         onClick={runCreateAppointment}
-        className={`fixed right-4 ${bottomClass} z-40 w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white flex items-center justify-center`}
+        className={`fixed right-4 ${bottomClass} z-[60] w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white items-center justify-center hidden md:flex`}
       >
         <Plus size={24} />
       </button>
 
-      {/* Speed-dial (apenas mobile) */}
-      <div
-        className="fixed right-4 md:hidden z-40"
-        style={{
-          // respeita a safe-area do iOS
-          bottom: "calc(1.5rem + env(safe-area-inset-bottom))",
-        }}
-      >
-        {/* Backdrop invisível para fechar ao tocar fora */}
-        {open && (
-          <button
-            aria-hidden="true"
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 md:hidden z-30"
-          />
-        )}
-
+      {/* SPEED-DIAL — SOMENTE MOBILE */}
+      <div className="fixed right-4 bottom-20 z-[70] md:hidden">
         {/* Itens quando aberto */}
         <div
-          id="fab-menu"
-          role="menu"
-          aria-label="Ações rápidas"
-          className={`z-40 mb-2 flex flex-col items-end gap-2 transition-all duration-200 ${
+          className={`mb-2 flex flex-col items-end gap-2 transition-all duration-200 ${
             open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
           }`}
         >
           {actions.map((a) => (
             <button
               key={a.id}
-              role="menuitem"
               onClick={() => {
                 setOpen(false);
                 a.run?.();
@@ -148,9 +115,6 @@ export default function FloatingActions({
         {/* Botão que abre/fecha o speed-dial */}
         <button
           type="button"
-          aria-haspopup="menu"
-          aria-expanded={open}
-          aria-controls="fab-menu"
           aria-label={open ? "Fechar ações" : "Ações rápidas"}
           title={open ? "Fechar ações" : "Ações rápidas"}
           onClick={() => setOpen((v) => !v)}
