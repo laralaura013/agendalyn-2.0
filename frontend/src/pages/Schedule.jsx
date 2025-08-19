@@ -429,7 +429,7 @@ export default function Schedule() {
   /* ====================== UI ====================== */
   return (
     <>
-      {/* CSS específico para mobile e para esconder qualquer FAB/CTA de desktop que vaze no mobile */}
+      {/* CSS: esconde qualquer FAB fixo de canto no mobile que não seja o nosso */}
       <style>{`
         @media (max-width: 768px) {
           .desktop-only,
@@ -439,15 +439,19 @@ export default function Schedule() {
           [data-desktop-only="true"] {
             display: none !important;
           }
-          /* Se existir algum botão flutuante roxo legado com essas cores/posições, escondemos no mobile */
+          /* algum FAB legado roxo */
           .fixed[class*="right-6"][class*="bottom-6"][class*="bg-purple"]{
+            display: none !important;
+          }
+          /* esconde QUALQUER outro botão fixo no canto inferior direito que não seja o nosso (#schedule-fab) */
+          .fixed[class*="bottom-"][class*="right-"]:not(#schedule-fab){
             display: none !important;
           }
         }
       `}</style>
 
       <div className="relative w-full">
-        {/* ====== TOPO MOBILE (estilo do print) ====== */}
+        {/* ====== TOPO MOBILE ====== */}
         <div className="md:hidden bg-white border-b">
           <div className="flex items-center justify-between px-4 py-3">
             <button onClick={goPrev} className="p-2 rounded hover:bg-gray-50" aria-label="Anterior">
@@ -535,7 +539,7 @@ export default function Schedule() {
             )}
           </div>
 
-          {/* Sidebar some desktop only */}
+          {/* Sidebar desktop only */}
           <aside className="hidden xl:block col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 space-y-4">
             <div className="flex items-start justify-between">
               <label className="flex items-center gap-2 select-none">
@@ -625,24 +629,15 @@ export default function Schedule() {
           </aside>
         </div>
 
-        {/* ====== FAB "+": no canto no mobile; no desktop mais afastado ====== */}
+        {/* ====== FAB ÚNICO (o que funciona), agora no canto inferior direito ====== */}
         <button
+          id="schedule-fab"
           onClick={openEmptyModal}
-          className={`
-            z-50 fixed rounded-full shadow-lg transition
-            text-white
-            md:right-6 md:bottom-6
-            right-4
-            /* deixa acima da bottom-nav (aprox 72px) */
-            bottom-24
-            bg-sky-600 hover:bg-sky-700
-          `}
+          className="z-50 fixed bottom-6 right-6 rounded-full shadow-lg transition bg-sky-600 hover:bg-sky-700 text-white p-4"
           title="Novo agendamento"
           aria-label="Novo agendamento"
         >
-          <span className="block p-4">
-            <PlusCircle size={28} />
-          </span>
+          <PlusCircle size={28} />
         </button>
       </div>
 
