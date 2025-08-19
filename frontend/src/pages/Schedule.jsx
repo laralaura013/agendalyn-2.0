@@ -1,4 +1,3 @@
-// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
@@ -14,9 +13,11 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
+import FloatingActions from "../components/schedule/FloatingActions";
 
 const DEFAULT_SLOT_MINUTES = 30;
 
@@ -88,6 +89,7 @@ export default function Schedule() {
   const [waitlistLoading, setWaitlistLoading] = useState(false);
 
   const loadedOnceRef = useRef(false);
+  const navigate = useNavigate();
 
   /* --------- Params por visão --------- */
   const buildRangeParams = useCallback(
@@ -426,22 +428,27 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
+  /* ---------- Callbacks do FAB ---------- */
+  const goToNewOrder = () => navigate("/dashboard/orders/new");
+  const goToWaitlist = () => navigate("/dashboard/waitlist");
+  const showBookingLink = async () => {
+    try {
+      const storedCompany =
+        JSON.parse(localStorage.getItem("companyData")) ||
+        JSON.parse(localStorage.getItem("user"))?.company ||
+        {};
+      const companyId = storedCompany?.id || "SEU_COMPANY_ID";
+      const link = `${window.location.origin}/agendar/${companyId}`;
+      await navigator.clipboard?.writeText(link);
+      toast.success("Link de agendamento copiado!");
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  };
+
   /* ====================== UI ====================== */
   return (
     <>
-      {/* CSS: esconde duplicatas no mobile, mas mantém nosso FAB (#schedule-fab) */}
-      <style>{`
-        @media (max-width: 768px) {
-          .desktop-only,
-          .fab-desktop,
-          .desktop-fab,
-          .hide-on-mobile,
-          [data-desktop-only="true"] { display: none !important; }
-          .fixed[class*="right-6"][class*="bottom-6"][class*="bg-purple"]{ display:none !important; }
-          .fixed[class*="bottom-"][class*="right-"]:not(#schedule-fab){ display:none !important; }
-        }
-      `}</style>
-
       <div className="relative w-full">
         {/* ====== TOPO MOBILE ====== */}
         <div className="md:hidden bg-white border-b">
@@ -497,7 +504,7 @@ export default function Schedule() {
             </button>
             <button
               onClick={openEmptyModal}
-              className="desktop-only px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+              className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
             >
               <PlusCircle className="w-4 h-4" />
               Encaixe
@@ -621,23 +628,14 @@ export default function Schedule() {
           </aside>
         </div>
 
-        {/* ====== FAB ÚNICO (o que FUNCIONA), movido pro canto e acima da bottom-nav ====== */}
-        <button
-          id="schedule-fab"
-          onClick={openEmptyModal}
-          className="
-            z-50 fixed
-            right-6
-            bottom-24   /* acima da bottom-nav no mobile (~96px) */
-            md:bottom-6 /* no desktop fica mais baixo */
-            rounded-full shadow-lg transition
-            bg-sky-600 hover:bg-sky-700 text-white p-4
-          "
-          title="Novo agendamento"
-          aria-label="Novo agendamento"
-        >
-          <PlusCircle size={28} />
-        </button>
+        {/* FABs (desktop e mobile) */}
+        <FloatingActions
+          bottomClass="bottom-24"
+          onCreateAppointment={openEmptyModal}
+          onOpenOrder={goToNewOrder}
+          onOpenWaitlist={goToWaitlist}
+          onShowBookingLink={showBookingLink}
+        />
       </div>
 
       {/* ====== MODAIS ====== */}

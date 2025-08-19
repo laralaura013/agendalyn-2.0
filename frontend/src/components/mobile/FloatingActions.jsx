@@ -1,85 +1,111 @@
 import React, { useMemo, useState } from "react";
-import { Plus, CalendarDays, Link as LinkIcon, Receipt, List } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Plus,
+  X,
+  Calendar as CalendarIcon,
+  Link as LinkIcon,
+  ClipboardList,
+  List,
+} from "lucide-react";
 
 /**
- * FAB + Speed-dial
+ * FloatingActions
+ * - Desktop (md+): FAB único que chama onCreateAppointment()
+ * - Mobile (<md): speed-dial com 4 ações (agendar, link, comanda, lista de espera)
  *
  * Props:
- * - area?: "admin" | "client" (opcional se não passar "actions")
- * - actions?: Array<{ id:string, label:string, icon:ReactNode, run:()=>void }>
- * - hideOn?: string[]  (rotas onde o FAB não aparece; prefix match)
+ *  - onCreateAppointment: () => void
+ *  - onOpenOrder: () => void
+ *  - onOpenWaitlist: () => void
+ *  - onShowBookingLink: () => void
+ *  - bottomClass?: string   (ex.: "bottom-24" para evitar colisão com bottom-nav)
  */
 export default function FloatingActions({
-  area = "admin",
-  actions: actionsProp,
-  hideOn = ["/dashboard/settings"],
+  onCreateAppointment,
+  onOpenOrder,
+  onOpenWaitlist,
+  onShowBookingLink,
+  bottomClass = "bottom-24",
 }) {
   const [open, setOpen] = useState(false);
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
 
-  const defaultActions = useMemo(() => {
-    if (area === "admin") {
-      return [
-        { id: "schedule", label: "Agendar horário", icon: <CalendarDays size={16} />, run: () => navigate("/dashboard/schedule") },
-        {
-          id: "share-link",
-          label: "Link de agendamento",
-          icon: <LinkIcon size={16} />,
-          run: async () => {
-            const url = `${window.location.origin}/agendar/`;
-            try { await navigator.clipboard.writeText(url); alert("Link copiado!"); }
-            catch { alert(url); }
-          },
-        },
-        { id: "open-order", label: "Abrir comanda", icon: <Receipt size={16} />, run: () => navigate("/dashboard/orders") },
-        { id: "waitlist", label: "Lista de espera", icon: <List size={16} />, run: () => navigate("/dashboard/waitlist") },
-      ];
-    }
-    return [
-      { id: "new-booking", label: "Novo agendamento", icon: <CalendarDays size={16} />, run: () => navigate("/portal/agenda") },
-      { id: "packages", label: "Meus pacotes", icon: <List size={16} />, run: () => navigate("/portal/pacotes") },
-    ];
-  }, [area, navigate]);
-
-  const actions = actionsProp?.length ? actionsProp : defaultActions;
-
-  const hidden = (hideOn || []).some((h) => pathname.startsWith(h));
-  if (hidden) return null;
+  // distância do fundo (não colidir com a bottom nav)
+  const bottom = useMemo(() => bottomClass, [bottomClass]);
 
   return (
-    <div className="fixed right-4 bottom-24 z-50">
-      {/* Itens quando aberto */}
-      <div
-        className={`flex flex-col items-end gap-2 transition-all duration-200 ${
-          open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
-        }`}
-      >
-        {actions.map((a) => (
-          <button
-            key={a.id}
-            onClick={() => {
-              setOpen(false);
-              a.run?.();
-            }}
-            className="px-3 py-2 bg-white rounded-full shadow-lg border border-gray-200 text-sm flex items-center gap-2"
-          >
-            <span>{a.label}</span>
-            {a.icon}
-          </button>
-        ))}
-      </div>
-
-      {/* Botão principal (AZUL) */}
+    <>
+      {/* DESKTOP: FAB direto para agendar */}
       <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white flex items-center justify-center"
-        aria-label="Ações rápidas"
-        title={open ? "Fechar ações" : "Abrir ações"}
+        onClick={onCreateAppointment}
+        className={`hidden md:flex fixed ${bottom} right-6 z-50 h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:scale-105 active:scale-95 transition`}
+        aria-label="Novo agendamento"
+        title="Novo agendamento"
       >
-        {open ? "✕" : <Plus size={24} />}
+        <Plus className="h-7 w-7" />
       </button>
-    </div>
+
+      {/* MOBILE: Speed-dial com 4 ações */}
+      <div className={`md:hidden fixed ${bottom} right-6 z-50 flex flex-col items-end gap-3`}>
+        {open && (
+          <div className="flex flex-col items-end gap-3">
+            <ActionChip
+              label="Agendar horário"
+              icon={<CalendarIcon className="h-5 w-5" />}
+              onClick={() => {
+                setOpen(false);
+                onCreateAppointment?.();
+              }}
+            />
+            <ActionChip
+              label="Link de agendamento"
+              icon={<LinkIcon className="h-5 w-5" />}
+              onClick={() => {
+                setOpen(false);
+                onShowBookingLink?.();
+              }}
+            />
+            <ActionChip
+              label="Abrir comanda"
+              icon={<ClipboardList className="h-5 w-5" />}
+              onClick={() => {
+                setOpen(false);
+                onOpenOrder?.();
+              }}
+            />
+            <ActionChip
+              label="Lista de espera"
+              icon={<List className="h-5 w-5" />}
+              onClick={() => {
+                setOpen(false);
+                onOpenWaitlist?.();
+              }}
+            />
+          </div>
+        )}
+
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-sky-600 text-white shadow-xl transition hover:scale-105 active:scale-95"
+          aria-label={open ? "Fechar ações" : "Abrir ações"}
+          title={open ? "Fechar ações" : "Abrir ações"}
+        >
+          {open ? <X className="h-7 w-7" /> : <Plus className="h-7 w-7" />}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function ActionChip({ label, icon, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-2 shadow-md ring-1 ring-black/5 transition hover:translate-x-[-2px] active:translate-x-[-1px]"
+    >
+      <span className="text-sm font-medium text-gray-800">{label}</span>
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 shadow-sm">
+        {icon}
+      </span>
+    </button>
   );
 }
