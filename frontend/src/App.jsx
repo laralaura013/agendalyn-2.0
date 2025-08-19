@@ -64,6 +64,9 @@ import ClientOriginsPage from "./pages/settings/ClientOriginsPage";
 import BirthdaysReportPage from "./pages/reports/BirthdaysReportPage";
 import CashflowReportPage from "./pages/reports/CashflowReportPage";
 
+// ✅ NOVO: Menu (agrupador para o mobile)
+import Menu from "./pages/Menu";
+
 // Componente Wrapper para o Layout do Admin
 function AdminLayoutWrapper() {
   const { isMobile } = useAppShellMode();
@@ -109,39 +112,51 @@ function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<AdminLayoutWrapper />}>
                 <Route index element={<Dashboard />} />
-                <Route path="clients" element={<Clients />} />
-                <Route path="clients/new" element={<ClientForm />} />
-                <Route path="clients/:id/edit" element={<ClientForm />} />
+
+                {/* ✅ NOVA ROTA DO MENU (mobile) */}
+                <Route path="menu" element={<Menu />} />
+
+                {/* Núcleo */}
                 <Route path="schedule" element={<Schedule />} />
                 <Route path="waitlist" element={<WaitlistPage />} />
-                <Route path="staff" element={<Staff />} />
-                <Route path="services" element={<Services />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="cashier" element={<Cashier />} />
-                <Route path="subscription" element={<SubscriptionPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="reports/birthdays" element={<BirthdaysReportPage />} />
                 <Route path="reports/cashflow" element={<CashflowReportPage />} />
                 <Route path="goals" element={<GoalsPage />} />
-                <Route path="anamnesis" element={<AnamnesisPage />} />
+
+                {/* Cadastros */}
+                <Route path="clients" element={<Clients />} />
+                <Route path="clients/new" element={<ClientForm />} />
+                <Route path="clients/:id/edit" element={<ClientForm />} />
+                <Route path="staff" element={<Staff />} />
+                <Route path="services" element={<Services />} />
                 <Route path="packages" element={<PackagesPage />} />
                 <Route path="products" element={<ProductsPage />} />
                 <Route path="categories" element={<CategoriesPage />} />
                 <Route path="brands" element={<BrandsPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="commissions" element={<CommissionsPage />} />
+                <Route path="anamnesis" element={<AnamnesisPage />} />
+
+                {/* Financeiro */}
                 <Route path="payables" element={<PayablesPage />} />
                 <Route path="receivables" element={<ReceivablesPage />} />
                 <Route path="finance-categories" element={<FinanceCategoriesPage />} />
                 <Route path="suppliers" element={<SuppliersPage />} />
                 <Route path="payment-methods" element={<PaymentMethodsPage />} />
+                <Route path="commissions" element={<CommissionsPage />} />
+
+                {/* Configurações */}
+                <Route path="settings" element={<SettingsPage />} />
                 <Route path="cancellation-reasons" element={<CancellationReasonsPage />} />
                 <Route path="client-origins" element={<ClientOriginsPage />} />
+                <Route path="subscription" element={<SubscriptionPage />} />
               </Route>
-              {/* A rota /settings agora é parte do /dashboard */}
-               <Route path="/settings" element={<AdminLayoutWrapper />}>
-                  <Route index element={<SettingsPage />} />
-               </Route>
+
+              {/* (opcional) rota isolada de /settings fora do /dashboard */}
+              <Route path="/settings" element={<AdminLayoutWrapper />}>
+                <Route index element={<SettingsPage />} />
+              </Route>
             </Route>
           </Routes>
         </Suspense>
