@@ -4,30 +4,46 @@ import { Plus, X, Calendar as CalendarIcon, Link as LinkIcon, ClipboardList, Lis
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
+/**
+ * FloatingActions
+ * - Desktop (md+): FAB azul único que abre agendamento.
+ * - Mobile: Speed-dial com 4 ações (Agendar, Link, Comanda, Espera).
+ *
+ * Props (todas opcionais, pois têm fallback):
+ *  - onCreateAppointment: () => void
+ *  - onOpenOrder:        () => void
+ *  - onOpenWaitlist:     () => void
+ *  - onShowBookingLink:  () => void
+ *  - bottomClass:        string  (ex.: "bottom-24")
+ */
 export default function FloatingActions({
-  // handlers vindos do Schedule.jsx
-  onCreateAppointment,        // abre modal de agendamento
-  onOpenOrder,                // vai para comanda
-  onOpenWaitlist,             // vai para lista de espera
-  onShowBookingLink,          // copia link de agendamento
+  onCreateAppointment,
+  onOpenOrder,
+  onOpenWaitlist,
+  onShowBookingLink,
   bottomClass = "bottom-24",
 }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const bottom = useMemo(() => bottomClass, [bottomClass]);
 
-  // Fallbacks para funcionar mesmo sem os handlers
-  const doCreate = async () => {
+  /* ------------ Fallbacks/Handlers ------------ */
+  const doCreate = () => {
     if (onCreateAppointment) return onCreateAppointment();
+    // fallback: navega para agenda (caso não tenha handler)
     navigate("/dashboard/schedule?new=1");
   };
+
   const doOrder = () => {
     if (onOpenOrder) return onOpenOrder();
     navigate("/dashboard/orders");
   };
+
   const doWaitlist = () => {
     if (onOpenWaitlist) return onOpenWaitlist();
     navigate("/dashboard/waitlist");
   };
+
   const doLink = async () => {
     if (onShowBookingLink) return onShowBookingLink();
     try {
@@ -44,7 +60,13 @@ export default function FloatingActions({
     }
   };
 
-  const bottom = useMemo(() => bottomClass, [bottomClass]);
+  // Util: garantir que o modal abre depois do menu fechar (mobile)
+  const runAfterClose = (fn) => {
+    setOpen(false);
+    // duas raf para esperar layout fechar o speed-dial
+    requestAnimationFrame(() => requestAnimationFrame(() => fn()));
+    // alternativa com timeout (caso prefira): setTimeout(fn, 120);
+  };
 
   return (
     <>
@@ -58,14 +80,30 @@ export default function FloatingActions({
         <Plus className="h-7 w-7" />
       </button>
 
-      {/* Mobile: speed-dial com 4 opções */}
+      {/* Mobile: Speed-dial */}
       <div className={`md:hidden fixed ${bottom} right-6 z-50 flex flex-col items-end gap-3`}>
         {open && (
           <div className="flex flex-col items-end gap-3">
-            <ActionChip label="Agendar horário" icon={<CalendarIcon className="h-5 w-5" />} onClick={() => { setOpen(false); doCreate(); }} />
-            <ActionChip label="Link de agendamento" icon={<LinkIcon className="h-5 w-5" />} onClick={() => { setOpen(false); doLink(); }} />
-            <ActionChip label="Abrir comanda" icon={<ClipboardList className="h-5 w-5" />} onClick={() => { setOpen(false); doOrder(); }} />
-            <ActionChip label="Lista de espera" icon={<List className="h-5 w-5" />} onClick={() => { setOpen(false); doWaitlist(); }} />
+            <ActionChip
+              label="Agendar horário"
+              icon={<CalendarIcon className="h-5 w-5" />}
+              onClick={() => runAfterClose(doCreate)}
+            />
+            <ActionChip
+              label="Link de agendamento"
+              icon={<LinkIcon className="h-5 w-5" />}
+              onClick={() => runAfterClose(doLink)}
+            />
+            <ActionChip
+              label="Abrir comanda"
+              icon={<ClipboardList className="h-5 w-5" />}
+              onClick={() => runAfterClose(doOrder)}
+            />
+            <ActionChip
+              label="Lista de espera"
+              icon={<List className="h-5 w-5" />}
+              onClick={() => runAfterClose(doWaitlist)}
+            />
           </div>
         )}
 
