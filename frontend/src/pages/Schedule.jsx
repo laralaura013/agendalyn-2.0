@@ -429,24 +429,16 @@ export default function Schedule() {
   /* ====================== UI ====================== */
   return (
     <>
-      {/* CSS: esconde qualquer FAB fixo de canto no mobile que não seja o nosso */}
+      {/* CSS: esconde duplicatas no mobile, mas mantém nosso FAB (#schedule-fab) */}
       <style>{`
         @media (max-width: 768px) {
           .desktop-only,
           .fab-desktop,
           .desktop-fab,
           .hide-on-mobile,
-          [data-desktop-only="true"] {
-            display: none !important;
-          }
-          /* algum FAB legado roxo */
-          .fixed[class*="right-6"][class*="bottom-6"][class*="bg-purple"]{
-            display: none !important;
-          }
-          /* esconde QUALQUER outro botão fixo no canto inferior direito que não seja o nosso (#schedule-fab) */
-          .fixed[class*="bottom-"][class*="right-"]:not(#schedule-fab){
-            display: none !important;
-          }
+          [data-desktop-only="true"] { display: none !important; }
+          .fixed[class*="right-6"][class*="bottom-6"][class*="bg-purple"]{ display:none !important; }
+          .fixed[class*="bottom-"][class*="right-"]:not(#schedule-fab){ display:none !important; }
         }
       `}</style>
 
@@ -629,11 +621,18 @@ export default function Schedule() {
           </aside>
         </div>
 
-        {/* ====== FAB ÚNICO (o que funciona), agora no canto inferior direito ====== */}
+        {/* ====== FAB ÚNICO (o que FUNCIONA), movido pro canto e acima da bottom-nav ====== */}
         <button
           id="schedule-fab"
           onClick={openEmptyModal}
-          className="z-50 fixed bottom-6 right-6 rounded-full shadow-lg transition bg-sky-600 hover:bg-sky-700 text-white p-4"
+          className="
+            z-50 fixed
+            right-6
+            bottom-24   /* acima da bottom-nav no mobile (~96px) */
+            md:bottom-6 /* no desktop fica mais baixo */
+            rounded-full shadow-lg transition
+            bg-sky-600 hover:bg-sky-700 text-white p-4
+          "
           title="Novo agendamento"
           aria-label="Novo agendamento"
         >
