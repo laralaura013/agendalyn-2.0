@@ -1,3 +1,4 @@
+// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
@@ -16,8 +17,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
-import AppointmentModal from "../components/schedule/AppointmentModal";
-import FloatingActions from "../components/mobile/FloatingActions.jsx";
+import AppointmentModalBase from "../components/schedule/AppointmentModal"; // <- importamos como Base
+import FloatingActions from "../components/mobile/FloatingActions.jsx"; // FAB mobile
 
 const DEFAULT_SLOT_MINUTES = 30;
 
@@ -34,10 +35,7 @@ const toYMD = (d) => {
 };
 
 const formatDateInput = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(
-    2,
-    "0"
-  )}`;
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const startOfWeek = (d) => {
   const copy = new Date(d);
@@ -56,6 +54,17 @@ const endOfWeek = (d) => {
 };
 const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
 const endOfMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+/* ====================== Wrapper anti-Hooks bug ====================== */
+/** 
+ * NÃO chama hooks de forma condicional dentro do mesmo componente.
+ * Aqui, só renderizamos o modal quando isOpen=true, evitando que
+ * o componente interno precise fazer `if (!isOpen) return null` ANTES de hooks.
+ */
+function AppointmentModal(props) {
+  if (!props?.isOpen) return null;
+  return <AppointmentModalBase {...props} />;
+}
 
 /* ====================== Componente ====================== */
 export default function Schedule() {
@@ -344,7 +353,7 @@ export default function Schedule() {
     setIsModalOpen(true);
   };
 
-  // Listener do evento global do FAB
+  // Ouve o evento global disparado pelo FAB mobile
   useEffect(() => {
     const handler = () => openEmptyModal();
     window.addEventListener("openEmptyAppointment", handler);
@@ -435,6 +444,7 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
+  /* ---------- Callbacks do FAB ---------- */
   const goToNewOrder = () => navigate("/dashboard/orders/new");
   const goToWaitlist = () => navigate("/dashboard/waitlist");
   const showBookingLink = async () => {
@@ -451,10 +461,6 @@ export default function Schedule() {
       toast.error("Não foi possível copiar o link.");
     }
   };
-
-  // esconde o FAB quando qualquer modal/drawer estiver aberto
-  const fabHidden =
-    isModalOpen || openSlots || openApptList || openWaitlist || openBlockTime;
 
   /* ====================== UI ====================== */
   return (
@@ -638,11 +644,10 @@ export default function Schedule() {
           </aside>
         </div>
 
-        {/* FAB (somente MOBILE). some quando modal/drawer aberto */}
+        {/* FABs (apenas mobile; o componente já esconde no desktop) */}
         <FloatingActions
-          hidden={fabHidden}
-          bottomOffsetPx={96}                 // ajuste fino p/ ficar 100% acima da bottom-nav
-          onCreateAppointment={openEmptyModal}
+          bottomClass="bottom-[88px]"          // sobe um pouco para não colidir com a bottom-tab
+          onCreateAppointment={openEmptyModal} // abre modal vazio
           onOpenOrder={() => navigate("/dashboard/orders/new")}
           onOpenWaitlist={() => navigate("/dashboard/waitlist")}
           onShowBookingLink={showBookingLink}
@@ -650,19 +655,17 @@ export default function Schedule() {
       </div>
 
       {/* ====== MODAIS ====== */}
-      {isModalOpen && (
-        <AppointmentModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          event={selectedEvent}
-          slot={selectedSlot}
-          clients={clients}
-          services={services}
-          staff={staff}
-          onSave={handleSave}
-          onDelete={handleDelete}
-        />
-      )}
+      <AppointmentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        event={selectedEvent}
+        slot={selectedSlot}
+        clients={clients}
+        services={services}
+        staff={staff}
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
 
       {openSlots && (
         <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
@@ -812,7 +815,7 @@ function Legend() {
 }
 function BaseModal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-lg border w-full max-w-lg">
         <div className="flex items-center justify-between p-4 border-b">
@@ -828,7 +831,7 @@ function BaseModal({ title, children, onClose }) {
 }
 function SideDrawer({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[100]">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-white shadow-xl border-l flex flex-col">
         <div className="px-4 py-3 border-b flex items-center justify-between">
