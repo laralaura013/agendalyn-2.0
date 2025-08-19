@@ -34,7 +34,10 @@ const toYMD = (d) => {
 };
 
 const formatDateInput = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(
+    2,
+    "0"
+  )}`;
 
 const startOfWeek = (d) => {
   const copy = new Date(d);
@@ -341,6 +344,13 @@ export default function Schedule() {
     setIsModalOpen(true);
   };
 
+  // Listener do evento global do FAB
+  useEffect(() => {
+    const handler = () => openEmptyModal();
+    window.addEventListener("openEmptyAppointment", handler);
+    return () => window.removeEventListener("openEmptyAppointment", handler);
+  }, []);
+
   const goToday = () => setDate(new Date());
   const goPrev = () => {
     const d = new Date(date);
@@ -425,7 +435,6 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  /* ---------- Callbacks do FAB ---------- */
   const goToNewOrder = () => navigate("/dashboard/orders/new");
   const goToWaitlist = () => navigate("/dashboard/waitlist");
   const showBookingLink = async () => {
@@ -443,17 +452,11 @@ export default function Schedule() {
     }
   };
 
-  /* --------- Listener global (fallback) --------- */
-  useEffect(() => {
-    const handler = () => openEmptyModal();
-    window.addEventListener("openEmptyAppointment", handler);
-    return () => window.removeEventListener("openEmptyAppointment", handler);
-  }, []);
-
-  /* ====================== UI ====================== */
-  const anyOverlayOpen =
+  // esconde o FAB quando qualquer modal/drawer estiver aberto
+  const fabHidden =
     isModalOpen || openSlots || openApptList || openWaitlist || openBlockTime;
 
+  /* ====================== UI ====================== */
   return (
     <>
       <div className="relative w-full">
@@ -471,13 +474,7 @@ export default function Schedule() {
             </button>
           </div>
 
-          <MobileDaysStrip
-            date={date}
-            onChangeDate={(d) => {
-              setDate(d);
-              setView("day");
-            }}
-          />
+          <MobileDaysStrip date={date} onChangeDate={(d) => { setDate(d); setView("day"); }} />
         </div>
 
         {/* ====== TOOLBAR DESKTOP ====== */}
@@ -641,13 +638,13 @@ export default function Schedule() {
           </aside>
         </div>
 
-        {/* FABs (desktop e mobile) — agora somem quando modal/drawer estiver aberto */}
+        {/* FAB (somente MOBILE). some quando modal/drawer aberto */}
         <FloatingActions
-          hidden={anyOverlayOpen}
-          bottomClass="bottom-24"
+          hidden={fabHidden}
+          bottomOffsetPx={96}                 // ajuste fino p/ ficar 100% acima da bottom-nav
           onCreateAppointment={openEmptyModal}
-          onOpenOrder={goToNewOrder}
-          onOpenWaitlist={goToWaitlist}
+          onOpenOrder={() => navigate("/dashboard/orders/new")}
+          onOpenWaitlist={() => navigate("/dashboard/waitlist")}
           onShowBookingLink={showBookingLink}
         />
       </div>
