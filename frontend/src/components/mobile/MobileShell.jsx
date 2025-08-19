@@ -1,4 +1,4 @@
-﻿import React, { useCallback } from "react";
+﻿import React, { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
@@ -7,29 +7,39 @@ import FloatingActions from "./FloatingActions";
 
 /**
  * Moldura principal (mobile): conteúdo + abas inferiores.
- * O FAB (botão flutuante) aparece apenas na Agenda (/dashboard/schedule).
+ * O FAB (botão flutuante) aparece apenas na Agenda (/dashboard/schedule),
+ * e some automaticamente quando um modal da Agenda estiver aberto.
  */
 export default function MobileShell() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const isOnSchedule = location.pathname.startsWith("/dashboard/schedule");
-  const showFloatingActions = isOnSchedule; // só mostra o FAB na Agenda
+  const [fabVisible, setFabVisible] = useState(true);
+
+  // Escuta eventos disparados pela página Schedule para esconder/mostrar o FAB
+  useEffect(() => {
+    const onToggle = (ev) => {
+      // detail: boolean -> true = FAB visível | false = FAB escondido
+      if (typeof ev.detail === "boolean") setFabVisible(ev.detail);
+    };
+    window.addEventListener("fab:toggle", onToggle);
+    return () => window.removeEventListener("fab:toggle", onToggle);
+  }, []);
 
   // Abre modal de agendamento vazio na Agenda.
   // Se não estivermos na Agenda, navega pra lá e dispara o evento logo em seguida.
   const openEmptyAppointment = useCallback(() => {
-    if (!isOnSchedule) {
-      navigate("/dashboard/schedule");
-      setTimeout(() => {
-        try {
-          window?.dispatchEvent?.(new Event("openEmptyAppointment"));
-        } catch {}
-      }, 0);
-    } else {
+    const fire = () => {
       try {
         window?.dispatchEvent?.(new Event("openEmptyAppointment"));
       } catch {}
+    };
+    if (!isOnSchedule) {
+      navigate("/dashboard/schedule");
+      setTimeout(fire, 0);
+    } else {
+      fire();
     }
   }, [isOnSchedule, navigate]);
 
@@ -57,11 +67,11 @@ export default function MobileShell() {
         <Outlet />
       </main>
 
-      {/* FAB só no mobile (este shell já é mobile) e somente na Agenda */}
-      {showFloatingActions && (
+      {/* FAB somente na Agenda (e apenas 1 instância: remova do Schedule.jsx) */}
+      {isOnSchedule && fabVisible && (
         <FloatingActions
-          // deixa o FAB acima das abas inferiores (64px) com 16px de respiro
-          bottomClass="bottom-[calc(64px+16px)]"
+          // deixa o FAB acima das abas (64px) + respiro de 16px, encostado à direita
+          bottomClass="bottom-[calc(64px+16px)] right-4"
           onCreateAppointment={openEmptyAppointment}
           onOpenOrder={openOrder}
           onOpenWaitlist={openWaitlist}
