@@ -1,3 +1,4 @@
+// frontend/src/pages/Menu.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,18 +14,19 @@ import {
   Tag,
   Archive,
   FileText,
+  List,
+  Receipt,
+  CreditCard,
+  Banknote,
+  Building2,
   BarChart3,
   Gift,
   Settings,
-  Building2,
-  CreditCard,
-  Banknote,
 } from "lucide-react";
 
 /**
  * MENU (MOBILE)
- * - Grupos + itens (accordions)
- * - Cada item navega para uma rota do App.jsx
+ * Mostra grupos (accordions) com links para as rotas do painel.
  */
 
 const GROUPS = [
@@ -37,8 +39,6 @@ const GROUPS = [
       { label: "Comandas", to: "/dashboard/orders", Icon: ClipboardList },
       { label: "Clientes", to: "/dashboard/clients", Icon: Users },
       { label: "Caixa", to: "/dashboard/cashier", Icon: Wallet },
-      { label: "Lista de Espera", to: "/dashboard/waitlist", Icon: ClipboardList },
-      { label: "Relatórios (geral)", to: "/dashboard/reports", Icon: BarChart3 },
     ],
   },
   {
@@ -50,15 +50,16 @@ const GROUPS = [
       { label: "Produtos", to: "/dashboard/products", Icon: Package },
       { label: "Categorias", to: "/dashboard/categories", Icon: Tag },
       { label: "Marcas", to: "/dashboard/brands", Icon: Tag },
-      { label: "Pacotes", to: "/dashboard/packages", Icon: Archive }, // /packages
-      { label: "Anamneses", to: "/dashboard/anamnesis", Icon: FileText }, // /anamnesis
+      { label: "Pacotes", to: "/dashboard/packages", Icon: Archive },
+      { label: "Anamneses", to: "/dashboard/anamnesis", Icon: FileText },
+      { label: "Lista de Espera", to: "/dashboard/waitlist", Icon: List },
     ],
   },
   {
     id: "financeiro",
     title: "Financeiro",
     items: [
-      { label: "Contas a Pagar", to: "/dashboard/payables", Icon: ClipboardList },
+      { label: "Contas a Pagar", to: "/dashboard/payables", Icon: Receipt },
       { label: "Contas a Receber", to: "/dashboard/receivables", Icon: Banknote },
       { label: "Categorias Financeiras", to: "/dashboard/finance-categories", Icon: Tag },
       { label: "Fornecedores", to: "/dashboard/suppliers", Icon: Building2 },
@@ -71,29 +72,26 @@ const GROUPS = [
     items: [
       { label: "Aniversariantes", to: "/dashboard/reports/birthdays", Icon: Gift },
       { label: "Fluxo de Caixa", to: "/dashboard/reports/cashflow", Icon: BarChart3 },
-      { label: "Metas", to: "/dashboard/goals", Icon: BarChart3 }, // /goals
+      { label: "Metas", to: "/dashboard/goals", Icon: BarChart3 },
     ],
   },
   {
     id: "config",
     title: "Configurações",
     items: [
-      { label: "Configurações", to: "/dashboard/settings", Icon: Settings },
-      { label: "Comissões", to: "/dashboard/commissions", Icon: Settings },
-      { label: "Motivos de Cancelamento", to: "/dashboard/cancellation-reasons", Icon: Settings },
-      { label: "Origem de Clientes", to: "/dashboard/client-origins", Icon: Settings },
+      { label: "Parâmetros", to: "/dashboard/settings", Icon: Settings },
+      { label: "Empresa", to: "/dashboard/settings", Icon: Building2 },
     ],
   },
 ];
 
 export default function Menu() {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(() => new Set(["principal"])); // abre "Principal" por padrão
+  const [open, setOpen] = useState(() => new Set(["principal"]));
 
   const toggle = (id) => {
     const s = new Set(open);
-    if (s.has(id)) s.delete(id);
-    else s.add(id);
+    s.has(id) ? s.delete(id) : s.add(id);
     setOpen(s);
   };
 
