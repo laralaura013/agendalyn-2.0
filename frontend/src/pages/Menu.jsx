@@ -13,21 +13,18 @@ import {
   Tag,
   Archive,
   FileText,
-  List,
-  Receipt,
-  CreditCard,
-  Banknote,
-  Building2,
   BarChart3,
   Gift,
   Settings,
+  Building2,
+  CreditCard,
+  Banknote,
 } from "lucide-react";
 
 /**
  * MENU (MOBILE)
- * - Mostra grupos com itens (accordions)
- * - Cada item navega para uma rota
- * - Sem FAB aqui (o FAB ficou no Schedule)
+ * - Grupos + itens (accordions)
+ * - Cada item navega para uma rota do App.jsx
  */
 
 const GROUPS = [
@@ -40,6 +37,8 @@ const GROUPS = [
       { label: "Comandas", to: "/dashboard/orders", Icon: ClipboardList },
       { label: "Clientes", to: "/dashboard/clients", Icon: Users },
       { label: "Caixa", to: "/dashboard/cashier", Icon: Wallet },
+      { label: "Lista de Espera", to: "/dashboard/waitlist", Icon: ClipboardList },
+      { label: "Relatórios (geral)", to: "/dashboard/reports", Icon: BarChart3 },
     ],
   },
   {
@@ -51,16 +50,15 @@ const GROUPS = [
       { label: "Produtos", to: "/dashboard/products", Icon: Package },
       { label: "Categorias", to: "/dashboard/categories", Icon: Tag },
       { label: "Marcas", to: "/dashboard/brands", Icon: Tag },
-      { label: "Pacotes", to: "/dashboard/bundles", Icon: Archive },
-      { label: "Anamneses", to: "/dashboard/anamneses", Icon: FileText },
-      { label: "Lista de Espera", to: "/dashboard/waitlist", Icon: List },
+      { label: "Pacotes", to: "/dashboard/packages", Icon: Archive }, // /packages
+      { label: "Anamneses", to: "/dashboard/anamnesis", Icon: FileText }, // /anamnesis
     ],
   },
   {
     id: "financeiro",
     title: "Financeiro",
     items: [
-      { label: "Contas a Pagar", to: "/dashboard/payables", Icon: Receipt },
+      { label: "Contas a Pagar", to: "/dashboard/payables", Icon: ClipboardList },
       { label: "Contas a Receber", to: "/dashboard/receivables", Icon: Banknote },
       { label: "Categorias Financeiras", to: "/dashboard/finance-categories", Icon: Tag },
       { label: "Fornecedores", to: "/dashboard/suppliers", Icon: Building2 },
@@ -73,15 +71,17 @@ const GROUPS = [
     items: [
       { label: "Aniversariantes", to: "/dashboard/reports/birthdays", Icon: Gift },
       { label: "Fluxo de Caixa", to: "/dashboard/reports/cashflow", Icon: BarChart3 },
-      { label: "Metas", to: "/dashboard/reports/goals", Icon: BarChart3 },
+      { label: "Metas", to: "/dashboard/goals", Icon: BarChart3 }, // /goals
     ],
   },
   {
     id: "config",
     title: "Configurações",
     items: [
-      { label: "Empresa", to: "/dashboard/company", Icon: Building2 },
-      { label: "Parâmetros", to: "/dashboard/settings", Icon: Settings },
+      { label: "Configurações", to: "/dashboard/settings", Icon: Settings },
+      { label: "Comissões", to: "/dashboard/commissions", Icon: Settings },
+      { label: "Motivos de Cancelamento", to: "/dashboard/cancellation-reasons", Icon: Settings },
+      { label: "Origem de Clientes", to: "/dashboard/client-origins", Icon: Settings },
     ],
   },
 ];
@@ -106,9 +106,6 @@ export default function Menu() {
 
       {/* Conteúdo */}
       <div className="p-3 space-y-4">
-        {/* Card do usuário/empresa opcional */}
-        {/* <UserCard /> */}
-
         {GROUPS.map((group) => (
           <section key={group.id} className="bg-white border rounded-xl shadow-sm">
             <button

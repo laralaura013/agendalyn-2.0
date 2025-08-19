@@ -1,4 +1,4 @@
-// Schedule.jsx
+// src/pages/Schedule.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { parseISO } from "date-fns";
 import toast from "react-hot-toast";
@@ -18,7 +18,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
-import FloatingActions from "../components/mobile/FloatingActions";
+// ❌ NÃO importe FloatingActions aqui — o FAB vem do MobileShell
 
 const DEFAULT_SLOT_MINUTES = 30;
 
@@ -254,13 +254,6 @@ export default function Schedule() {
     return () => ac.abort();
   }, [view, date, selectedPro, fetchAppointments, fetchBlocks]);
 
-  // Listener global opcional: abrir modal vazio ao ouvir o evento do FAB
-  useEffect(() => {
-    const handler = () => openEmptyModal();
-    window.addEventListener("openEmptyAppointment", handler);
-    return () => window.removeEventListener("openEmptyAppointment", handler);
-  }, []);
-
   /* --------- Handlers --------- */
   const handleSelectSlot = useCallback(
     (slotInfo) => {
@@ -436,27 +429,21 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
-  /* ---------- Callbacks do FAB ---------- */
-  const goToNewOrder = () => navigate("/dashboard/orders/new");
-  const goToWaitlist = () => navigate("/dashboard/waitlist");
-  const showBookingLink = async () => {
-    try {
-      const storedCompany =
-        JSON.parse(localStorage.getItem("companyData")) ||
-        JSON.parse(localStorage.getItem("user"))?.company ||
-        {};
-      const companyId = storedCompany?.id || "SEU_COMPANY_ID";
-      const link = `${window.location.origin}/agendar/${companyId}`;
-      await navigator.clipboard?.writeText(link);
-      toast.success("Link de agendamento copiado!");
-    } catch {
-      toast.error("Não foi possível copiar o link.");
-    }
-  };
+  /* ---------- Recebe o clique do FAB global ---------- */
+  useEffect(() => {
+    const handler = () => openEmptyModal();
+    window.addEventListener("openEmptyAppointment", handler);
+    return () => window.removeEventListener("openEmptyAppointment", handler);
+  }, []);
 
-  // esconde FAB quando qualquer modal/drawer estiver aberto
-  const overlaysOpen =
-    isModalOpen || openSlots || openApptList || openWaitlist || openBlockTime;
+  /* ---------- Esconde/mostra o FAB global quando modais/sidebars abrem ---------- */
+  useEffect(() => {
+    const anyOverlayOpen =
+      isModalOpen || openSlots || openApptList || openWaitlist || openBlockTime;
+    try {
+      window.dispatchEvent(new CustomEvent("fab:toggle", { detail: !anyOverlayOpen }));
+    } catch {}
+  }, [isModalOpen, openSlots, openApptList, openWaitlist, openBlockTime]);
 
   /* ====================== UI ====================== */
   return (
@@ -639,17 +626,6 @@ export default function Schedule() {
             </Accordion>
           </aside>
         </div>
-
-        {/* FAB (somente mobile) — escondido quando qualquer modal/drawer aberto */}
-        {!overlaysOpen && (
-          <FloatingActions
-            bottomClass="bottom-[88px]"
-            onCreateAppointment={openEmptyModal}
-            onOpenOrder={goToNewOrder}
-            onOpenWaitlist={goToWaitlist}
-            onShowBookingLink={showBookingLink}
-          />
-        )}
       </div>
 
       {/* ====== MODAIS ====== */}
@@ -815,7 +791,7 @@ function Legend() {
 }
 function BaseModal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-lg border w-full max-w-lg">
         <div className="flex items-center justify-between p-4 border-b">
@@ -831,7 +807,7 @@ function BaseModal({ title, children, onClose }) {
 }
 function SideDrawer({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[100]">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-white shadow-xl border-l flex flex-col">
         <div className="px-4 py-3 border-b flex items-center justify-between">
