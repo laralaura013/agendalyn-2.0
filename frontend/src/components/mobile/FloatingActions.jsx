@@ -1,35 +1,39 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Plus, CalendarDays, Link as LinkIcon, Receipt, List as ListIcon, X } from "lucide-react";
 
 /**
  * FloatingActions (mobile + desktop)
  *
  * Props:
- * - hidden?: boolean                      // força esconder tudo (ex.: quando modal aberto)
+ * - bottomClass?: string
  * - onCreateAppointment?: () => void
  * - onOpenOrder?: () => void
  * - onOpenWaitlist?: () => void
  * - onShowBookingLink?: () => Promise<void> | void
- *
- * Comportamento:
- * - MOBILE (md:hidden): um speed-dial no canto inferior direito (acima da bottom-nav).
- * - DESKTOP (hidden md:inline-flex): um FAB azul no canto inferior direito.
- * - "Agendar horário" dispara a prop e também o evento global "openEmptyAppointment".
+ * - hidden?: boolean   // <- NOVO: esconde tudo quando true (modal aberto, etc)
  */
 export default function FloatingActions({
-  hidden = false,
+  bottomClass = "bottom-24",
   onCreateAppointment,
   onOpenOrder,
   onOpenWaitlist,
   onShowBookingLink,
+  hidden = false,
 }) {
   const [open, setOpen] = useState(false);
+
+  // fecha o speed-dial se ficar hidden (ex.: abriu modal)
+  useEffect(() => {
+    if (hidden) setOpen(false);
+  }, [hidden]);
 
   const runCreateAppointment = () => {
     onCreateAppointment?.();
     try {
       window?.dispatchEvent?.(new Event("openEmptyAppointment"));
-    } catch { /* no-op */ }
+    } catch {
+      /* no-op */
+    }
   };
 
   const actions = useMemo(
@@ -50,8 +54,12 @@ export default function FloatingActions({
             return;
           }
           const url = `${window.location.origin}/agendar/`;
-          try { await navigator.clipboard.writeText(url); alert("Link copiado!"); }
-          catch { alert(url); }
+          try {
+            await navigator.clipboard.writeText(url);
+            alert("Link copiado!");
+          } catch {
+            alert(url);
+          }
         },
       },
       {
@@ -70,14 +78,24 @@ export default function FloatingActions({
     [onOpenOrder, onOpenWaitlist, onShowBookingLink]
   );
 
-  const z = "z-[9999]"; // por cima da bottom-nav e do calendário
-
+  // quando hidden, não renderiza nada (evita sobrepor modal)
   if (hidden) return null;
 
   return (
     <>
-      {/* ===== MOBILE: speed-dial (somente em telas < md) ===== */}
-      <div className={`fixed right-4 bottom-24 md:hidden ${z}`}>
+      {/* FAB principal (azul) — acima da bottom-nav no mobile */}
+      <button
+        type="button"
+        aria-label="Novo agendamento"
+        title="Novo agendamento"
+        onClick={runCreateAppointment}
+        className={`fixed right-4 ${bottomClass} z-40 w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white flex items-center justify-center`}
+      >
+        <Plus size={24} />
+      </button>
+
+      {/* Speed-dial (apenas mobile) */}
+      <div className="fixed right-4 bottom-6 z-40 md:hidden">
         {/* Itens quando aberto */}
         <div
           className={`mb-2 flex flex-col items-end gap-2 transition-all duration-200 ${
@@ -99,28 +117,17 @@ export default function FloatingActions({
           ))}
         </div>
 
-        {/* Toggle do speed-dial */}
+        {/* Botão que abre/fecha o speed-dial (preto, canto direito) */}
         <button
           type="button"
           aria-label={open ? "Fechar ações" : "Ações rápidas"}
           title={open ? "Fechar ações" : "Ações rápidas"}
           onClick={() => setOpen((v) => !v)}
-          className="w-12 h-12 rounded-full shadow-xl bg-gray-900 text-white flex items-center justify-center"
+          className="fixed right-4 bottom-6 w-12 h-12 rounded-full shadow-xl bg-gray-900 text-white flex items-center justify-center"
         >
           {open ? <X size={20} /> : <Plus size={20} />}
         </button>
       </div>
-
-      {/* ===== DESKTOP: FAB azul (somente em telas >= md) ===== */}
-      <button
-        type="button"
-        aria-label="Novo agendamento"
-        title="Novo agendamento"
-        onClick={runCreateAppointment}
-        className={`hidden md:inline-flex fixed right-6 bottom-6 ${z} w-14 h-14 rounded-full shadow-xl bg-[#1976d2] text-white items-center justify-center`}
-      >
-        <Plus size={24} />
-      </button>
     </>
   );
 }
