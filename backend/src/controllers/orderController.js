@@ -127,13 +127,16 @@ export const createOrder = async (req, res) => {
 
 /* ========================= PAGAMENTOS (definir lista) =========================
  * Substitui TODAS as formas de pagamento da comanda (enquanto OPEN).
- * body: { payments: [{ paymentMethodId, amount, installments?, cardBrand?, insertIntoCashier? }] }
+ * body: {
+ *   payments: [{ paymentMethodId, amount, installments?, cardBrand?, insertIntoCashier? }],
+ *   expectedTotal?: number // (opcional) total já com desconto/gorjeta aplicado no front
+ * }
  */
 export const setOrderPayments = async (req, res) => {
   try {
     const { id } = req.params;
     const companyId = req.company.id;
-    const { payments } = req.body || {};
+    const { payments, expectedTotal } = req.body || {};
 
     if (!Array.isArray(payments) || payments.length === 0) {
       return res.status(400).json({ message: 'Envie ao menos uma forma de pagamento.' });
@@ -189,11 +192,15 @@ export const setOrderPayments = async (req, res) => {
       });
     }
 
-    if (round2(sum) !== round2(order.total)) {
-      return res.status(400).json({
-        message: 'A soma dos pagamentos deve ser igual ao total da comanda.',
-        details: { total: Number(order.total), sum },
-      });
+    // ✅ NOVO: se o front enviar expectedTotal (total com desconto/gorjeta), valida com ele.
+    // Se não enviar, não bloqueia pela diferença com order.total (permite desconto/gorjeta sem mexer no schema).
+    if (typeof expectedTotal === 'number') {
+      if (round2(sum) !== round2(expectedTotal)) {
+        return res.status(400).json({
+          message: 'A soma dos pagamentos deve ser igual ao total a pagar.',
+          details: { expectedTotal: round2(expectedTotal), sum: round2(sum) },
+        });
+      }
     }
 
     // replace all
@@ -216,7 +223,7 @@ export const setOrderPayments = async (req, res) => {
 };
 
 /* ========================= FINALIZAR =========================
- * - Valida soma dos pagamentos == total
+ * - Exige haver pagamentos (não compara com order.total, pois desconto/gorjeta não estão no schema)
  * - Para cada pagamento:
  *    - installments = 1 => cria 1 Receivable (hoje). Se insertIntoCashier, marca RECEIVED e lança no caixa.
  *    - installments > 1 => cria N Receivables mensais. Se insertIntoCashier, marca RECEIVED e lança no caixa APENAS a 1ª parcela (hoje); demais ficam OPEN com dueDate em +1M, +2M...
@@ -247,11 +254,11 @@ export const finishOrder = async (req, res) => {
         .status(400)
         .json({ message: 'Defina as formas de pagamento antes de finalizar a comanda.' });
     }
+
+    // ✅ NÃO comparamos com order.total (aceita desconto/gorjeta oriundos do front)
     const sum = round2(order.payments.reduce((acc, p) => acc + Number(p.amount || 0), 0));
-    if (sum !== round2(order.total)) {
-      return res
-        .status(400)
-        .json({ message: 'A soma dos pagamentos não bate com o total da comanda.' });
+    if (!(sum > 0)) {
+      return res.status(400).json({ message: 'O valor total dos pagamentos precisa ser maior que zero.' });
     }
 
     // Checa necessidade de caixa
@@ -309,7 +316,6 @@ export const finishOrder = async (req, res) => {
           }
         } else {
           // múltiplas parcelas
-          // Divide valor igualmente e ajusta centavos na última parcela
           const base = Math.floor((totalPay * 100) / installments) / 100;
           let acc = 0;
 
@@ -356,10 +362,7 @@ export const finishOrder = async (req, res) => {
   }
 };
 
-/* ========================= CANCELAR =========================
- * - Apenas comanda OPEN
- * - Restaura estoque dos produtos
- */
+/* ========================= CANCELAR ========================= */
 export const cancelOrder = async (req, res) => {
   const { id } = req.params;
   try {
