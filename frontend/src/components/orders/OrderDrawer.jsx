@@ -209,9 +209,12 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
   const refreshCashierStatus = async () => {
     try {
       const res = await api.get('/cashier/status');
-      setCashierStatus(res?.data?.status || 'UNKNOWN');
+      const s = res?.data?.status || 'UNKNOWN';
+      setCashierStatus(s);
+      return s;
     } catch {
       setCashierStatus('UNKNOWN');
+      return 'UNKNOWN';
     }
   };
 
@@ -239,12 +242,11 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
     } catch (_) {}
   };
 
-  const hasCashierPosting = payments.some((p) => p.insertIntoCashier);
-  const blockCashierOps = hasCashierPosting && !isCashierOpen;
-
-  const ensureCashierOk = () => {
-    if (blockCashierOps) {
-      toast.error('Abra o Caixa para lançar recebimentos (desmarque "Inserir no Caixa" ou abra o Caixa).');
+  const ensureCashierOk = async () => {
+    // revalida no backend antes de bloquear
+    const s = await refreshCashierStatus();
+    if (payments.some((p) => p.insertIntoCashier) && s !== 'OPEN') {
+      toast.error('Caixa fechado: desmarque “Inserir no Caixa” ou abra o Caixa para continuar.');
       return false;
     }
     return true;
@@ -261,7 +263,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
         toast.error('A soma dos pagamentos deve ser igual ao total a pagar.');
         return;
       }
-      if (!ensureCashierOk()) return;
+      if (!(await ensureCashierOk())) return;
 
       const payload = {
         payments: payments.map((p) => ({
@@ -286,7 +288,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
   const handleFinalize = async () => {
     try {
       setLoading(true);
-      if (!ensureCashierOk()) return;
+      if (!(await ensureCashierOk())) return;
 
       await savePayments();
       if (Math.round(sumPayments * 100) !== Math.round(adjustedTotal * 100)) return;
@@ -370,7 +372,13 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           </div>
           <div className="flex items-center gap-2">
             <CashierBadge />
-            {/* Botões do caixa */}
+            <button
+              onClick={refreshCashierStatus}
+              className="px-2 py-1 text-xs rounded-md border bg-white hover:bg-gray-50"
+              title="Recarregar status do caixa"
+            >
+              Atualizar status
+            </button>
             {cashierStatus === 'CLOSED' && (
               <button
                 onClick={handleOpenCashier}
@@ -405,7 +413,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                 disabled={loading}
                 onClick={savePayments}
                 className="px-3 py-1.5 rounded-md border hover:bg-gray-50 disabled:opacity-60"
-                title={blockCashierOps ? 'Abra o Caixa ou desmarque "Inserir no Caixa" para salvar' : undefined}
+                title={!isCashierOpen && payments.some(p=>p.insertIntoCashier) ? 'Abra o Caixa ou desmarque "Inserir no Caixa" para salvar' : undefined}
               >
                 Salvar Pagamentos
               </button>
@@ -414,7 +422,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                 onClick={handleFinalize}
                 className="px-3 py-1.5 rounded-md bg-purple-700 text-white hover:bg-purple-800 disabled:opacity-60"
                 title={
-                  !isCashierOpen && hasCashierPosting
+                  !isCashierOpen && payments.some(p=>p.insertIntoCashier)
                     ? 'Abra o Caixa ou desmarque "Inserir no Caixa" para finalizar'
                     : undefined
                 }
@@ -463,7 +471,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
               A soma dos pagamentos deve ser igual ao total a pagar.
             </p>
           )}
-          {blockCashierOps && (
+          {!isCashierOpen && payments.some(p=>p.insertIntoCashier) && (
             <p className="mt-2 text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5 inline-flex items-center gap-2">
               <AlertTriangle size={14} />
               Caixa fechado: desmarque “Inserir no Caixa” nas formas de pagamento ou abra o Caixa para continuar.
@@ -793,7 +801,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                 <span>Restante</span>
                 <span>{currency(Math.max(0, remaining))}</span>
               </div>
-              {!isCashierOpen && hasCashierPosting && (
+              {!isCashierOpen && payments.some(p=>p.insertIntoCashier) && (
                 <p className="mt-2 text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5">
                   Caixa fechado: desmarque “Inserir no Caixa” nas formas de pagamento ou abra o Caixa para continuar.
                 </p>
@@ -813,7 +821,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                 disabled={loading}
                 onClick={savePayments}
                 className="px-4 py-2 rounded-md border hover:bg-gray-50 disabled:opacity-60"
-                title={blockCashierOps ? 'Abra o Caixa ou desmarque "Inserir no Caixa" para salvar' : undefined}
+                title={!isCashierOpen && payments.some(p=>p.insertIntoCashier) ? 'Abra o Caixa ou desmarque "Inserir no Caixa" para salvar' : undefined}
               >
                 Salvar Pagamentos
               </button>
@@ -822,7 +830,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                 onClick={handleFinalize}
                 className="px-4 py-2 rounded-md bg-purple-700 text-white hover:bg-purple-800 disabled:opacity-60"
                 title={
-                  !isCashierOpen && hasCashierPosting
+                  !isCashierOpen && payments.some(p=>p.insertIntoCashier)
                     ? 'Abra o Caixa ou desmarque "Inserir no Caixa" para finalizar'
                     : undefined
                 }

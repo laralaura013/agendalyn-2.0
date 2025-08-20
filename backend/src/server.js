@@ -32,12 +32,12 @@ import waitlistRoutes from './routes/waitlistRoutes.js';
 import blockRoutes from './routes/blockRoutes.js';
 import googleRoutes from './routes/googleRoutes.js';
 
-// ✅ NOVO (já existiam)
+// Extras
 import financeRoutes from './routes/financeRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 
-// ✅ NOVO (rotas de formas de pagamento usadas pelo OrderDrawer)
+// Formas de pagamento (OrderDrawer)
 import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
 dotenv.config();
@@ -76,7 +76,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '2mb' }));
 
-// ✅ Logger de companyId (mostra no console qual empresa está em cada request)
+// Logger de companyId (mostra no console qual empresa está em cada request)
 app.use(companyLogger);
 
 /* ----------------------------- Rotas ------------------------------ */
@@ -108,17 +108,29 @@ app.use('/api/agenda/blocks', blockRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/integrations/google', googleRoutes);
 
-// ✅ NOVO
+// Extras
 app.use('/api/finance', financeRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/exports', exportRoutes);
 
-// ✅ NOVO (formas de pagamento para o OrderDrawer)
+// Formas de pagamento (OrderDrawer)
 app.use('/api/payment-methods', paymentMethodRoutes);
 
 /* --------------------------- Healthcheck -------------------------- */
 app.get('/api', (_req, res) => res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' }));
 app.get('/', (_req, res) => res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' }));
+
+/* ----------------------- 404 & Error Handler ---------------------- */
+app.use((req, res) => {
+  res.status(404).json({ message: 'Rota não encontrada.' });
+});
+
+// Handler simples para não derrubar o server em erros não tratados
+// (mantém compat, só loga e retorna 500 padrão)
+app.use((err, _req, res, _next) => {
+  console.error('❌ Unhandled error:', err);
+  res.status(500).json({ message: 'Erro interno do servidor.' });
+});
 
 /* ---------------------------- Servidor ---------------------------- */
 app.listen(PORT, '0.0.0.0', () => {
