@@ -1,7 +1,12 @@
+// src/server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
+// Middlewares
+import { companyLogger } from './middlewares/loggerMiddleware.js';
+
+// Rotas
 import authRoutes from './routes/authRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
@@ -32,14 +37,15 @@ import financeRoutes from './routes/financeRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 
-// ✅ NOVO (adicionadas agora)
+// ✅ NOVO (rotas de formas de pagamento usadas pelo OrderDrawer)
 import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Log simples de origem e rota
+/* ------------------------ Logs & Preflight ------------------------ */
+// Log de origem e rota (rápido)
 app.use((req, _res, next) => {
   console.log('🌐 Origin:', req.headers.origin || '—', '| URL:', req.method, req.originalUrl);
   next();
@@ -62,14 +68,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS + JSON
+/* ------------------------ Core middlewares ------------------------ */
 app.use(cors({
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
+// ✅ Logger de companyId (mostra no console qual empresa está em cada request)
+app.use(companyLogger);
+
+/* ----------------------------- Rotas ------------------------------ */
 // Webhooks
 app.use('/api/webhooks', webhookRoutes);
 
@@ -103,12 +113,14 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/exports', exportRoutes);
 
-// ✅ NOVO (rotas de formas de pagamento usadas pelo OrderDrawer)
+// ✅ NOVO (formas de pagamento para o OrderDrawer)
 app.use('/api/payment-methods', paymentMethodRoutes);
 
+/* --------------------------- Healthcheck -------------------------- */
 app.get('/api', (_req, res) => res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' }));
 app.get('/', (_req, res) => res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' }));
 
+/* ---------------------------- Servidor ---------------------------- */
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });

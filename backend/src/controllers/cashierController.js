@@ -4,21 +4,36 @@ import * as cashbox from '../services/cashboxService.js';
 
 /* ============================================================
  * DETECÇÃO DE ESQUEMA
- * - Seu schema usa CashierSession/Transaction (legado).
+ * - Seu schema atual usa CashierSession/Transaction.
  * - Mantemos compat com um eventual modelo futuro "cashier".
  * ==========================================================*/
 function hasModel(modelName) {
   const m = prisma?.[modelName];
   return !!m && typeof m.findFirst === 'function';
 }
-const USE_NEW_CASHIER = hasModel('cashier'); // compat futuro (não existe hoje)
+const USE_NEW_CASHIER = hasModel('cashier');            // compat futuro (não existe hoje)
 const USE_OLD_SESSION = !USE_NEW_CASHIER && hasModel('cashierSession');
 
 /* ========================= Helpers ========================= */
+function getCompanyId(req) {
+  // 1) preferencial (seu middleware costuma popular)
+  if (req.company?.id) return req.company.id;
+  // 2) se usar auth com req.user
+  if (req.user?.companyId) return req.user.companyId;
+  // 3) DEV: header opcional
+  const fromHeader = req.headers['x-company-id'];
+  if (fromHeader) return String(fromHeader);
+  // 4) DEV: fallback via env
+  if (process.env.COMPANY_ID_FALLBACK) return process.env.COMPANY_ID_FALLBACK;
+
+  return null;
+}
+
 async function legacyGetActiveSession(companyId) {
   return prisma.cashierSession.findFirst({
     where: { companyId, status: 'OPEN' },
     include: { transactions: true },
+    orderBy: { openedAt: 'desc' },
   });
 }
 
@@ -54,15 +69,20 @@ const defaultRange = () => {
 
 /* ============================================================
  * GET /api/cashier/status
+ * - Retorna { status: 'OPEN'|'CLOSED'|'UNKNOWN', isOpen, ... }
+ * - Compat: mantém isOpen, mas o front novo usa status.
  * ==========================================================*/
 export const getCashierStatus = async (req, res) => {
   try {
-    const companyId = req.company?.id;
-    if (!companyId) return res.status(400).json({ message: 'Empresa não identificada.' });
+    const companyId = getCompanyId(req);
+    if (!companyId) return res.status(400).json({ status: 'UNKNOWN', message: 'Empresa não identificada.' });
 
     if (USE_NEW_CASHIER) {
-      const status = await cashbox.cashierStatus(null, companyId);
-      return res.json(status);
+      // caso futuro
+      const statusObj = await cashbox.cashierStatus(null, companyId);
+      // garanta campo status padronizado
+      if (statusObj?.status) return res.json(statusObj);
+      return res.json({ status: statusObj?.isOpen ? 'OPEN' : 'CLOSED', ...statusObj });
     }
 
     if (USE_OLD_SESSION) {
@@ -73,35 +93,41 @@ export const getCashierStatus = async (req, res) => {
           activeSession.openingBalance
         );
         return res.status(200).json({
+          status: 'OPEN',
           isOpen: true,
-          session: activeSession,
+          sessionId: activeSession.id,
+          openedAt: activeSession.openedAt ?? activeSession.createdAt ?? null,
           totalsToday: { income: totals.income, expense: totals.expense, balance: totals.balance },
         });
       }
-      return res
-        .status(200)
-        .json({ isOpen: false, session: null, totalsToday: { income: 0, expense: 0, balance: 0 } });
+      return res.status(200).json({
+        status: 'CLOSED',
+        isOpen: false,
+        sessionId: null,
+        openedAt: null,
+        totalsToday: { income: 0, expense: 0, balance: 0 },
+      });
     }
 
     return res.status(500).json({
+      status: 'UNKNOWN',
       message:
         'Nenhum modelo de caixa encontrado (cashier ou cashierSession). Verifique seu schema.prisma.',
     });
   } catch (error) {
     console.error('Erro ao buscar status do caixa:', error);
-    return res.status(500).json({ message: 'Erro ao consultar status do caixa.' });
+    // Preferimos 200 com UNKNOWN para o front exibir badge coerente
+    return res.status(200).json({ status: 'UNKNOWN', message: 'Erro ao consultar status do caixa.' });
   }
 };
 
 /* ============================================================
  * GET /api/cashier/statement?from&to
- * Extrato (por dia) + totais por categoria
- * - usa Transactions (createdAt) do período, filtrando por cashierSession.companyId
- * - se from/to não vierem: 1º dia do mês → hoje
+ * Extrato (por dia) + totais por categoria (Transactions no período)
  * ==========================================================*/
 export const getCashierStatement = async (req, res) => {
   try {
-    const companyId = req.company?.id;
+    const companyId = getCompanyId(req);
     if (!companyId) return res.status(400).json({ message: 'Empresa não identificada.' });
 
     const { from: Qfrom, to: Qto } = req.query || {};
@@ -160,11 +186,11 @@ export const getCashierStatement = async (req, res) => {
     const [receivables, payables] = await Promise.all([
       recvIds.length ? prisma.receivable.findMany({
         where: { companyId, id: { in: recvIds } },
-        select: { id: true, categoryId: true, category: { select: { id: true, name: true } } },
+        select: { id: true, categoryId: true, category: { select: { id: true, name: true} } },
       }) : [],
       payIds.length ? prisma.payable.findMany({
         where: { companyId, id: { in: payIds } },
-        select: { id: true, categoryId: true, category: { select: { id: true, name: true } } },
+        select: { id: true, categoryId: true, category: { select: { id: true, name: true} } },
       }) : [],
     ]);
 
@@ -203,15 +229,11 @@ export const getCashierStatement = async (req, res) => {
 
 /* ============================================================
  * GET /api/cashier/summary?from&to
- * KPIs do período:
- *  - totals (income/expense/balance) via Transaction
- *  - receivablesKPIs: {count, receivedCount, receivedAmount, avgTicket, receivedRate, byPaymentMethod, byCategory}
- *  - payablesKPIs:    {count, paidCount, paidAmount, avgTicket, paidRate, byPaymentMethod, byCategory}
- * Se não informar from/to: 1º dia do mês → hoje.
+ * KPIs do período (Transactions + Receivables + Payables)
  * ==========================================================*/
 export const getCashierSummary = async (req, res) => {
   try {
-    const companyId = req.company?.id;
+    const companyId = getCompanyId(req);
     if (!companyId) return res.status(400).json({ message: 'Empresa não identificada.' });
 
     const { from: Qfrom, to: Qto } = req.query || {};
@@ -372,7 +394,7 @@ export const getCashierSummary = async (req, res) => {
  * ==========================================================*/
 export const openCashier = async (req, res) => {
   try {
-    const companyId = req.company?.id;
+    const companyId = getCompanyId(req);
     if (!companyId) return res.status(400).json({ message: 'Empresa não identificada.' });
 
     const openingAmount =
@@ -383,7 +405,9 @@ export const openCashier = async (req, res) => {
     if (USE_NEW_CASHIER) {
       const opened = await cashbox.openCashier(null, companyId, isFinite(openingAmount) ? openingAmount : 0);
       const status = await cashbox.cashierStatus(null, companyId);
-      return res.status(201).json({ cashier: opened, status });
+      // normaliza status
+      const norm = status?.status ? status.status : (status?.isOpen ? 'OPEN' : 'CLOSED');
+      return res.status(201).json({ cashier: opened, status: norm });
     }
 
     if (USE_OLD_SESSION) {
@@ -403,15 +427,10 @@ export const openCashier = async (req, res) => {
         include: { transactions: true },
       });
 
-      const totals = legacyTotalsFromTransactions(newSession.transactions, newSession.openingBalance);
       return res.status(201).json({
         cashier: newSession,
-        status: {
-          isOpen: true,
-          openedAt: newSession.createdAt || newSession.openedAt || null,
-          cashierId: newSession.id,
-          totalsToday: { income: totals.income, expense: totals.expense, balance: totals.balance },
-        },
+        status: 'OPEN',
+        sessionId: newSession.id,
       });
     }
 
@@ -430,7 +449,7 @@ export const openCashier = async (req, res) => {
  * ==========================================================*/
 export const closeCashier = async (req, res) => {
   try {
-    const companyId = req.company?.id;
+    const companyId = getCompanyId(req);
     if (!companyId) return res.status(400).json({ message: 'Empresa não identificada.' });
 
     const { closingAmount = null, notes = '' } = req.body || {};
@@ -440,8 +459,7 @@ export const closeCashier = async (req, res) => {
       if (!closed) {
         return res.status(409).json({ message: 'Não há caixa aberto para fechar.' });
       }
-      const status = await cashbox.cashierStatus(null, companyId);
-      return res.json({ cashier: closed, status });
+      return res.json({ cashier: closed, status: 'CLOSED' });
     }
 
     if (USE_OLD_SESSION) {
@@ -473,7 +491,8 @@ export const closeCashier = async (req, res) => {
 
       return res.status(200).json({
         cashier: closedSession,
-        status: { isOpen: false, openedAt: null, cashierId: null, totalsToday: { income: 0, expense: 0, balance: 0 } },
+        status: 'CLOSED',
+        sessionId: null,
       });
     }
 

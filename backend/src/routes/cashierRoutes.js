@@ -16,21 +16,22 @@ router.use(protect);
 
 /**
  * GET /api/cashier/status
- * Retorna se há caixa aberto + totais do dia.
+ * Retorna se há caixa aberto + status padronizado.
+ * { status: 'OPEN'|'CLOSED'|'UNKNOWN', ... }
  */
 router.get('/status', getCashierStatus);
 
 /**
  * GET /api/cashier/statement?from=YYYY-MM-DD&to=YYYY-MM-DD
  * Extrato por período (por dia) + totais por categoria.
- * Se não informar, usa 1º dia do mês atual até hoje.
+ * Se não informar, 1º dia do mês atual → hoje.
  */
 router.get('/statement', getCashierStatement);
 
 /**
  * GET /api/cashier/summary?from=YYYY-MM-DD&to=YYYY-MM-DD
- * KPIs do período (recebíveis/pagáveis), pronto para cards e gráficos.
- * Se não informar, usa 1º dia do mês atual até hoje.
+ * KPIs do período (recebíveis/pagáveis).
+ * Se não informar, 1º dia do mês atual → hoje.
  */
 router.get('/summary', getCashierSummary);
 
