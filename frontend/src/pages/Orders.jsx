@@ -93,10 +93,9 @@ const Orders = () => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // ✅ corrigido: sem "tela branca" e já abre o drawer da comanda criada
   const handleSave = async (data) => {
     try {
-      setIsModalOpen(false); // fecha antes para evitar race
+      setIsModalOpen(false);
       const res = await api.post('/orders', data);
       const created = res?.data;
 
@@ -116,7 +115,7 @@ const Orders = () => {
     } catch (err) {
       console.error(err);
       toast.error(err?.response?.data?.message || 'Erro ao criar comanda.');
-      setIsModalOpen(true); // reabre caso dê erro
+      setIsModalOpen(true);
     }
   };
 
@@ -189,21 +188,13 @@ const Orders = () => {
       {/* Modal de criação */}
       {isModalOpen && (
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-          <OrderForm
-            onSave={handleSave}
-            onCancel={() => setIsModalOpen(false)}
-          />
+          <OrderForm onSave={handleSave} onCancel={() => setIsModalOpen(false)} />
         </Modal>
       )}
 
       {/* Drawer de Pagamentos/Resumo */}
       {selectedOrder && (
-        <OrderDrawer
-          order={selectedOrder}
-          open={drawerOpen}
-          onClose={closeDrawer}
-          refreshOrders={fetchOrders}
-        />
+        <OrderDrawer order={selectedOrder} open={drawerOpen} onClose={closeDrawer} refreshOrders={fetchOrders} />
       )}
     </div>
   );
