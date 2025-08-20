@@ -58,6 +58,10 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
   const [tipValue, setTipValue] = useState(0);
   const [tipMode, setTipMode] = useState('R$'); // 'R$' | '%'
 
+  // Flags de status
+  const isOpen = order?.status === 'OPEN';
+  const isFinished = order?.status === 'FINISHED';
+
   const total = useMemo(() => Number(order?.total || 0), [order]);
 
   const discountAbs = useMemo(
@@ -84,10 +88,13 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
     [adjustedTotal, sumPayments]
   );
 
+  // Apenas em ABERTA mostramos o aviso
+  const showSumWarning =
+    isOpen && Math.round(sumPayments * 100) !== Math.round(adjustedTotal * 100);
+
   const canFinalize =
-    order?.status === 'OPEN' &&
-    adjustedTotal >= 0 &&
-    Math.round(sumPayments * 100) === Math.round(adjustedTotal * 100) &&
+    isOpen &&
+    payments.length > 0 &&
     (isCashierOpen || !payments.some((p) => p.insertIntoCashier));
 
   // carregar dados ao abrir
@@ -137,9 +144,10 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
         toast.error('Erro ao carregar dados da comanda.');
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, order, total]);
 
-  const disabled = order?.status !== 'OPEN';
+  const disabled = !isOpen;
 
   const updateRow = (idx, patch) => {
     setPayments((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
@@ -259,10 +267,6 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
         toast.error('Adicione ao menos uma forma de pagamento.');
         return;
       }
-      if (Math.round(sumPayments * 100) !== Math.round(adjustedTotal * 100)) {
-        toast.error('A soma dos pagamentos deve ser igual ao total a pagar.');
-        return;
-      }
       if (!(await ensureCashierOk())) return;
 
       const payload = {
@@ -273,6 +277,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           cardBrand: p.cardBrand || undefined,
           insertIntoCashier: !!p.insertIntoCashier,
         })),
+        // NÃO enviamos expectedTotal para permitir desconto/gorjeta sem travar.
       };
       await api.put(`/orders/${order.id}/payments`, payload);
       toast.success('Pagamentos salvos!');
@@ -290,8 +295,8 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
       setLoading(true);
       if (!(await ensureCashierOk())) return;
 
+      // salve pagamentos; backend aceita diferença do total (desconto/gorjeta)
       await savePayments();
-      if (Math.round(sumPayments * 100) !== Math.round(adjustedTotal * 100)) return;
 
       await api.put(`/orders/${order.id}/finish`);
       toast.success('Comanda finalizada!');
@@ -342,9 +347,9 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
         </span>
       );
     return (
-      <span className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-700 font-semibold">
-        CAIXA: —
-      </span>
+        <span className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-700 font-semibold">
+          CAIXA: —
+        </span>
     );
   };
 
@@ -407,7 +412,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           <button onClick={onClose} className="px-3 py-1.5 rounded-md border hover:bg-gray-50">
             Fechar
           </button>
-          {order?.status === 'OPEN' && (
+          {isOpen && (
             <>
               <button
                 disabled={loading}
@@ -450,31 +455,49 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                 <span>{currency(tipAbs)}</span>
               </div>
             </div>
+
             <div className="rounded-lg border p-2">
               <div className="flex justify-between">
-                <span className="text-gray-600">Total a pagar</span>
+                <span className="text-gray-600">
+                  {isOpen ? 'Total a pagar' : 'Total da comanda'}
+                </span>
                 <strong>{currency(adjustedTotal)}</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Pago</span>
                 <span>{currency(sumPayments)}</span>
               </div>
-              <div className={`flex justify-between ${remaining > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                <span>Restante</span>
-                <span className="font-semibold">{currency(Math.max(0, remaining))}</span>
-              </div>
+
+              {isOpen && (
+                <div
+                  className={`flex justify-between ${
+                    remaining > 0 ? 'text-amber-700' : 'text-emerald-700'
+                  }`}
+                >
+                  <span>Restante</span>
+                  <span className="font-semibold">{currency(Math.max(0, remaining))}</span>
+                </div>
+              )}
             </div>
           </div>
-          {Math.round(sumPayments * 100) !== Math.round(adjustedTotal * 100) && (
+
+          {showSumWarning && (
             <p className="mt-2 text-[12px] text-yellow-800 bg-yellow-50 border border-yellow-200 rounded-md px-2.5 py-1.5 inline-flex items-center gap-2">
               <AlertTriangle size={14} />
               A soma dos pagamentos deve ser igual ao total a pagar.
             </p>
           )}
-          {!isCashierOpen && payments.some(p=>p.insertIntoCashier) && (
+
+          {isOpen && !isCashierOpen && payments.some(p=>p.insertIntoCashier) && (
             <p className="mt-2 text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5 inline-flex items-center gap-2">
               <AlertTriangle size={14} />
               Caixa fechado: desmarque “Inserir no Caixa” nas formas de pagamento ou abra o Caixa para continuar.
+            </p>
+          )}
+
+          {!isOpen && (
+            <p className="mt-2 text-[12px] text-slate-600">
+              Comanda finalizada. Valores exibidos são informativos.
             </p>
           )}
         </div>
@@ -524,7 +547,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           <section>
             <div className="flex items-center justify-between mb-2 gap-2">
               <h3 className="text-sm font-semibold text-gray-700">Formas de Pagamento</h3>
-              {order?.status === 'OPEN' && (
+              {isOpen && (
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -789,7 +812,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                 <span>{currency(tipAbs)}</span>
               </div>
               <div className="flex justify-between font-semibold">
-                <span>Total a pagar</span>
+                <span>{isOpen ? 'Total a pagar' : 'Total da comanda'}</span>
                 <span>{currency(adjustedTotal)}</span>
               </div>
               <hr className="my-2" />
@@ -797,11 +820,15 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                 <span>Pago (somatório)</span>
                 <span>{currency(sumPayments)}</span>
               </div>
-              <div className="flex justify-between font-semibold">
-                <span>Restante</span>
-                <span>{currency(Math.max(0, remaining))}</span>
-              </div>
-              {!isCashierOpen && payments.some(p=>p.insertIntoCashier) && (
+
+              {isOpen && (
+                <div className="flex justify-between font-semibold">
+                  <span>Restante</span>
+                  <span>{currency(Math.max(0, remaining))}</span>
+                </div>
+              )}
+
+              {isOpen && !isCashierOpen && payments.some(p=>p.insertIntoCashier) && (
                 <p className="mt-2 text-[12px] text-red-800 bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5">
                   Caixa fechado: desmarque “Inserir no Caixa” nas formas de pagamento ou abra o Caixa para continuar.
                 </p>
@@ -815,7 +842,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           <button onClick={onClose} className="px-4 py-2 rounded-md border hover:bg-gray-50">
             Fechar
           </button>
-          {order?.status === 'OPEN' && (
+          {isOpen && (
             <>
               <button
                 disabled={loading}
