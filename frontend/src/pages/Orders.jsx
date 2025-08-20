@@ -93,26 +93,31 @@ const Orders = () => {
     fetchOrders();
   }, [fetchOrders]);
 
+  // ✅ corrigido: sem "tela branca" e já abre o drawer da comanda criada
   const handleSave = async (data) => {
-    const savePromise = api.post('/orders', data);
-    toast.promise(savePromise, {
-      loading: 'Criando comanda...',
-      success: async (res) => {
-        await fetchOrders();
-        setIsModalOpen(false);
-        // Abre direto o drawer da comanda criada para já lançar pagamento
-        const created = res?.data;
-        const fullOrder = created
-          ? (await api.get('/orders')).data.find(o => o.id === created.id)
-          : null;
-        if (fullOrder) {
-          setSelectedOrder(fullOrder);
-          setDrawerOpen(true);
-        }
-        return 'Comanda criada com sucesso!';
-      },
-      error: (err) => err.response?.data?.message || 'Erro ao criar comanda.',
-    });
+    try {
+      setIsModalOpen(false); // fecha antes para evitar race
+      const res = await api.post('/orders', data);
+      const created = res?.data;
+
+      await fetchOrders();
+
+      let fullOrder = null;
+      if (created?.id) {
+        const list = (await api.get('/orders')).data || [];
+        fullOrder = list.find((o) => o.id === created.id) || null;
+      }
+
+      if (fullOrder) {
+        setSelectedOrder(fullOrder);
+        setDrawerOpen(true);
+      }
+      toast.success('Comanda criada com sucesso!');
+    } catch (err) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || 'Erro ao criar comanda.');
+      setIsModalOpen(true); // reabre caso dê erro
+    }
   };
 
   const handleFinishOrder = async (id) => {
