@@ -160,10 +160,11 @@ model Order {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  client  Client      @relation(fields: [clientId], references: [id])
-  company Company     @relation(fields: [companyId], references: [id])
-  user    User        @relation(fields: [userId], references: [id])
-  items   OrderItem[]
+  client   Client         @relation(fields: [clientId], references: [id])
+  company  Company        @relation(fields: [companyId], references: [id])
+  user     User           @relation(fields: [userId], references: [id])
+  items    OrderItem[]
+  payments OrderPayment[] // pagamentos por comanda
 
   // SPRINT 1: receivable opcional linkado
   receivables Receivable[]
@@ -190,6 +191,24 @@ model OrderItem {
   @@index([productId])
 }
 
+/// Pagamentos de comanda
+model OrderPayment {
+  id                String   @id @default(cuid())
+  orderId           String
+  paymentMethodId   String
+  amount            Decimal  @db.Decimal(10, 2)
+  installments      Int      @default(1) // nº de parcelas (>=1)
+  cardBrand         String? // ex.: "VISA", "MASTERCARD"
+  insertIntoCashier Boolean  @default(true) // lançar no caixa a 1ª parcela (ou parcela única)
+  createdAt         DateTime @default(now())
+
+  order         Order         @relation(fields: [orderId], references: [id])
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([orderId])
+  @@index([paymentMethodId])
+}
+
 model CashierSession {
   id             String        @id @default(cuid())
   openingBalance Decimal       @db.Decimal(10, 2)
@@ -214,15 +233,15 @@ model Transaction {
   createdAt        DateTime        @default(now())
 
   // Campos para idempotência de integrações (Caixa)
-  sourceType       CashSourceType?
-  sourceId         String?
+  sourceType CashSourceType?
+  sourceId   String?
 
   cashierSession CashierSession @relation(fields: [cashierSessionId], references: [id])
 
-  @@index([cashierSessionId])
-  @@index([cashierSessionId, createdAt])  // acelera filtros por período
-  @@index([createdAt])                    // consultas por data
   @@unique([sourceType, sourceId])
+  @@index([cashierSessionId])
+  @@index([cashierSessionId, createdAt])
+  @@index([createdAt])
 }
 
 model Plan {
@@ -527,9 +546,10 @@ model PaymentMethod {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company     Company      @relation(fields: [companyId], references: [id])
-  payables    Payable[]
-  receivables Receivable[]
+  company       Company        @relation(fields: [companyId], references: [id])
+  payables      Payable[]
+  receivables   Receivable[]
+  orderPayments OrderPayment[] // relação reversa para pagamentos de comanda
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -540,8 +560,8 @@ model FinanceCategory {
   companyId String
   name      String
   type      FinanceCategoryType
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
 
   company     Company      @relation(fields: [companyId], references: [id])
   payables    Payable[]
@@ -570,7 +590,7 @@ model Payable {
   paymentMethod PaymentMethod?  @relation(fields: [paymentMethodId], references: [id])
 
   @@index([companyId, dueDate])
-  @@index([companyId, status, paidAt])  // acelera KPIs (summary)
+  @@index([companyId, status, paidAt])
 }
 
 model Receivable {
@@ -594,7 +614,7 @@ model Receivable {
   paymentMethod PaymentMethod?   @relation(fields: [paymentMethodId], references: [id])
 
   @@index([companyId, dueDate])
-  @@index([companyId, status, receivedAt]) // acelera KPIs (summary)
+  @@index([companyId, status, receivedAt])
 }
 
 model CancellationReason {

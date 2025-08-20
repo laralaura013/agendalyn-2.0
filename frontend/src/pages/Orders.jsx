@@ -1,8 +1,10 @@
+// src/pages/Orders.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { FileText, CheckCircle, XCircle } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Modal from '../components/dashboard/Modal';
 import OrderForm from '../components/forms/OrderForm';
+import OrderDrawer from '../components/orders/OrderDrawer';
 import api from '../services/api';
 
 const statusMap = {
@@ -11,7 +13,7 @@ const statusMap = {
   CANCELED: { text: 'CANCELADA', style: 'bg-red-100 text-red-800' },
 };
 
-const OrderCard = ({ order, onFinish, onCancel }) => {
+const OrderCard = ({ order, onFinish, onCancel, onOpen }) => {
   const currentStatus = statusMap[order.status] || {
     text: 'DESCONHECIDO',
     style: 'bg-gray-100 text-gray-700',
@@ -32,27 +34,36 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
         <p><strong>Data:</strong> {new Date(order.createdAt).toLocaleString('pt-BR')}</p>
       </div>
 
-      <div className="mt-auto pt-3 border-t flex justify-between items-center">
+      <div className="mt-auto pt-3 border-t flex flex-wrap gap-2 items-center justify-between">
         <p className="font-bold text-base">
           Total: <span className="text-emerald-600">R$ {Number(order.total).toFixed(2)}</span>
         </p>
 
-        {order.status === 'OPEN' && (
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              onClick={() => onCancel(order.id)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-md hover:bg-red-700 transition"
-            >
-              <XCircle size={16} /> Cancelar
-            </button>
-            <button
-              onClick={() => onFinish(order.id)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition"
-            >
-              <CheckCircle size={16} /> Finalizar
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <button
+            onClick={() => onOpen(order)}
+            className="flex items-center gap-1 px-3 py-1.5 bg-white border text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 transition"
+          >
+            <Eye size={16} /> Abrir
+          </button>
+
+          {order.status === 'OPEN' && (
+            <>
+              <button
+                onClick={() => onCancel(order.id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-md hover:bg-red-700 transition"
+              >
+                <XCircle size={16} /> Cancelar
+              </button>
+              <button
+                onClick={() => onFinish(order.id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-md hover:bg-green-700 transition"
+              >
+                <CheckCircle size={16} /> Finalizar
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -61,6 +72,8 @@ const OrderCard = ({ order, onFinish, onCancel }) => {
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = useCallback(async () => {
@@ -84,9 +97,18 @@ const Orders = () => {
     const savePromise = api.post('/orders', data);
     toast.promise(savePromise, {
       loading: 'Criando comanda...',
-      success: () => {
-        fetchOrders();
+      success: async (res) => {
+        await fetchOrders();
         setIsModalOpen(false);
+        // Abre direto o drawer da comanda criada para já lançar pagamento
+        const created = res?.data;
+        const fullOrder = created
+          ? (await api.get('/orders')).data.find(o => o.id === created.id)
+          : null;
+        if (fullOrder) {
+          setSelectedOrder(fullOrder);
+          setDrawerOpen(true);
+        }
         return 'Comanda criada com sucesso!';
       },
       error: (err) => err.response?.data?.message || 'Erro ao criar comanda.',
@@ -94,7 +116,7 @@ const Orders = () => {
   };
 
   const handleFinishOrder = async (id) => {
-    if (window.confirm('Finalizar esta comanda e lançar no caixa?')) {
+    if (window.confirm('Finalizar esta comanda (sem editar pagamentos)?')) {
       const finishPromise = api.put(`/orders/${id}/finish`);
       toast.promise(finishPromise, {
         loading: 'Finalizando...',
@@ -121,6 +143,16 @@ const Orders = () => {
     }
   };
 
+  const openDrawer = (order) => {
+    setSelectedOrder(order);
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setSelectedOrder(null);
+  };
+
   return (
     <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
@@ -143,11 +175,13 @@ const Orders = () => {
               order={order}
               onFinish={handleFinishOrder}
               onCancel={handleCancelOrder}
+              onOpen={openDrawer}
             />
           ))}
         </div>
       )}
 
+      {/* Modal de criação */}
       {isModalOpen && (
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
           <OrderForm
@@ -155,6 +189,16 @@ const Orders = () => {
             onCancel={() => setIsModalOpen(false)}
           />
         </Modal>
+      )}
+
+      {/* Drawer de Pagamentos/Resumo */}
+      {selectedOrder && (
+        <OrderDrawer
+          order={selectedOrder}
+          open={drawerOpen}
+          onClose={closeDrawer}
+          refreshOrders={fetchOrders}
+        />
       )}
     </div>
   );
