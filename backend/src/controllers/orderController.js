@@ -7,7 +7,6 @@ function toNumber(v, def = 0) {
   const n = Number(v);
   return isFinite(n) ? n : def;
 }
-
 function assertPositive(n, field) {
   if (!(Number(n) > 0)) {
     const err = new Error(`${field || 'valor'} inválido.`);
@@ -15,23 +14,13 @@ function assertPositive(n, field) {
     throw err;
   }
 }
-
 function addMonths(date, months) {
   const d = new Date(date);
   d.setMonth(d.getMonth() + months);
   return d;
 }
-
 function round2(n) {
   return Math.round(Number(n) * 100) / 100;
-}
-
-function adjustedTotalFromOrder(order) {
-  // total ajustado = subtotal (order.total) - desconto + gorjeta
-  const subtotal = Number(order?.total || 0);
-  const discount = Number(order?.discount || 0);
-  const tip = Number(order?.tip || 0);
-  return round2(Math.max(0, subtotal - discount + tip));
 }
 
 /* ========================= LISTAR ========================= */
@@ -64,7 +53,7 @@ export const listOrders = async (req, res) => {
 /* ========================= CRIAR ========================= */
 export const createOrder = async (req, res) => {
   try {
-    const { clientId, userId, items, discount = 0, tip = 0 } = req.body;
+    const { clientId, userId, items } = req.body;
     const companyId = req.company.id;
 
     if (!clientId || !userId || !items || items.length === 0) {
@@ -114,9 +103,15 @@ export const createOrder = async (req, res) => {
     const transactionResult = await prisma.$transaction([
       prisma.order.create({
         data: {
-          total,                          // SUBTOTAL (itens)
-          discount: round2(toNumber(discount, 0)), // Desconto inicial, se vier
-          tip: round2(toNumber(tip, 0)),          // Gorjeta inicial, se vier
+          total,
+          // ✅ inicia totais persistidos
+          discountAmount: 0,
+          discountMode: 'R$',
+          tipAmount: 0,
+          tipMode: 'R$',
+          totalToPay: total, // subtotal - 0 + 0
+          paidTotal: 0,
+
           status: 'OPEN',
           companyId,
           clientId,
@@ -135,60 +130,29 @@ export const createOrder = async (req, res) => {
   }
 };
 
-/* ========================= ATUALIZAR DESCONTO / GORJETA =========================
- * PUT /orders/:id/totals
- * body: { discount?: number, tip?: number }
- * Apenas quando a comanda está OPEN.
- */
-export const updateOrderTotals = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const companyId = req.company.id;
-    const { discount = null, tip = null } = req.body || {};
-
-    const order = await prisma.order.findFirst({
-      where: { id, companyId },
-      select: { id: true, status: true },
-    });
-
-    if (!order || order.status !== 'OPEN') {
-      return res.status(404).json({ message: 'Comanda não encontrada ou não está ABERTA.' });
-    }
-
-    const data = {};
-    if (discount !== null) data.discount = round2(Math.max(0, toNumber(discount, 0)));
-    if (tip !== null) data.tip = round2(Math.max(0, toNumber(tip, 0)));
-
-    const updated = await prisma.order.update({
-      where: { id },
-      data,
-      include: {
-        client: { select: { name: true } },
-        user: { select: { name: true } },
-        items: true,
-        payments: { include: { paymentMethod: { select: { id: true, name: true } } } },
-      },
-    });
-
-    return res.status(200).json(updated);
-  } catch (error) {
-    console.error('--- ERRO updateOrderTotals ---', error);
-    return res.status(500).json({ message: 'Erro ao atualizar desconto/gorjeta.' });
-  }
-};
-
 /* ========================= PAGAMENTOS (definir lista) =========================
- * Substitui TODAS as formas de pagamento da comanda (enquanto OPEN).
+ * Substitui TODAS as formas de pagamento (enquanto OPEN).
  * body: {
  *   payments: [{ paymentMethodId, amount, installments?, cardBrand?, insertIntoCashier? }],
- *   expectedTotal?: number // opcional; se vier, será validado também
+ *   discount?: number,
+ *   discountMode?: "R$" | "%",
+ *   tip?: number,
+ *   tipMode?: "R$" | "%",
+ *   expectedTotal?: number // total calculado no front (subtotal - desconto + gorjeta)
  * }
  */
 export const setOrderPayments = async (req, res) => {
   try {
     const { id } = req.params;
     const companyId = req.company.id;
-    const { payments, expectedTotal } = req.body || {};
+    const {
+      payments,
+      discount = 0,
+      discountMode = 'R$',
+      tip = 0,
+      tipMode = 'R$',
+      expectedTotal,
+    } = req.body || {};
 
     if (!Array.isArray(payments) || payments.length === 0) {
       return res.status(400).json({ message: 'Envie ao menos uma forma de pagamento.' });
@@ -221,7 +185,6 @@ export const setOrderPayments = async (req, res) => {
       }
       assertPositive(amount, 'amount');
 
-      // método pertence à empresa?
       const pm = await prisma.paymentMethod.findFirst({
         where: { id: paymentMethodId, companyId },
         select: { id: true },
@@ -244,29 +207,43 @@ export const setOrderPayments = async (req, res) => {
       });
     }
 
-    // total ajustado calculado no back (usa campos persistidos)
-    const adjusted = adjustedTotalFromOrder(order);
-
-    // Se o front enviou expectedTotal, validamos coerência (ambos devem bater com a soma)
-    if (typeof expectedTotal === 'number' && round2(expectedTotal) !== adjusted) {
-      return res.status(400).json({
-        message:
-          'Total esperado (front) difere do total ajustado (back). Recarregue e tente novamente.',
-        details: { expectedTotal: round2(expectedTotal), adjusted },
-      });
+    // valida com o total do front (subtotal - desconto + gorjeta)
+    if (typeof expectedTotal === 'number') {
+      if (round2(sum) !== round2(expectedTotal)) {
+        return res.status(400).json({
+          message: 'A soma dos pagamentos deve ser igual ao total a pagar.',
+          details: { expectedTotal: round2(expectedTotal), sum: round2(sum) },
+        });
+      }
     }
 
-    if (round2(sum) !== adjusted) {
-      return res.status(400).json({
-        message: 'A soma dos pagamentos deve ser igual ao total a pagar.',
-        details: { totalAjustado: adjusted, somaPagamentos: round2(sum) },
-      });
-    }
+    // calcula e persiste os totais
+    const subtotal = Number(order.total);
+    const discountAmount =
+      discountMode === '%'
+        ? round2((subtotal * Number(discount || 0)) / 100)
+        : round2(Number(discount || 0));
+    const tipAmount =
+      tipMode === '%'
+        ? round2((subtotal * Number(tip || 0)) / 100)
+        : round2(Number(tip || 0));
+    const totalToPay = round2(Math.max(0, subtotal - discountAmount) + tipAmount);
+    const paidTotal = round2(sum);
 
-    // replace all
     await prisma.$transaction(async (tx) => {
       await tx.orderPayment.deleteMany({ where: { orderId: order.id } });
       await tx.orderPayment.createMany({ data: toCreate });
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          discountAmount,
+          discountMode,
+          tipAmount,
+          tipMode,
+          totalToPay,
+          paidTotal,
+        },
+      });
     });
 
     const updated = await prisma.order.findFirst({
@@ -282,19 +259,12 @@ export const setOrderPayments = async (req, res) => {
   }
 };
 
-/* ========================= FINALIZAR =========================
- * - Exige haver pagamentos batendo com o total ajustado
- * - Para cada pagamento:
- *    - installments = 1 => cria 1 Receivable (hoje). Se insertIntoCashier, marca RECEIVED e lança no caixa.
- *    - installments > 1 => cria N Receivables mensais. Se insertIntoCashier, marca RECEIVED e lança no caixa APENAS a 1ª parcela (hoje); demais ficam OPEN com dueDate em +1M, +2M...
- * - Atualiza status da comanda para FINISHED.
- */
+/* ========================= FINALIZAR ========================= */
 export const finishOrder = async (req, res) => {
   const { id } = req.params;
   const companyId = req.company.id;
 
   try {
-    // Comanda + pagamentos
     const order = await prisma.order.findFirst({
       where: { id, companyId },
       include: {
@@ -314,17 +284,11 @@ export const finishOrder = async (req, res) => {
         .json({ message: 'Defina as formas de pagamento antes de finalizar a comanda.' });
     }
 
-    const adjusted = adjustedTotalFromOrder(order);
     const sum = round2(order.payments.reduce((acc, p) => acc + Number(p.amount || 0), 0));
-
-    if (sum !== adjusted) {
-      return res.status(400).json({
-        message: 'A soma dos pagamentos não bate com o total a pagar.',
-        details: { totalAjustado: adjusted, somaPagamentos: sum },
-      });
+    if (!(sum > 0)) {
+      return res.status(400).json({ message: 'O valor total dos pagamentos precisa ser maior que zero.' });
     }
 
-    // Checa necessidade de caixa
     const requiresCashier = order.payments.some((p) => p.insertIntoCashier);
     if (requiresCashier) {
       const activeCashier = await prisma.cashierSession.findFirst({
@@ -338,22 +302,20 @@ export const finishOrder = async (req, res) => {
       }
     }
 
-    // Finalização + criação de Receivables + lançamentos no caixa
     await prisma.$transaction(async (tx) => {
-      // Finaliza a comanda
-      await tx.order.update({ where: { id: order.id }, data: { status: 'FINISHED' } });
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: 'FINISHED', paidTotal: sum }, // garante paidTotal
+      });
 
       const today = new Date();
 
       for (const pay of order.payments) {
         const totalPay = round2(pay.amount || 0);
         const installments = Math.max(1, parseInt(pay.installments || 1, 10));
-        const notesBase = `Comanda #${order.id.slice(0, 8)}${
-          pay.cardBrand ? ` (${pay.cardBrand})` : ''
-        }`;
+        const notesBase = `Comanda #${order.id.slice(0, 8)}${pay.cardBrand ? ` (${pay.cardBrand})` : ''}`;
 
         if (installments <= 1) {
-          // parcela única
           const recv = await tx.receivable.create({
             data: {
               companyId,
@@ -368,7 +330,6 @@ export const finishOrder = async (req, res) => {
             },
           });
 
-          // caixa imediato
           if (pay.insertIntoCashier) {
             await cashbox.ensureIncomeForReceivable(tx, companyId, {
               id: recv.id,
@@ -378,7 +339,6 @@ export const finishOrder = async (req, res) => {
             });
           }
         } else {
-          // múltiplas parcelas
           const base = Math.floor((totalPay * 100) / installments) / 100;
           let acc = 0;
 
@@ -389,8 +349,8 @@ export const finishOrder = async (req, res) => {
             acc = round2(acc + amt);
 
             const due = i === 0 ? today : addMonths(today, i);
-
             const receivedNow = isFirst && pay.insertIntoCashier;
+
             const recv = await tx.receivable.create({
               data: {
                 companyId,
@@ -462,14 +422,4 @@ export const cancelOrder = async (req, res) => {
     console.error('--- ERRO AO CANCELAR COMANDA ---', error);
     res.status(500).json({ message: 'Erro ao cancelar comanda.' });
   }
-};
-
-/* ========================= Exports ========================= */
-export default {
-  listOrders,
-  createOrder,
-  updateOrderTotals,
-  setOrderPayments,
-  finishOrder,
-  cancelOrder,
 };

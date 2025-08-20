@@ -1,4 +1,3 @@
-// src/components/orders/OrderDrawer.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   X,
@@ -57,8 +56,9 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
   const [tipValue, setTipValue] = useState(0);
   const [tipMode, setTipMode] = useState('R$'); // 'R$' | '%'
 
-  // Flags
+  // Flags de status
   const isOpen = order?.status === 'OPEN';
+  const isFinished = order?.status === 'FINISHED';
 
   const total = useMemo(() => Number(order?.total || 0), [order]);
 
@@ -94,7 +94,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
     payments.length > 0 &&
     (isCashierOpen || !payments.some((p) => p.insertIntoCashier));
 
-  // carregar dados ao abrir
+  // ✅ Ao abrir uma comanda, carrega os dados necessários
   useEffect(() => {
     if (!open) return;
     (async () => {
@@ -114,7 +114,6 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           setCashierStatus('UNKNOWN');
         }
 
-        // pagamentos existentes
         const current = (order?.payments || []).map((p) => ({
           paymentMethodId: p.paymentMethodId,
           amount: Number(p.amount),
@@ -123,7 +122,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           insertIntoCashier: p.insertIntoCashier !== false,
         }));
 
-        if (!current.length) {
+        if (!current.length && isOpen) {
           const firstMethodId = pmRes.status === 'fulfilled' ? pmRes.value.data?.[0]?.id || '' : '';
           setPayments([rowDefaults(total, firstMethodId)]);
           setSelectedIdx(0);
@@ -132,10 +131,18 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           setSelectedIdx(0);
         }
 
-        setDiscountValue(0);
-        setDiscountMode('R$');
-        setTipValue(0);
-        setTipMode('R$');
+        // ✅ Carrega desconto/gorjeta persistidos quando não estiver ABERTA
+        if (isOpen) {
+          setDiscountValue(0);
+          setDiscountMode('R$');
+          setTipValue(0);
+          setTipMode('R$');
+        } else {
+          setDiscountValue(Number(order?.discountAmount || 0));
+          setDiscountMode(order?.discountMode || 'R$');
+          setTipValue(Number(order?.tipAmount || 0));
+          setTipMode(order?.tipMode || 'R$');
+        }
       } catch (e) {
         console.error(e);
         toast.error('Erro ao carregar dados da comanda.');
@@ -256,29 +263,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
     return true;
   };
 
-  // ====== Totais (desconto/gorjeta) ======
-  const saveTotals = async () => {
-    if (!order?.id || !isOpen) return;
-    try {
-      await api.put(`/orders/${order.id}/totals`, {
-        discount: discountAbs,
-        tip: tipAbs,
-      });
-    } catch (e) {
-      console.warn('Falha ao salvar desconto/gorjeta:', e?.response?.data || e?.message);
-    }
-  };
-
-  // autosave com debounce
-  useEffect(() => {
-    if (!open || !isOpen) return;
-    const t = setTimeout(() => {
-      saveTotals();
-    }, 600);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isOpen, order?.id, discountAbs, tipAbs]);
-
+  // ✅ Função de salvar pagamentos agora envia os totais juntos
   const savePayments = async () => {
     try {
       setLoading(true);
@@ -288,11 +273,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
       }
       if (!(await ensureCashierOk())) return;
 
-      // garante que o backend recebeu os totais
-      await saveTotals();
-
       const payload = {
-        expectedTotal: Number(adjustedTotal.toFixed(2)),
         payments: payments.map((p) => ({
           paymentMethodId: p.paymentMethodId,
           amount: Number(Number(p.amount || 0).toFixed(2)),
@@ -300,9 +281,16 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           cardBrand: p.cardBrand || undefined,
           insertIntoCashier: !!p.insertIntoCashier,
         })),
+        // Envia totais para persistir
+        discount: Number(discountValue || 0),
+        discountMode,
+        tip: Number(tipValue || 0),
+        tipMode,
+        expectedTotal: Number(adjustedTotal || 0),
       };
+
       await api.put(`/orders/${order.id}/payments`, payload);
-      toast.success('Pagamentos salvos!');
+      toast.success('Pagamentos e totais salvos!');
       await refreshOrders?.();
     } catch (e) {
       const msg = e?.response?.data?.message || 'Erro ao salvar pagamentos.';
@@ -317,8 +305,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
       setLoading(true);
       if (!(await ensureCashierOk())) return;
 
-      // salva totais + pagamentos (com expectedTotal) antes de finalizar
-      await saveTotals();
+      // Salva pagamentos (que agora inclui os totais) antes de finalizar
       await savePayments();
 
       await api.put(`/orders/${order.id}/finish`);
@@ -668,7 +655,6 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                           value={p.amount}
                           onChange={(e) => updateRow(idx, { amount: Number(e.target.value) })}
                           className="w-full px-3 py-2 text-sm border rounded-md"
-                          onBlur={saveTotals}
                         />
                         {!disabled && (
                           <button
@@ -777,7 +763,6 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                   disabled={disabled}
                   value={discountValue}
                   onChange={(e) => setDiscountValue(Math.max(0, Number(e.target.value || 0)))}
-                  onBlur={saveTotals}
                   className="w-full mt-1 px-3 py-2 text-sm border rounded-md"
                 />
                 <p className="text-[11px] text-gray-500 mt-1">
@@ -815,7 +800,6 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                   disabled={disabled}
                   value={tipValue}
                   onChange={(e) => setTipValue(Math.max(0, Number(e.target.value || 0)))}
-                  onBlur={saveTotals}
                   className="w-full mt-1 px-3 py-2 text-sm border rounded-md"
                 />
                 <p className="text-[11px] text-gray-500 mt-1">

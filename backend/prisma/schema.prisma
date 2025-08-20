@@ -151,18 +151,22 @@ model Appointment {
 }
 
 model Order {
-  id       String  @id @default(cuid())
-  total    Decimal @db.Decimal(10, 2)
-  // 👇 novos campos persistidos
-  discount Decimal @default(0) @db.Decimal(10, 2)
-  tip      Decimal @default(0) @db.Decimal(10, 2)
-
+  id        String      @id @default(cuid())
+  total     Decimal     @db.Decimal(10, 2) // Subtotal (soma dos itens)
   status    OrderStatus @default(OPEN)
   companyId String
   clientId  String
   userId    String
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+
+  // ✅ Totais persistidos p/ desconto & gorjeta
+  discountAmount Decimal @default(0) @db.Decimal(10, 2) // valor de desconto aplicado
+  discountMode   String  @default("R$") // "R$" | "%"
+  tipAmount      Decimal @default(0) @db.Decimal(10, 2) // valor de gorjeta
+  tipMode        String  @default("R$") // "R$" | "%"
+  totalToPay     Decimal @default(0) @db.Decimal(10, 2) // total = total - desconto + gorjeta
+  paidTotal      Decimal @default(0) @db.Decimal(10, 2) // somatório dos pagamentos
 
   client   Client         @relation(fields: [clientId], references: [id])
   company  Company        @relation(fields: [companyId], references: [id])
