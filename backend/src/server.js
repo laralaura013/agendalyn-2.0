@@ -27,20 +27,25 @@ import waitlistRoutes from './routes/waitlistRoutes.js';
 import blockRoutes from './routes/blockRoutes.js';
 import googleRoutes from './routes/googleRoutes.js';
 
-// ✅ NOVO
+// ✅ NOVO (já existiam)
 import financeRoutes from './routes/financeRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
+
+// ✅ NOVO (adicionadas agora)
+import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Log simples de origem e rota
 app.use((req, _res, next) => {
   console.log('🌐 Origin:', req.headers.origin || '—', '| URL:', req.method, req.originalUrl);
   next();
 });
 
+// Tratativa manual de preflight para maior compatibilidade
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     const reqOrigin  = req.headers.origin || 'https://frontlyn.netlify.app';
@@ -57,6 +62,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// CORS + JSON
 app.use(cors({
   origin: true,
   credentials: true,
@@ -96,6 +102,9 @@ app.use('/api/integrations/google', googleRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/exports', exportRoutes);
+
+// ✅ NOVO (rotas de formas de pagamento usadas pelo OrderDrawer)
+app.use('/api/payment-methods', paymentMethodRoutes);
 
 app.get('/api', (_req, res) => res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' }));
 app.get('/', (_req, res) => res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' }));
