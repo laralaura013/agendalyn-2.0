@@ -4,7 +4,8 @@ import { protect } from '../middlewares/authMiddleware.js';
 import {
   createOrder,
   listOrders,
-  setOrderPayments, // << nova ação
+  updateOrderTotals,   // << NOVO
+  setOrderPayments,
   finishOrder,
   cancelOrder,
 } from '../controllers/orderController.js';
@@ -20,14 +21,18 @@ router
   .get(listOrders)
   .post(createOrder);
 
-// Definir/Substituir TODAS as formas de pagamento de uma comanda (enquanto OPEN)
-// body: { payments: [{ paymentMethodId, amount, installments?, cardBrand?, insertIntoCashier? }] }
+// Atualizar desconto e gorjeta da comanda (enquanto estiver ABERTA)
+// body: { discount?: number, tip?: number }
+router.put('/:id/totals', updateOrderTotals);  // << NOVO
+
+// Definir/Substituir TODAS as formas de pagamento (enquanto ABERTA)
+// body: { payments: [{ paymentMethodId, amount, installments?, cardBrand?, insertIntoCashier? }], expectedTotal? }
 router.put('/:id/payments', setOrderPayments);
 
-// Finalizar comanda (valida pagamentos, cria Receivables, lança no Caixa quando marcar)
+// Finalizar comanda (valida pagamentos vs total ajustado, gera Receivables, lança no Caixa se marcado)
 router.put('/:id/finish', finishOrder);
 
-// Cancelar comanda (devolve estoque de produtos, muda status para CANCELED)
+// Cancelar comanda (devolve estoque e marca como CANCELED)
 router.delete('/:id/cancel', cancelOrder);
 
 export default router;

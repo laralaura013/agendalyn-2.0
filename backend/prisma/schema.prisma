@@ -151,8 +151,12 @@ model Appointment {
 }
 
 model Order {
-  id        String      @id @default(cuid())
-  total     Decimal     @db.Decimal(10, 2)
+  id       String  @id @default(cuid())
+  total    Decimal @db.Decimal(10, 2)
+  // 👇 novos campos persistidos
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  tip      Decimal @default(0) @db.Decimal(10, 2)
+
   status    OrderStatus @default(OPEN)
   companyId String
   clientId  String
