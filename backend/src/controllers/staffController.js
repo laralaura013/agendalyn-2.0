@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 const parseDecimalNullable = (v) => {
   if (v === '' || v === null || v === undefined) return null;
   const n = Number(v);
-  return Number.isFinite(n) ? n : null; // Prisma aceita number para Decimal
+  return Number.isFinite(n) ? n : null;
 };
 
 const parseVisible = (v) => {
@@ -27,10 +27,7 @@ const safeWorkSchedule = (workSchedule) => {
 };
 
 /* ========================= LIST =========================
- * Suporta filtros:
- *  - ?q= (nome/email)
- *  - ?role=OWNER|ADMIN|MANAGER|STAFF|BARBER|HAIRDRESSER
- *  - ?visible=YES|NO
+ * GET /api/staff?q=&role=&visible=YES|NO
  */
 export const listStaff = async (req, res) => {
   try {
@@ -60,6 +57,8 @@ export const listStaff = async (req, res) => {
         showInBooking: true,
         workSchedule: true,
         commission: true,
+        phone: true,
+        nickname: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -75,18 +74,16 @@ export const listStaff = async (req, res) => {
 /* ========================= CREATE ========================= */
 export const createStaff = async (req, res) => {
   try {
-    const { name, email, password, role, showInBooking, workSchedule, commission } = req.body;
+    const { name, email, password, role, showInBooking, workSchedule, commission, phone, nickname } = req.body;
     const companyId = req.company.id;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Nome, email e senha são obrigatórios.' });
     }
 
-    // hash de senha
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // validação simples de horário
     const ws = safeWorkSchedule(workSchedule);
     if (ws && typeof ws === 'object') {
       for (const day of Object.values(ws)) {
@@ -106,6 +103,8 @@ export const createStaff = async (req, res) => {
         showInBooking: typeof showInBooking === 'boolean' ? showInBooking : true,
         workSchedule: ws ?? {},
         commission: parseDecimalNullable(commission),
+        phone: phone || null,
+        nickname: nickname || null,
       },
       select: {
         id: true,
@@ -115,6 +114,8 @@ export const createStaff = async (req, res) => {
         showInBooking: true,
         workSchedule: true,
         commission: true,
+        phone: true,
+        nickname: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -136,11 +137,10 @@ export const updateStaff = async (req, res) => {
     const { id } = req.params;
     const companyId = req.company.id;
 
-    // Garante que o usuário pertence à empresa
     const exists = await prisma.user.findFirst({ where: { id, companyId } });
     if (!exists) return res.status(404).json({ message: 'Colaborador não encontrado.' });
 
-    const { name, email, role, password, showInBooking, workSchedule, commission } = req.body;
+    const { name, email, role, password, showInBooking, workSchedule, commission, phone, nickname } = req.body;
 
     const data = {
       ...(name !== undefined ? { name } : {}),
@@ -148,6 +148,8 @@ export const updateStaff = async (req, res) => {
       ...(role !== undefined ? { role } : {}),
       ...(typeof showInBooking === 'boolean' ? { showInBooking } : {}),
       ...(workSchedule !== undefined ? { workSchedule: safeWorkSchedule(workSchedule) } : {}),
+      ...(phone !== undefined ? { phone } : {}),
+      ...(nickname !== undefined ? { nickname } : {}),
     };
 
     if (commission !== undefined) {
@@ -159,7 +161,6 @@ export const updateStaff = async (req, res) => {
       data.password = await bcrypt.hash(password, salt);
     }
 
-    // update com escopo de empresa
     const result = await prisma.user.updateMany({
       where: { id, companyId },
       data,
@@ -177,6 +178,8 @@ export const updateStaff = async (req, res) => {
         showInBooking: true,
         workSchedule: true,
         commission: true,
+        phone: true,
+        nickname: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -201,7 +204,6 @@ export const deleteStaff = async (req, res) => {
     const { id } = req.params;
     const companyId = req.company.id;
 
-    // valida escopo
     const exists = await prisma.user.findFirst({ where: { id, companyId } });
     if (!exists) return res.status(404).json({ message: 'Colaborador não encontrado.' });
 
@@ -228,11 +230,13 @@ export const exportStaffCsv = async (req, res) => {
         role: true,
         showInBooking: true,
         commission: true,
+        phone: true,
+        nickname: true,
         createdAt: true,
       },
     });
 
-    const cols = ['id','name','email','role','showInBooking','commission','createdAt'];
+    const cols = ['id','name','email','role','showInBooking','commission','phone','nickname','createdAt'];
     const header = cols.join(',');
     const lines = rows.map((r) =>
       cols.map((c) => {
@@ -249,5 +253,32 @@ export const exportStaffCsv = async (req, res) => {
   } catch (error) {
     console.error('--- ERRO AO EXPORTAR CSV ---', error);
     res.status(500).json({ message: 'Falha ao exportar CSV.' });
+  }
+};
+
+/* ========================= VISIBILIDADE (dedicado) ========================= */
+export const setStaffVisibility = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.company.id;
+
+    const value = req.body?.showInBooking;
+    if (typeof value !== 'boolean') {
+      return res.status(400).json({ message: 'Parâmetro showInBooking inválido.' });
+    }
+
+    const exists = await prisma.user.findFirst({ where: { id, companyId } });
+    if (!exists) return res.status(404).json({ message: 'Colaborador não encontrado.' });
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { showInBooking: value },
+      select: { id: true, showInBooking: true },
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    console.error('--- ERRO AO ALTERAR VISIBILIDADE ---', error);
+    return res.status(500).json({ message: 'Falha ao alterar visibilidade.' });
   }
 };

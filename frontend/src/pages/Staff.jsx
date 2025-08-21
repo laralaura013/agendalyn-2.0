@@ -19,12 +19,9 @@ import api from '../services/api';
  * Página de Colaboradores — versão “parruda”
  * - Busca com debounce (nome/email)
  * - Filtros por função e visibilidade
- * - Toggle de visibilidade inline (PUT parcial)
+ * - Toggle de visibilidade inline (PATCH dedicado)
  * - Export CSV do dataset filtrado
  * - Toolbar com ações rápidas e contador de resultados
- *
- * Observação: não exige alterações no backend.
- * O toggle de visibilidade faz PUT apenas do campo alterado.
  */
 
 const ROLES = ['OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'BARBER', 'HAIRDRESSER'];
@@ -45,7 +42,6 @@ const toCSV = (rows) => {
     cols
       .map((c) => {
         const val = r?.[c] ?? '';
-        // escapa vírgula/aspas/quebras
         const s = String(val).replace(/"/g, '""');
         return /[,"\n]/.test(s) ? `"${s}"` : s;
       })
@@ -69,9 +65,8 @@ const Staff = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
 
-  // filtros/busca
   const [search, setSearch] = useState('');
-  const [q, setQ] = useState(''); // valor de busca aplicado (debounced)
+  const [q, setQ] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [visibleFilter, setVisibleFilter] = useState('ALL'); // ALL | YES | NO
 
@@ -92,12 +87,10 @@ const Staff = () => {
     fetchStaff();
   }, [fetchStaff]);
 
-  // debounce da busca
   useEffect(() => {
     const apply = debounce((v) => setQ(v), 400);
     apply(search);
     return () => apply('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   const filtered = useMemo(() => {
@@ -160,19 +153,20 @@ const Staff = () => {
     });
   };
 
+  // === Toggle usando endpoint dedicado (resolve seu erro) ===
   const handleToggleVisible = async (row) => {
     const next = !row.showInBooking;
     const id = row.id;
-    // otimista
+
     setStaff((prev) => prev.map((r) => (r.id === id ? { ...r, showInBooking: next } : r)));
 
     try {
-      await api.put(`/staff/${id}`, { showInBooking: next });
+      await api.patch(`/staff/${id}/visibility`, { showInBooking: next });
       toast.success(next ? 'Visível no agendamento.' : 'Oculto do agendamento.');
     } catch (e) {
-      // rollback
       setStaff((prev) => prev.map((r) => (r.id === id ? { ...r, showInBooking: !next } : r)));
-      toast.error('Não foi possível alterar a visibilidade.');
+      const msg = e?.response?.data?.message || 'Não foi possível alterar a visibilidade.';
+      toast.error(msg);
     }
   };
 

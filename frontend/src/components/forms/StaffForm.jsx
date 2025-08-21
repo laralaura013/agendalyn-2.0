@@ -33,7 +33,6 @@ const buildDefaultSchedule = () => {
 };
 
 const sanitizePayload = (data) => {
-  // remove strings vazias e normaliza comissão para número
   const out = {};
   Object.entries(data).forEach(([k, v]) => {
     if (v === '' || v == null) return;
@@ -47,10 +46,7 @@ const sanitizePayload = (data) => {
   return out;
 };
 
-const compareTime = (a, b) => {
-  // retorna negativo se a < b
-  return a.localeCompare(b);
-};
+const compareTime = (a, b) => a.localeCompare(b);
 
 /* ========================= Componente ========================= */
 const StaffForm = ({ initialData, onSave, onCancel }) => {
@@ -71,7 +67,6 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
 
   const [workSchedule, setWorkSchedule] = useState(buildDefaultSchedule());
 
-  // campos em massa para aplicar a todos os dias
   const [bulkStart, setBulkStart] = useState(DEFAULT_START);
   const [bulkEnd, setBulkEnd] = useState(DEFAULT_END);
 
@@ -215,13 +210,12 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
       workSchedule,
     });
 
-    // Em edição, senha vazia não será enviada (sanitizePayload já remove '')
     onSave(payload);
   };
 
   /* ========================= UI ========================= */
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 w-[92vw] max-w-3xl">
+    <form onSubmit={handleSubmit} className="space-y-6 w-full max-w-3xl">
       <h2 className="text-2xl font-bold">
         {isEdit ? 'Editar Colaborador' : 'Novo Colaborador'}
       </h2>
