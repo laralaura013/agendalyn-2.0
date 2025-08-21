@@ -91,7 +91,7 @@ export async function openCashier(dbMaybe, companyId, openingAmount = 0) {
   });
 }
 
-export async function closeCashier(dbMaybe, companyId, { closingAmount = null } = {}) {
+export async function closeCashier(dbMaybe, companyId, { closingAmount = null /*, notes = ''*/ } = {}) {
   const db = pickDb(dbMaybe);
   if (!companyId) throw new Error('companyId é obrigatório para fechar caixa.');
 
@@ -120,12 +120,14 @@ export async function closeCashier(dbMaybe, companyId, { closingAmount = null } 
       ? Number(closingAmount)
       : computedClosing;
 
+  // Se houver coluna 'closingNotes' no schema, adicione no data: { closingNotes: notes }
   return db.cashierSession.update({
     where: { id: session.id },
     data: {
       status: 'CLOSED',
       closedAt: new Date(),
       closingBalance,
+      // closingNotes: notes || null, // <- descomente se existir a coluna
     },
   });
 }
@@ -169,6 +171,7 @@ export async function cashierStatus(dbMaybe, companyId) {
     isOpen: !!session,
     openedAt: session?.openedAt || null,
     cashierId: session?.id || null,
+    openingBalance: session ? Number(session.openingBalance || 0) : null, // << NOVO
     totalsToday,
   };
 }
@@ -191,7 +194,6 @@ async function upsertTx(db, {
   const amt = toAmount(amount);
   const createdAt = asDateOrNow(when);
 
-  // description é obrigatório no schema
   const desc =
     typeof description === 'string' && description.trim() !== ''
       ? description.trim()
@@ -204,7 +206,7 @@ async function upsertTx(db, {
       amount: amt,
       description: desc,
       cashierSessionId: sessionId,
-      createdAt, // permite espelhar receivedAt/paidAt
+      createdAt,
     },
     create: {
       type,
@@ -280,7 +282,7 @@ export async function removeForPayable(dbMaybe, payableId /*, companyId? */) {
 }
 
 /* ============================================================================
- * Export default (opcional)
+ * Export default
  * ==========================================================================*/
 export default {
   SOURCE,
