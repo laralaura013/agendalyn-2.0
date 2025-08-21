@@ -8,7 +8,9 @@ export const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
-/* =============== Helpers =============== */
+/* =============== Feature flags / Helpers =============== */
+const ENABLE_GENDER = String(process.env.ENABLE_CLIENT_GENDER || '').trim() === '1';
+
 const toDate = (v) => (v ? new Date(v) : null);
 const now = () => new Date();
 
@@ -97,6 +99,52 @@ const formatDateOnly = (d) => {
   }
 };
 
+/** Normaliza valores de gênero vindos de UI/CSV para o enum do Prisma */
+const normalizeGender = (v) => {
+  if (!v && v !== 0) return null;
+  const s = String(v).trim().toLowerCase();
+
+  // Mapas comuns
+  if (['m', 'masculino', 'male', 'homem', 'masc'].includes(s)) return 'MALE';
+  if (['f', 'feminino', 'female', 'mulher', 'fem'].includes(s)) return 'FEMALE';
+  if (['o', 'outro', 'other', 'nao binario', 'não binário', 'nb'].includes(s)) return 'OTHER';
+
+  // Já pode estar em maiúsculas
+  if (['MALE', 'FEMALE', 'OTHER'].includes(String(v).toUpperCase())) return String(v).toUpperCase();
+
+  // Valor desconhecido -> null
+  return null;
+};
+
+/** Campos seguros de cliente para SELECT quando a coluna gender não existe no banco */
+const baseClientSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  cpf: true,
+  rg: true,
+  // gender: (somente quando ENABLE_GENDER === true)
+  birthDate: true,
+  notes: true,
+  avatarUrl: true,
+  zipCode: true,
+  street: true,
+  number: true,
+  complement: true,
+  district: true,
+  city: true,
+  state: true,
+  tags: true,
+  isActive: true,
+  deletedAt: true,
+  companyId: true,
+  createdAt: true,
+  updatedAt: true,
+  password: true,
+  originId: true,
+};
+
 /* =============== LIST (filtros + paginação + stats) =============== */
 export const listClients = async (req, res) => {
   try {
@@ -110,6 +158,9 @@ export const listClients = async (req, res) => {
       includeDeleted: truthy(req.query.includeDeleted),
     });
 
+    // select seguro: só inclui gender se a feature estiver ligada
+    const select = { ...baseClientSelect, ...(ENABLE_GENDER ? { gender: true } : {}) };
+
     const [total, baseItems] = await Promise.all([
       prisma.client.count({ where }),
       prisma.client.findMany({
@@ -117,6 +168,7 @@ export const listClients = async (req, res) => {
         orderBy: [{ deletedAt: 'asc' }, { createdAt: 'desc' }],
         skip,
         take,
+        select,
       }),
     ]);
 
@@ -150,8 +202,12 @@ export const getClientById = async (req, res) => {
 
     const includeDeleted = truthy(req.query.includeDeleted);
 
+    // select seguro no GET também
+    const select = { ...baseClientSelect, ...(ENABLE_GENDER ? { gender: true } : {}) };
+
     const client = await prisma.client.findFirst({
       where: { id, companyId, ...(includeDeleted ? {} : { deletedAt: null }) },
+      select,
     });
 
     if (!client) return res.status(404).json({ message: 'Cliente não encontrado.' });
@@ -172,18 +228,23 @@ export const createClient = async (req, res) => {
       tags, originId, isActive,
     } = req.body;
 
-    const client = await prisma.client.create({
-      data: {
-        name, email, phone, cpf, rg, gender,
-        birthDate: toDate(birthDate),
-        notes, avatarUrl, zipCode, street, number, complement, district, city, state,
-        tags: Array.isArray(tags) ? tags : [],
-        originId: originId || null,
-        isActive: isActive ?? true,
-        deletedAt: null,
-        companyId,
-      },
-    });
+    const data = {
+      name, email, phone, cpf, rg,
+      birthDate: toDate(birthDate),
+      notes, avatarUrl, zipCode, street, number, complement, district, city, state,
+      tags: Array.isArray(tags) ? tags : [],
+      originId: originId || null,
+      isActive: isActive ?? true,
+      deletedAt: null,
+      companyId,
+    };
+
+    if (ENABLE_GENDER) {
+      const g = normalizeGender(gender);
+      if (g) data.gender = g;
+    }
+
+    const client = await prisma.client.create({ data });
 
     res.status(201).json(client);
   } catch (error) {
@@ -206,16 +267,22 @@ export const updateClient = async (req, res) => {
       tags, originId, isActive,
     } = req.body;
 
+    const data = {
+      name, email, phone, cpf, rg,
+      birthDate: toDate(birthDate),
+      notes, avatarUrl, zipCode, street, number, complement, district, city, state,
+      tags: Array.isArray(tags) ? tags : undefined,
+      originId: originId ?? undefined,
+      isActive: typeof isActive === 'boolean' ? isActive : undefined,
+    };
+
+    if (ENABLE_GENDER) {
+      data.gender = normalizeGender(gender);
+    }
+
     const result = await prisma.client.updateMany({
       where: { id, companyId },
-      data: {
-        name, email, phone, cpf, rg, gender,
-        birthDate: toDate(birthDate),
-        notes, avatarUrl, zipCode, street, number, complement, district, city, state,
-        tags: Array.isArray(tags) ? tags : undefined,
-        originId: originId ?? undefined,
-        isActive: typeof isActive === 'boolean' ? isActive : undefined,
-      },
+      data,
     });
 
     if (result.count === 0) return res.status(404).json({ message: 'Cliente não encontrado.' });
@@ -347,14 +414,13 @@ export const mergeClients = async (req, res) => {
       await tx.waitlist.updateMany({ where: { companyId, clientId: loserId }, data: { clientId: winnerId } });
       await tx.receivable.updateMany({ where: { companyId, clientId: loserId }, data: { clientId: winnerId } });
 
-      // Mesclar dados: manter dados não vazios (winner prioriza valores preenchidos; se winner vazio e loser tem, copiar)
+      // Mesclar dados
       const merged = {
         name: winner.name || loser.name,
         email: winner.email || loser.email,
         phone: winner.phone || loser.phone,
         cpf: winner.cpf || loser.cpf,
         rg: winner.rg || loser.rg,
-        gender: winner.gender || loser.gender,
         birthDate: winner.birthDate || loser.birthDate,
         notes: winner.notes || loser.notes,
         avatarUrl: winner.avatarUrl || loser.avatarUrl,
@@ -369,6 +435,9 @@ export const mergeClients = async (req, res) => {
         originId: winner.originId || loser.originId,
         isActive: winner.isActive || loser.isActive,
       };
+      if (ENABLE_GENDER) {
+        merged.gender = winner.gender || loser.gender || null;
+      }
 
       await tx.client.update({
         where: { id: winnerId },
@@ -401,7 +470,13 @@ export const exportClientsCsv = async (req, res) => {
       includeDeleted: truthy(req.query.includeDeleted),
     });
 
-    const clients = await prisma.client.findMany({ where, orderBy: { createdAt: 'desc' } });
+    const select = { ...baseClientSelect, ...(ENABLE_GENDER ? { gender: true } : {}) };
+
+    const clients = await prisma.client.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select,
+    });
 
     const ids = clients.map((c) => c.id);
     const statsMap = await buildAppointmentStatsMap(companyId, ids);
@@ -416,13 +491,14 @@ export const exportClientsCsv = async (req, res) => {
 
     const lines = clients.map((c) => {
       const s = statsMap[c.id] || { appointmentsCount: 0, lastVisit: null };
+      const genderText = ENABLE_GENDER ? (c.gender ?? '') : ''; // evita erro quando coluna não existe
       return [
         csvEscape(c.name),
         csvEscape(c.email ?? ''),
         csvEscape(c.phone ?? ''),
         csvEscape(c.cpf ?? ''),
         csvEscape(c.rg ?? ''),
-        csvEscape(c.gender ?? ''),
+        csvEscape(genderText),
         csvEscape(formatDateOnly(c.birthDate)),
         csvEscape(c.zipCode ?? ''),
         csvEscape(c.street ?? ''),
@@ -480,13 +556,13 @@ export const importClientsCsv = async (req, res) => {
           : [];
 
         // tentar match por email ou cpf
+        const emailCond = norm(r.email) ? { email: norm(r.email) } : undefined;
+        const cpfCond = norm(r.cpf) ? { cpf: norm(r.cpf) } : undefined;
+
         const existing = await tx.client.findFirst({
           where: {
             companyId,
-            OR: [
-              norm(r.email) ? { email: norm(r.email) } : undefined,
-              norm(r.cpf) ? { cpf: norm(r.cpf) } : undefined,
-            ].filter(Boolean),
+            OR: [emailCond, cpfCond].filter(Boolean),
           },
         });
 
@@ -496,7 +572,6 @@ export const importClientsCsv = async (req, res) => {
           phone: norm(r.phone),
           cpf: norm(r.cpf) || null,
           rg: norm(r.rg) || null,
-          gender: norm(r.gender) || null,
           birthDate: norm(r.birthDate) ? toDate(norm(r.birthDate)) : null,
           zipCode: norm(r.zipCode) || null,
           street: norm(r.street) || null,
@@ -507,10 +582,17 @@ export const importClientsCsv = async (req, res) => {
           state: norm(r.state) || null,
           notes: norm(r.notes) || null,
           tags,
-          isActive: norm(r.isActive).toLowerCase() === 'true' || norm(r.isActive).toUpperCase() === 'SIM',
+          isActive:
+            norm(r.isActive).toLowerCase() === 'true' ||
+            norm(r.isActive).toUpperCase() === 'SIM',
           deletedAt: null,
           companyId,
         };
+
+        if (ENABLE_GENDER) {
+          const g = normalizeGender(norm(r.gender));
+          payload.gender = g;
+        }
 
         if (!payload.name || !payload.phone) {
           skipped++;
