@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
-import CashierControll from '../cashier/CashierControll';
+import CashierControll from '../components/cashier/CashierControll';
 
 /* =========================================================================
  * Helpers
@@ -193,8 +193,8 @@ const Cashier = () => {
   const [date, setDate] = useState(todayISO());
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
-  const [methodId, setMethodId] = useState(''); // (reservado se quiser filtrar server-side depois)
-  const [userId, setUserId] = useState('');     // (reservado se quiser filtrar server-side depois)
+  const [methodId, setMethodId] = useState(''); // reservado p/ futura filtragem server-side
+  const [userId, setUserId] = useState('');     // reservado p/ futura filtragem server-side
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [staff, setStaff] = useState([]);
 
@@ -593,7 +593,7 @@ const Cashier = () => {
           <select
             value={userId}
             onChange={(e) => { setUserId(e.target.value); }}
-            className="border rounded-md px-3 py-1.5 text sm w-full"
+            className="border rounded-md px-3 py-1.5 text-sm w-full"
           >
             <option value="">Usuário (todos)</option>
             {staff.map((u) => (
