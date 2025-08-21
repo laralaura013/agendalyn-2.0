@@ -59,7 +59,7 @@ app.use((req, _res, next) => {
 /* ------------------------ Preflight manual ------------------------- */
 const allowOrigin = (origin) => {
   if (!origin) return true; // server-to-server
-  const netlify = /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin);
+  const netlify = /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin) || origin === 'https://frontlyn.netlify.app';
   const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
   const railway = /railway\.app$/i.test(origin);
   const vercel = /\.vercel\.app$/i.test(origin);
@@ -95,16 +95,18 @@ app.use(
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-// Logger com status + duração
+// Logger contextual (empresa/usuário)
 app.use(companyLogger);
 
 /* ----------------------------- Rotas ------------------------------ */
-// Webhooks
+// Webhooks primeiro
 app.use('/api/webhooks', webhookRoutes);
 
 // Rotas públicas e gerais
 app.use('/api/portal', clientPortalRoutes);
 app.use('/api/public', publicRoutes);
+
+// Auth e entidades
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/company', companyRoutes);
@@ -146,7 +148,6 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
-  // CORS em erros também, para o browser não bloquear
   const origin = req.headers?.origin;
   if (origin && allowOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);

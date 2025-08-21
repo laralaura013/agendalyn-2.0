@@ -1,4 +1,4 @@
-generator client {
+generator client { 
   provider = "prisma-client-js"
 }
 
@@ -45,12 +45,14 @@ model Company {
 
 model User {
   id            String   @id @default(cuid())
-  email         String   @unique
+  email         String
   name          String
   password      String
   role          Role     @default(STAFF)
   commission    Decimal? @db.Decimal(5, 2)
   workSchedule  Json?
+  phone         String?                      // <— NOVO (opcional)
+  nickname      String?                      // <— NOVO (opcional)
   companyId     String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -67,6 +69,7 @@ model User {
   googleIntegration    GoogleIntegration?
 
   @@index([companyId])
+  @@unique([companyId, email])               // <— Único por empresa (multi-tenant)
 }
 
 model Service {
@@ -478,7 +481,11 @@ model GoogleIntegration {
 
 enum Role {
   OWNER
+  ADMIN        // <— NOVO
+  MANAGER      // <— NOVO
   STAFF
+  BARBER       // (opcional, caso use)
+  HAIRDRESSER  // (opcional, caso use)
 }
 
 enum AppointmentStatus {
