@@ -23,6 +23,43 @@ function round2(n) {
   return Math.round(Number(n) * 100) / 100;
 }
 
+/**
+ * Recalcula os totais de uma comanda a partir dos itens e pagamentos atuais.
+ * - subtotal: soma(item.price * item.quantity)
+ * - totalToPay: max(0, subtotal - discountAmount) + tipAmount
+ * - paidTotal: soma dos pagamentos (amount)
+ */
+async function recalcOrderTotalsFields(orderId, companyId) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, companyId },
+    include: {
+      items: true,
+      payments: true,
+    },
+  });
+  if (!order) return null;
+
+  const subtotal = round2(
+    (order.items || []).reduce((acc, it) => acc + Number(it.price || 0) * Number(it.quantity || 0), 0)
+  );
+
+  const discountAmount = round2(Number(order.discountAmount || 0));
+  const tipAmount = round2(Number(order.tipAmount || 0));
+  const totalToPay = round2(Math.max(0, subtotal - discountAmount) + tipAmount);
+
+  const paidTotal = round2(
+    (order.payments || []).reduce((acc, p) => acc + Number(p.amount || 0), 0)
+  );
+
+  return {
+    subtotal,
+    discountAmount,
+    tipAmount,
+    totalToPay,
+    paidTotal,
+  };
+}
+
 /* ========================= LISTAR ========================= */
 export const listOrders = async (req, res) => {
   try {
@@ -127,6 +164,60 @@ export const createOrder = async (req, res) => {
   } catch (error) {
     console.error('--- ERRO AO CRIAR COMANDA ---', error);
     res.status(400).json({ message: error.message || 'Erro ao criar comanda.' });
+  }
+};
+
+/* ========================= ATUALIZAR TOTAIS (NOVO) =========================
+ * Recalcula subtotal/totalToPay/paidTotal a partir dos itens/pagamentos atuais.
+ * Útil após editar itens, descontos ou pagamentos fora do fluxo principal.
+ * Aceita comandas OPEN/FINISHED; bloqueia se CANCELED.
+ */
+export const updateOrderTotals = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.company.id;
+
+    const order = await prisma.order.findFirst({
+      where: { id, companyId },
+      include: { items: true, payments: true },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Comanda não encontrada.' });
+    }
+    if (order.status === 'CANCELED') {
+      return res.status(400).json({ message: 'Não é possível recalcular totais de comanda cancelada.' });
+    }
+
+    const totals = await recalcOrderTotalsFields(order.id, companyId);
+    if (!totals) {
+      return res.status(404).json({ message: 'Comanda não encontrada.' });
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        total: totals.subtotal,
+        totalToPay: totals.totalToPay,
+        paidTotal: totals.paidTotal,
+      },
+      include: {
+        items: {
+          include: {
+            service: { select: { name: true } },
+            product: { select: { name: true } },
+          },
+        },
+        payments: { include: { paymentMethod: { select: { id: true, name: true } } } },
+        client: { select: { name: true } },
+        user: { select: { name: true } },
+      },
+    });
+
+    return res.status(200).json(updated);
+  } catch (error) {
+    console.error('--- ERRO updateOrderTotals ---', error);
+    return res.status(500).json({ message: 'Erro ao recalcular totais da comanda.' });
   }
 };
 
