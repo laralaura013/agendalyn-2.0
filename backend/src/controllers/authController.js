@@ -1,3 +1,4 @@
+// src/controllers/authController.js
 import prisma from '../prismaClient.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -10,13 +11,29 @@ const getCompanyId = (req) =>
   req?.company?.id ||
   null;
 
-/** Assinatura do token (mantendo expiração de 1 dia como no seu código) */
+/** Assinatura do token (expiração de 1 dia) */
 const signToken = (user) =>
   jwt.sign(
     { id: user.id, companyId: user.companyId, role: user.role },
     process.env.JWT_SECRET || 'secret',
     { expiresIn: '1d' }
   );
+
+/** Seleção segura de usuário (sem password) */
+const userSelect = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  companyId: true,
+  showInBooking: true,
+  commission: true,
+  phone: true,
+  nickname: true,
+  workSchedule: true,
+  createdAt: true,
+  updatedAt: true,
+};
 
 /* ============================= REGISTER ============================= */
 export const register = async (req, res) => {
@@ -26,8 +43,7 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Todos os campos são obrigatórios.' });
     }
 
-    // (Opcional) manter a validação global de email para evitar reuso em múltiplas empresas.
-    // Se você QUISER permitir o mesmo email em empresas diferentes, remova este bloco.
+    // Se NÃO quiser permitir o mesmo e-mail em empresas diferentes, mantenha esta verificação:
     const emailAlreadyUsed = await prisma.user.findFirst({
       where: { email },
       select: { id: true },
@@ -70,7 +86,7 @@ export const register = async (req, res) => {
         companyId: newCompany.id,
         role: 'OWNER',
       },
-      select: { id: true, name: true, email: true, role: true, companyId: true },
+      select: userSelect,
     });
 
     const token = signToken(newUser);
@@ -88,7 +104,7 @@ export const register = async (req, res) => {
     if (error?.code === 'P2002' && error?.meta?.target?.includes('User_companyId_email_key')) {
       return res.status(409).json({ message: 'Este email já está em uso nesta empresa.' });
     }
-    console.error('--- ERRO NO REGISTRO ---', error);
+    console.error('--- ERRO NO REGISTO ---', error);
     return res.status(500).json({ message: 'Erro ao registar novo utilizador.' });
   }
 };
@@ -101,22 +117,22 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: 'Email e senha são obrigatórios.' });
     }
 
-    // companyId pode vir no body, header x-company-id ou não vir (cair para findFirst)
+    // companyId pode vir no body, header x-company-id ou não vir (cai para findFirst)
     const cid = bodyCompanyId || getCompanyId(req);
 
     let user;
     if (cid) {
-      // 🔧 Com chave composta (companyId, email) quando sabemos a empresa
+      // Com chave composta (companyId, email) quando sabemos a empresa
       user = await prisma.user.findUnique({
         where: { companyId_email: { companyId: cid, email } },
-        select: { id: true, name: true, email: true, role: true, companyId: true, password: true },
+        select: { ...userSelect, password: true },
       });
     } else {
-      // 🔧 Compatibilidade sem companyId: pega o mais recente com esse email
+      // Compat sem companyId: pega o mais recente com esse email
       user = await prisma.user.findFirst({
         where: { email },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, name: true, email: true, role: true, companyId: true, password: true },
+        select: { ...userSelect, password: true },
       });
     }
 
@@ -126,17 +142,37 @@ export const login = async (req, res) => {
     if (!ok) return res.status(401).json({ message: 'Credenciais inválidas.' });
 
     const token = signToken(user);
+    const { password: _p, ...safeUser } = user;
     return res.status(200).json({
       token,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+        id: safeUser.id,
+        name: safeUser.name,
+        email: safeUser.email,
+        role: safeUser.role,
       },
     });
   } catch (error) {
     console.error('--- ERRO NO LOGIN ---', error);
     return res.status(500).json({ message: 'Erro interno do servidor.' });
+  }
+};
+
+/* =============================== ME =============================== */
+export const me = async (req, res) => {
+  try {
+    const id = req.user?.id;
+    if (!id) return res.status(401).json({ message: 'Não autenticado.' });
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: userSelect,
+    });
+    if (!user) return res.status(404).json({ message: 'Usuário não encontrado.' });
+
+    return res.json({ user });
+  } catch (error) {
+    console.error('--- ERRO NO ME ---', error);
+    return res.status(500).json({ message: 'Erro interno.' });
   }
 };
