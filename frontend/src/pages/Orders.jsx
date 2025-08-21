@@ -13,8 +13,27 @@ const statusMap = {
   CANCELED: { text: 'CANCELADA', style: 'bg-red-100 text-red-800' },
 };
 
+// --- helpers ---
+const normalizeOrders = (data) => {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  return []; // fallback seguro
+};
+
+const toBRL = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 'R$ 0,00';
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
+const safeDateTime = (v) => {
+  const d = v ? new Date(v) : null;
+  return d && !isNaN(d.getTime()) ? d.toLocaleString('pt-BR') : '—';
+};
+
+// --- card ---
 const OrderCard = ({ order, onFinish, onCancel, onOpen }) => {
-  const currentStatus = statusMap[order.status] || {
+  const currentStatus = statusMap[order?.status] || {
     text: 'DESCONHECIDO',
     style: 'bg-gray-100 text-gray-700',
   };
@@ -22,21 +41,21 @@ const OrderCard = ({ order, onFinish, onCancel, onOpen }) => {
   return (
     <div className="bg-white p-5 rounded-2xl shadow hover:shadow-lg transition-all border flex flex-col justify-between">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="font-semibold text-lg">#{order.id.slice(0, 8)}</h3>
+        <h3 className="font-semibold text-lg">#{order?.id?.slice?.(0, 8) || '—'}</h3>
         <span className={`px-2 py-1 text-xs font-bold rounded-full ${currentStatus.style}`}>
           {currentStatus.text}
         </span>
       </div>
 
       <div className="text-sm text-gray-600 space-y-1 mb-4">
-        <p><strong>Cliente:</strong> {order.client?.name || 'N/A'}</p>
-        <p><strong>Colaborador:</strong> {order.user?.name || 'N/A'}</p>
-        <p><strong>Data:</strong> {new Date(order.createdAt).toLocaleString('pt-BR')}</p>
+        <p><strong>Cliente:</strong> {order?.client?.name || 'N/A'}</p>
+        <p><strong>Colaborador:</strong> {order?.user?.name || 'N/A'}</p>
+        <p><strong>Data:</strong> {safeDateTime(order?.createdAt)}</p>
       </div>
 
       <div className="mt-auto pt-3 border-t flex flex-wrap gap-2 items-center justify-between">
         <p className="font-bold text-base">
-          Total: <span className="text-emerald-600">R$ {Number(order.total).toFixed(2)}</span>
+          Total: <span className="text-emerald-600">{toBRL(order?.total)}</span>
         </p>
 
         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -47,7 +66,7 @@ const OrderCard = ({ order, onFinish, onCancel, onOpen }) => {
             <Eye size={16} /> Abrir
           </button>
 
-          {order.status === 'OPEN' && (
+          {order?.status === 'OPEN' && (
             <>
               <button
                 onClick={() => onCancel(order.id)}
@@ -70,7 +89,7 @@ const OrderCard = ({ order, onFinish, onCancel, onOpen }) => {
 };
 
 const Orders = () => {
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState([]);      // sempre array
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -79,11 +98,12 @@ const Orders = () => {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/orders');
-      setOrders(res.data);
+      const res = await api.get('/orders');      // suporta array ou paginado
+      setOrders(normalizeOrders(res.data));
     } catch (error) {
       console.error('Erro ao buscar comandas:', error);
       toast.error('Não foi possível carregar as comandas.');
+      setOrders([]); // garante array mesmo em erro
     } finally {
       setLoading(false);
     }
@@ -99,11 +119,14 @@ const Orders = () => {
       const res = await api.post('/orders', data);
       const created = res?.data;
 
-      await fetchOrders();
+      await fetchOrders(); // atualiza a lista
 
+      // tenta abrir a comanda recém criada
       let fullOrder = null;
       if (created?.id) {
-        const list = (await api.get('/orders')).data || [];
+        // busca a lista novamente e normaliza (caso o backend retorne formato diferente)
+        const listRes = await api.get('/orders');
+        const list = normalizeOrders(listRes.data);
         fullOrder = list.find((o) => o.id === created.id) || null;
       }
 
@@ -124,11 +147,11 @@ const Orders = () => {
       const finishPromise = api.put(`/orders/${id}/finish`);
       toast.promise(finishPromise, {
         loading: 'Finalizando...',
-        success: () => {
-          fetchOrders();
+        success: async () => {
+          await fetchOrders();
           return 'Comanda finalizada!';
         },
-        error: (err) => err.response?.data?.message || 'Erro ao finalizar comanda.',
+        error: (err) => err?.response?.data?.message || 'Erro ao finalizar comanda.',
       });
     }
   };
@@ -138,11 +161,11 @@ const Orders = () => {
       const cancelPromise = api.delete(`/orders/${id}/cancel`);
       toast.promise(cancelPromise, {
         loading: 'Cancelando...',
-        success: () => {
-          fetchOrders();
+        success: async () => {
+          await fetchOrders();
           return 'Comanda cancelada!';
         },
-        error: (err) => err.response?.data?.message || 'Erro ao cancelar comanda.',
+        error: (err) => err?.response?.data?.message || 'Erro ao cancelar comanda.',
       });
     }
   };
@@ -171,6 +194,10 @@ const Orders = () => {
 
       {loading ? (
         <p className="text-gray-500">Carregando comandas...</p>
+      ) : orders.length === 0 ? (
+        <div className="rounded-md bg-gray-50 text-gray-600 px-3 py-2 text-sm">
+          Nenhuma comanda encontrada.
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {orders.map((order) => (
@@ -194,7 +221,12 @@ const Orders = () => {
 
       {/* Drawer de Pagamentos/Resumo */}
       {selectedOrder && (
-        <OrderDrawer order={selectedOrder} open={drawerOpen} onClose={closeDrawer} refreshOrders={fetchOrders} />
+        <OrderDrawer
+          order={selectedOrder}
+          open={drawerOpen}
+          onClose={closeDrawer}
+          refreshOrders={fetchOrders}
+        />
       )}
     </div>
   );
