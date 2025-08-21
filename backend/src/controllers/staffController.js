@@ -17,10 +17,10 @@ const safeWorkSchedule = (workSchedule) => {
   return {};
 };
 
-/* LIST */
-export const listStaff = async (req, res) => {
+/* ========================= LIST ========================= */
+export const listStaff = async (_req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = _req.company.id;
     const staff = await prisma.user.findMany({
       where: { companyId },
       orderBy: [{ name: 'asc' }],
@@ -43,11 +43,12 @@ export const listStaff = async (req, res) => {
   }
 };
 
-/* CREATE */
+/* ========================= CREATE ========================= */
 export const createStaff = async (req, res) => {
   try {
     const { name, email, password, role, showInBooking, workSchedule, commission } = req.body;
     const companyId = req.company.id;
+
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Nome, email e senha são obrigatórios.' });
     }
@@ -97,13 +98,17 @@ export const createStaff = async (req, res) => {
   }
 };
 
-/* UPDATE */
+/* ========================= UPDATE ========================= */
 export const updateStaff = async (req, res) => {
   try {
     const { id } = req.params;
     const companyId = req.company.id;
 
-    const exists = await prisma.user.findFirst({ where: { id, companyId } });
+    // 🔧 HOTFIX: selecionar só id para não quebrar em colunas ausentes
+    const exists = await prisma.user.findFirst({
+      where: { id, companyId },
+      select: { id: true },
+    });
     if (!exists) return res.status(404).json({ message: 'Colaborador não encontrado.' });
 
     const { name, email, role, password, showInBooking, workSchedule, commission } = req.body;
@@ -147,13 +152,17 @@ export const updateStaff = async (req, res) => {
   }
 };
 
-/* DELETE */
+/* ========================= DELETE ========================= */
 export const deleteStaff = async (req, res) => {
   try {
     const { id } = req.params;
     const companyId = req.company.id;
 
-    const exists = await prisma.user.findFirst({ where: { id, companyId } });
+    // 🔧 HOTFIX: selecionar só id
+    const exists = await prisma.user.findFirst({
+      where: { id, companyId },
+      select: { id: true },
+    });
     if (!exists) return res.status(404).json({ message: 'Colaborador não encontrado.' });
 
     await prisma.user.delete({ where: { id } });
@@ -164,7 +173,7 @@ export const deleteStaff = async (req, res) => {
   }
 };
 
-/* EXPORT CSV (sem phone/nickname) */
+/* ========================= EXPORT CSV ========================= */
 export const exportStaffCsv = async (req, res) => {
   try {
     const companyId = req.company.id;
@@ -172,8 +181,13 @@ export const exportStaffCsv = async (req, res) => {
       where: { companyId },
       orderBy: { name: 'asc' },
       select: {
-        id: true, name: true, email: true, role: true, showInBooking: true,
-        commission: true, createdAt: true,
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        showInBooking: true,
+        commission: true,
+        createdAt: true,
       },
     });
 
@@ -197,7 +211,7 @@ export const exportStaffCsv = async (req, res) => {
   }
 };
 
-/* VISIBILIDADE */
+/* ==================== VISIBILIDADE (dedicado) ==================== */
 export const setStaffVisibility = async (req, res) => {
   try {
     const { id } = req.params;
@@ -208,7 +222,11 @@ export const setStaffVisibility = async (req, res) => {
       return res.status(400).json({ message: 'Parâmetro showInBooking inválido.' });
     }
 
-    const exists = await prisma.user.findFirst({ where: { id, companyId } });
+    // 🔧 HOTFIX: selecionar só id
+    const exists = await prisma.user.findFirst({
+      where: { id, companyId },
+      select: { id: true },
+    });
     if (!exists) return res.status(404).json({ message: 'Colaborador não encontrado.' });
 
     const updated = await prisma.user.update({
