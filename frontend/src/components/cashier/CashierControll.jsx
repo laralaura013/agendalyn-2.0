@@ -1,11 +1,11 @@
-// src/cashier/CashierControll.jsx
+// src/components/cashier/CashierControll.jsx
 import React, { useState } from 'react';
 import Modal from '../dashboard/Modal';
 import TransactionForm from './TransactionForm';
-import api from '../services/api';
+import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-// util simples p/ moeda -> número (aceita "1.234,56" ou "1234.56")
+// util simples p/ moeda -> número
 const toNumber = (v) => {
   if (typeof v === 'number') return v;
   if (!v) return 0;
@@ -16,12 +16,12 @@ const toNumber = (v) => {
 
 /**
  * Componente de controle rápido do Caixa.
- * - Abre/fecha caixa (modal de abertura simples)
- * - Lança Entrada/Saída (TransactionForm)
+ * - Abre/fecha caixa (com modal de abertura)
+ * - Lança Entrada/Saída (usa TransactionForm)
  * - Emite window.dispatchEvent(new Event('cashier:refresh')) após alterações
  *
- * Props opcionais (legado):
- *   - session, setSession
+ * Props opcionais de legado:
+ *   - session, setSession (mantidos para compatibilidade com seu estado local)
  */
 const CashierControll = ({ session, setSession }) => {
   const [isOpeningModalOpen, setIsOpeningModalOpen] = useState(false);
@@ -33,10 +33,10 @@ const CashierControll = ({ session, setSession }) => {
   const safeRefresh = () => {
     try {
       window.dispatchEvent(new Event('cashier:refresh'));
-    } catch {}
+    } catch (_) {}
   };
 
-  /* ===================== ABRIR ===================== */
+  // --------- ABRIR CAIXA ----------
   const handleOpenCashier = async () => {
     const opening = toNumber(openingBalance);
     if (opening < 0) {
@@ -52,11 +52,9 @@ const CashierControll = ({ session, setSession }) => {
       safeRefresh();
       toast.success('Caixa aberto!');
     } catch (e) {
+      // Fallback: atualiza estado local (legado)
       console.warn('[CashierControll] Falha em /cashier/open, usando estado local.', e);
-      // Fallback (legado)
-      if (setSession) {
-        setSession({ status: 'OPEN', openingBalance: opening, transactions: [] });
-      }
+      setSession?.({ status: 'OPEN', openingBalance: opening, transactions: [] });
       setIsOpeningModalOpen(false);
       setOpeningBalance('');
       safeRefresh();
@@ -66,7 +64,7 @@ const CashierControll = ({ session, setSession }) => {
     }
   };
 
-  /* ===================== FECHAR ===================== */
+  // --------- FECHAR CAIXA ----------
   const handleCloseCashier = async () => {
     if (!window.confirm('Tem certeza que deseja fechar o caixa? Esta ação não pode ser desfeita.')) return;
 
@@ -77,7 +75,7 @@ const CashierControll = ({ session, setSession }) => {
       toast.success('Caixa fechado!');
     } catch (e) {
       console.warn('[CashierControll] Falha em /cashier/close, usando estado local.', e);
-      if (setSession) setSession({ status: 'CLOSED' });
+      setSession?.({ status: 'CLOSED' });
       safeRefresh();
       toast('Caixa fechado (modo local).', { icon: '⚠️' });
     } finally {
@@ -85,11 +83,11 @@ const CashierControll = ({ session, setSession }) => {
     }
   };
 
-  /* ===================== TRANSAÇÃO ===================== */
+  // --------- NOVA TRANSAÇÃO (Entrada/Saída) ----------
   const handleSaveTransaction = async (data) => {
-    // data vem do TransactionForm (amount, description, paymentMethodId, sourceType/sourceId opcionais)
+    // data vem do TransactionForm (paymentMethodId, amount, description, etc.)
     const payload = {
-      type: txType,
+      type: txType, // 'INCOME' | 'EXPENSE'
       amount: toNumber(data.amount),
       description: data.description || '',
       paymentMethodId: data.paymentMethodId || undefined,
@@ -104,27 +102,14 @@ const CashierControll = ({ session, setSession }) => {
 
     setBusy(true);
     try {
-      const r = await api.post('/cashier/transactions', payload);
-      if (r?.status === 201) {
-        toast.success(`${txType === 'INCOME' ? 'Entrada' : 'Saída'} lançada!`);
-      } else {
-        toast.success('Lançamento realizado.');
-      }
+      await api.post('/cashier/transactions', payload);
       setIsTransactionModalOpen(false);
       safeRefresh();
+      toast.success(`${txType === 'INCOME' ? 'Entrada' : 'Saída'} lançada!`);
     } catch (e) {
-      const msg = e?.response?.data?.message || '';
-      // Ambiente "novo" pode retornar 501 para lançamento manual
-      if (e?.response?.status === 501) {
-        toast.error(
-          'Lançamento manual indisponível neste modelo de caixa. Registre via Recebíveis/Pagáveis.'
-        );
-      } else {
-        toast.error(msg || 'Não foi possível salvar a transação.');
-      }
-
-      // Fallback de legado: se há um session aberto no estado local, persistimos ali
-      if (setSession && session?.status === 'OPEN' && payload.amount > 0) {
+      console.warn('[CashierControll] Falha em /cashier/transactions, usando estado local se possível.', e);
+      // Fallback de legado: empurra no array local se existir
+      if (setSession && session?.status === 'OPEN') {
         const prev = Array.isArray(session.transactions) ? session.transactions : [];
         setSession({
           ...session,
@@ -135,14 +120,16 @@ const CashierControll = ({ session, setSession }) => {
         });
         setIsTransactionModalOpen(false);
         safeRefresh();
-        toast('Lançamento salvo localmente (fallback).', { icon: '⚠️' });
+        toast('Lançamento salvo localmente.', { icon: '⚠️' });
+      } else {
+        toast.error(e?.response?.data?.message || 'Não foi possível salvar a transação.');
       }
     } finally {
       setBusy(false);
     }
   };
 
-  /* ===================== RENDER ===================== */
+  // ------------- RENDER -------------
   const closed = session?.status === 'CLOSED';
 
   if (closed) {
@@ -162,9 +149,7 @@ const CashierControll = ({ session, setSession }) => {
         <Modal isOpen={isOpeningModalOpen} onClose={() => setIsOpeningModalOpen(false)}>
           <div className="p-4">
             <h3 className="text-xl font-bold mb-4">Abrir Caixa</h3>
-            <label className="block text-sm font-medium text-gray-700">
-              Valor de Abertura (Troco)
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Valor de Abertura (Troco)</label>
             <input
               type="number"
               value={openingBalance}
@@ -206,15 +191,12 @@ const CashierControll = ({ session, setSession }) => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           <div className="p-4 bg-gray-100 rounded-lg">
             <h4 className="text-sm font-semibold text-gray-600">Saldo Inicial</h4>
-            <p className="text-lg font-bold">
-              R$ {Number(session?.openingBalance || 0).toFixed(2)}
-            </p>
+            <p className="text-lg font-bold">R$ {(Number(session?.openingBalance || 0)).toFixed(2)}</p>
           </div>
           <div className="p-4 bg-green-100 rounded-lg">
             <h4 className="text-sm font-semibold text-green-800">Entradas</h4>
             <p className="text-lg font-bold text-green-800">
-              R${' '}
-              {Number(
+              R$ {Number(
                 (session?.transactions || [])
                   .filter((t) => t.type === 'INCOME')
                   .reduce((s, t) => s + Number(t.amount || 0), 0)
@@ -224,8 +206,7 @@ const CashierControll = ({ session, setSession }) => {
           <div className="p-4 bg-red-100 rounded-lg">
             <h4 className="text-sm font-semibold text-red-800">Saídas</h4>
             <p className="text-lg font-bold text-red-800">
-              R${' '}
-              {Number(
+              R$ {Number(
                 (session?.transactions || [])
                   .filter((t) => t.type === 'EXPENSE')
                   .reduce((s, t) => s + Number(t.amount || 0), 0)
@@ -235,17 +216,12 @@ const CashierControll = ({ session, setSession }) => {
           <div className="p-4 bg-blue-100 rounded-lg">
             <h4 className="text-sm font-semibold text-blue-800">Saldo Atual</h4>
             <p className="text-lg font-bold text-blue-800">
-              R${' '}
-              {Number(
+              R$ {Number(
                 Number(session?.openingBalance || 0) +
-                  (session?.transactions || []).reduce(
-                    (s, t) =>
-                      s +
-                      (t.type === 'INCOME'
-                        ? Number(t.amount || 0)
-                        : -Number(t.amount || 0)),
-                    0
-                  )
+                (session?.transactions || []).reduce(
+                  (s, t) => s + (t.type === 'INCOME' ? Number(t.amount || 0) : -Number(t.amount || 0)),
+                  0
+                )
               ).toFixed(2)}
             </p>
           </div>
@@ -254,20 +230,14 @@ const CashierControll = ({ session, setSession }) => {
         <div className="mt-6 flex flex-wrap gap-2 justify-center sm:justify-start">
           <button
             disabled={busy}
-            onClick={() => {
-              setTxType('INCOME');
-              setIsTransactionModalOpen(true);
-            }}
+            onClick={() => { setTxType('INCOME'); setIsTransactionModalOpen(true); }}
             className="px-5 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-60"
           >
             Lançar Entrada
           </button>
           <button
             disabled={busy}
-            onClick={() => {
-              setTxType('EXPENSE');
-              setIsTransactionModalOpen(true);
-            }}
+            onClick={() => { setTxType('EXPENSE'); setIsTransactionModalOpen(true); }}
             className="px-5 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 disabled:opacity-60"
           >
             Lançar Saída
