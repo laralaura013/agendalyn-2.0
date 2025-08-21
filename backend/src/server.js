@@ -41,42 +41,61 @@ import exportRoutes from './routes/exportRoutes.js';
 import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
 dotenv.config();
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-/* ------------------------ Logs & Preflight ------------------------ */
-// Log de origem e rota (rápido)
+/* ------------------------ Segurança & infra ------------------------ */
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+/* ------------------------ Log simples de origem -------------------- */
 app.use((req, _res, next) => {
-  console.log('🌐 Origin:', req.headers.origin || '—', '| URL:', req.method, req.originalUrl);
+  const origin = req.headers.origin || '—';
+  console.log('🌐 Origin:', origin, '| URL:', req.method, req.originalUrl);
   next();
 });
 
-// Tratativa manual de preflight para maior compatibilidade
+/* ------------------------ Preflight manual ------------------------- */
+const allowOrigin = (origin) => {
+  if (!origin) return true; // server-to-server
+  const netlify = /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin);
+  const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  const railway = /railway\.app$/i.test(origin);
+  const vercel = /\.vercel\.app$/i.test(origin);
+  return netlify || local || railway || vercel;
+};
+
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     const reqOrigin  = req.headers.origin || 'https://frontlyn.netlify.app';
     const reqHeaders = req.headers['access-control-request-headers'] || 'Content-Type, Authorization';
-
-    res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin(reqOrigin) ? reqOrigin : 'https://frontlyn.netlify.app');
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', reqHeaders);
-
     return res.sendStatus(204);
   }
   next();
 });
 
 /* ------------------------ Core middlewares ------------------------ */
-app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-}));
-app.use(express.json({ limit: '2mb' }));
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (allowOrigin(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  })
+);
 
-// Logger de companyId (mostra no console qual empresa está em cada request)
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+
+// Logger com status + duração
 app.use(companyLogger);
 
 /* ----------------------------- Rotas ------------------------------ */
@@ -125,10 +144,15 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Rota não encontrada.' });
 });
 
-// Handler simples para não derrubar o server em erros não tratados
-// (mantém compat, só loga e retorna 500 padrão)
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   console.error('❌ Unhandled error:', err);
+  // CORS em erros também, para o browser não bloquear
+  const origin = req.headers?.origin;
+  if (origin && allowOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   res.status(500).json({ message: 'Erro interno do servidor.' });
 });
 
