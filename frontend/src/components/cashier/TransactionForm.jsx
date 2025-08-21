@@ -1,8 +1,8 @@
-// src/cashier/TransactionForm.jsx
+// src/components/cashier/TransactionForm.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../services/api';
+import api from '../../services/api'; // <-- caminho corrigido (duas pastas acima)
 
 // transforma "1.234,56" -> 1234.56
 const toNumber = (v) => {
