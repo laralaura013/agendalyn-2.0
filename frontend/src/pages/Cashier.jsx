@@ -53,8 +53,12 @@ function normalizeStatus(data) {
   if (data?.session) {
     const opening = Number(data.session.openingBalance || 0);
     const txs = Array.isArray(data.session.transactions) ? data.session.transactions : [];
-    const income = txs.filter(t => t?.type === 'INCOME').reduce((s, t) => s + Number(t?.amount || 0), 0);
-    const expense = txs.filter(t => t?.type === 'EXPENSE').reduce((s, t) => s + Number(t?.amount || 0), 0);
+    const income = txs
+      .filter((t) => t?.type === 'INCOME')
+      .reduce((s, t) => s + Number(t?.amount || 0), 0);
+    const expense = txs
+      .filter((t) => t?.type === 'EXPENSE')
+      .reduce((s, t) => s + Number(t?.amount || 0), 0);
     const balance = opening + income - expense;
 
     return {
@@ -106,7 +110,10 @@ const BarChartByMethod = ({ data }) => {
   const barW = 22;
   const gap = 20;
 
-  const maxY = Math.max(1, ...data.map(d => Math.max(Number(d.entries || 0), Number(d.exits || 0))));
+  const maxY = Math.max(
+    1,
+    ...data.map((d) => Math.max(Number(d.entries || 0), Number(d.exits || 0)))
+  );
 
   return (
     <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
@@ -119,29 +126,9 @@ const BarChartByMethod = ({ data }) => {
         const exitsH = (Number(d.exits || 0) * (height - 2 * padding)) / maxY;
         return (
           <g key={i}>
-            <rect
-              x={x0}
-              y={height - padding - entriesH}
-              width={barW}
-              height={entriesH}
-              fill="#059669"
-              rx="3"
-            />
-            <rect
-              x={x0 + barW + 6}
-              y={height - padding - exitsH}
-              width={barW}
-              height={exitsH}
-              fill="#dc2626"
-              rx="3"
-            />
-            <text
-              x={x0 + barW}
-              y={height - padding + 12}
-              textAnchor="middle"
-              fontSize="10"
-              fill="#6b7280"
-            >
+            <rect x={x0} y={height - padding - entriesH} width={barW} height={entriesH} fill="#059669" rx="3" />
+            <rect x={x0 + barW + 6} y={height - padding - exitsH} width={barW} height={exitsH} fill="#dc2626" rx="3" />
+            <text x={x0 + barW} y={height - padding + 12} textAnchor="middle" fontSize="10" fill="#6b7280">
               {safeStr(d.name || '').slice(0, 10)}
             </text>
           </g>
@@ -194,7 +181,7 @@ const Cashier = () => {
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [methodId, setMethodId] = useState(''); // reservado p/ futura filtragem server-side
-  const [userId, setUserId] = useState('');     // reservado p/ futura filtragem server-side
+  const [userId, setUserId] = useState(''); // reservado p/ futura filtragem server-side
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [staff, setStaff] = useState([]);
 
@@ -212,27 +199,30 @@ const Cashier = () => {
 
   // ---- Modal Fechamento com contagem
   const [closeOpenModal, setCloseOpenModal] = useState(false);
-  const DENOMS = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.25, 0.10, 0.05];
-  const [counts, setCounts] = useState(Object.fromEntries(DENOMS.map(v => [String(v), 0])));
+  const DENOMS = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05];
+  const [counts, setCounts] = useState(Object.fromEntries(DENOMS.map((v) => [String(v), 0])));
   const [closeNote, setCloseNote] = useState('');
 
-  const countedTotal = useMemo(() =>
-    DENOMS.reduce((sum, v) => sum + Number(counts[String(v)] || 0) * v, 0).toFixed(2),
+  const countedTotal = useMemo(
+    () => DENOMS.reduce((sum, v) => sum + Number(counts[String(v)] || 0) * v, 0).toFixed(2),
     [counts]
   );
-  const expectedTotal = useMemo(() =>
-    Number((Number(view.openingBalance || 0) + Number(view.income || 0) - Number(view.expense || 0))).toFixed(2),
+  const expectedTotal = useMemo(
+    () =>
+      Number(
+        Number(view.openingBalance || 0) + Number(view.income || 0) - Number(view.expense || 0)
+      ).toFixed(2),
     [view.openingBalance, view.income, view.expense]
   );
-  const diffTotal = useMemo(() => (Number(countedTotal) - Number(expectedTotal)).toFixed(2), [countedTotal, expectedTotal]);
+  const diffTotal = useMemo(
+    () => (Number(countedTotal) - Number(expectedTotal)).toFixed(2),
+    [countedTotal, expectedTotal]
+  );
 
   /* ---------------- Basics ---------------- */
   const loadBasics = useCallback(async () => {
     try {
-      const [pm, st] = await Promise.allSettled([
-        api.get('/payment-methods'),
-        api.get('/staff'),
-      ]);
+      const [pm, st] = await Promise.allSettled([api.get('/payment-methods'), api.get('/staff')]);
       setPaymentMethods(pm.status === 'fulfilled' ? normalizeList(pm.value?.data) : []);
       setStaff(st.status === 'fulfilled' ? normalizeList(st.value?.data) : []);
     } catch {
@@ -249,14 +239,17 @@ const Cashier = () => {
       const normalized = normalizeStatus(res.data || {});
       setView(normalized);
 
-      // manter compatibilidade com controle legado
-      if (normalized.isOpen && normalized.mode === 'legacy') {
+      // 🔧 Mantém o CashierControll sempre em sincronia com o status real,
+      // independentemente do "modo" retornado pelo backend.
+      if (normalized.isOpen) {
         setLegacySession({
           status: 'OPEN',
-          openingBalance: normalized.openingBalance,
-          transactions: (res.data?.session?.transactions || []),
+          openingBalance: Number(normalized.openingBalance || 0),
+          transactions: Array.isArray(normalized.raw?.session?.transactions)
+            ? normalized.raw.session.transactions
+            : [],
         });
-      } else if (!normalized.isOpen) {
+      } else {
         setLegacySession({ status: 'CLOSED', openingBalance: 0, transactions: [] });
       }
     } catch (error) {
@@ -277,12 +270,12 @@ const Cashier = () => {
       const totals = r?.data?.totals || { income: 0, expense: 0, balance: 0 };
 
       // Monta “por método” combinando receivables (entradas) e payables (saídas)
-      const recvPM = normalizeList(r?.data?.receivables?.byPaymentMethod).map(x => ({
+      const recvPM = normalizeList(r?.data?.receivables?.byPaymentMethod).map((x) => ({
         id: x.paymentMethodId || null,
         name: x.name || '—',
         entries: Number(x.amount || 0),
       }));
-      const payPM = normalizeList(r?.data?.payables?.byPaymentMethod).map(x => ({
+      const payPM = normalizeList(r?.data?.payables?.byPaymentMethod).map((x) => ({
         id: x.paymentMethodId || null,
         name: x.name || '—',
         exits: Number(x.amount || 0),
@@ -300,7 +293,9 @@ const Cashier = () => {
         prev.exits += s.exits || 0;
         map.set(key, prev);
       }
-      const byMethod = Array.from(map.values()).sort((a, b) => (b.entries + b.exits) - (a.entries + a.exits));
+      const byMethod = Array.from(map.values()).sort(
+        (a, b) => b.entries + b.exits - (a.entries + a.exits)
+      );
 
       setSummary({
         entries: Number(totals.income || 0),
@@ -317,37 +312,42 @@ const Cashier = () => {
   }, [date, view.expense, view.income]);
 
   /* ---------------- Tabela por dia (usa /cashier/statement) ---------------- */
-  const loadByDay = useCallback(async () => {
-    try {
-      setLoadingTable(true);
-      const from = `${date}T00:00:00.000`;
-      const to = `${date}T23:59:59.999`;
+  const loadByDay = useCallback(
+    async () => {
+      try {
+        setLoadingTable(true);
+        const from = `${date}T00:00:00.000`;
+        const to = `${date}T23:59:59.999`;
 
-      const r = await api.get('/cashier/statement', { params: { from, to } });
-      const arr = normalizeList(r?.data?.byDay);
-      // Filtros simples na UI (tipo)
-      const filtered = arr.filter(row => {
-        if (!type) return true;
-        if (type === 'INCOME') return Number(row.income || 0) > 0;
-        if (type === 'EXPENSE') return Number(row.expense || 0) > 0;
-        return true;
-      });
-      // Filtro texto (q) em data/valores (simples)
-      const filteredQ = q
-        ? filtered.filter(row => {
-            const s = `${row.date} ${row.income} ${row.expense} ${row.balance}`.toLowerCase();
-            return s.includes(q.toLowerCase());
-          })
-        : filtered;
+        const r = await api.get('/cashier/statement', { params: { from, to } });
+        const arr = normalizeList(r?.data?.byDay);
 
-      setByDayRows(filteredQ);
-    } catch (e) {
-      console.error(e);
-      setByDayRows([]);
-    } finally {
-      setLoadingTable(false);
-    }
-  }, [date, q, type]);
+        // Filtros simples na UI (tipo)
+        const filtered = arr.filter((row) => {
+          if (!type) return true;
+          if (type === 'INCOME') return Number(row.income || 0) > 0;
+          if (type === 'EXPENSE') return Number(row.expense || 0) > 0;
+          return true;
+        });
+
+        // Filtro texto (q)
+        const filteredQ = q
+          ? filtered.filter((row) => {
+              const s = `${row.date} ${row.income} ${row.expense} ${row.balance}`.toLowerCase();
+              return s.includes(q.toLowerCase());
+            })
+          : filtered;
+
+        setByDayRows(filteredQ);
+      } catch (e) {
+        console.error(e);
+        setByDayRows([]);
+      } finally {
+        setLoadingTable(false);
+      }
+    },
+    [date, q, type]
+  );
 
   /* ---------------- init & refresh ---------------- */
   useEffect(() => {
@@ -372,7 +372,7 @@ const Cashier = () => {
 
   /* ---------------- Actions ---------------- */
   const handleOpenCashier = async () => {
-    const initial = (view.openingBalance ?? 0);
+    const initial = view.openingBalance ?? 0;
     const openingBalanceStr = prompt(
       'Digite o valor de abertura do caixa (fundo de troco):',
       Number(initial).toFixed(2)
@@ -426,14 +426,14 @@ const Cashier = () => {
 
       await api.post('/cashier/close', details);
       setCloseOpenModal(false);
-      setCounts(Object.fromEntries(DENOMS.map(v => [String(v), 0])));
+      setCounts(Object.fromEntries(DENOMS.map((v) => [String(v), 0])));
       setCloseNote('');
       await Promise.all([fetchCashierStatus(), loadSummary(), loadByDay()]);
       toast.success('Caixa fechado!');
     } catch (error) {
       // Fallback local
       setCloseOpenModal(false);
-      setCounts(Object.fromEntries(DENOMS.map(v => [String(v), 0])));
+      setCounts(Object.fromEntries(DENOMS.map((v) => [String(v), 0])));
       setCloseNote('');
       setLegacySession({ status: 'CLOSED', openingBalance: 0, transactions: [] });
       setView((v) => ({ ...v, isOpen: false }));
@@ -443,7 +443,7 @@ const Cashier = () => {
 
   const exportDaily = () => {
     const header = ['Data;Entradas;Saídas;Saldo acumulado'];
-    const lines = (Array.isArray(byDayRows) ? byDayRows : []).map(row => {
+    const lines = (Array.isArray(byDayRows) ? byDayRows : []).map((row) => {
       const dt = row.date;
       const inc = Number(row.income || 0).toFixed(2).replace('.', ',');
       const exp = Number(row.expense || 0).toFixed(2).replace('.', ',');
@@ -548,7 +548,9 @@ const Cashier = () => {
             <Wallet className="text-slate-700" />
           </div>
           <div className="mt-2 text-2xl font-bold">
-            {toBRL('balance' in summary ? summary.balance : (Number(view.income || 0) - Number(view.expense || 0)))}
+            {toBRL(
+              'balance' in summary ? summary.balance : Number(view.income || 0) - Number(view.expense || 0)
+            )}
           </div>
         </div>
       </div>
@@ -561,7 +563,9 @@ const Cashier = () => {
             <input
               type="date"
               value={date}
-              onChange={(e) => { setDate(e.target.value); }}
+              onChange={(e) => {
+                setDate(e.target.value);
+              }}
               className="border rounded-md px-3 py-1.5 text-sm"
             />
           </label>
@@ -570,34 +574,46 @@ const Cashier = () => {
             <Filter size={16} />
             <select
               value={type}
-              onChange={(e) => { setType(e.target.value); }}
+              onChange={(e) => {
+                setType(e.target.value);
+              }}
               className="border rounded-md px-3 py-1.5 text-sm w-full"
             >
               {TYPE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </label>
 
           <select
             value={methodId}
-            onChange={(e) => { setMethodId(e.target.value); }}
+            onChange={(e) => {
+              setMethodId(e.target.value);
+            }}
             className="border rounded-md px-3 py-1.5 text-sm w-full"
           >
             <option value="">Método de pagamento (todos)</option>
             {paymentMethods.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
             ))}
           </select>
 
           <select
             value={userId}
-            onChange={(e) => { setUserId(e.target.value); }}
+            onChange={(e) => {
+              setUserId(e.target.value);
+            }}
             className="border rounded-md px-3 py-1.5 text-sm w-full"
           >
             <option value="">Usuário (todos)</option>
             {staff.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
             ))}
           </select>
 
@@ -605,7 +621,9 @@ const Cashier = () => {
             <Search size={16} />
             <input
               value={q}
-              onChange={(e) => { setQ(e.target.value); }}
+              onChange={(e) => {
+                setQ(e.target.value);
+              }}
               placeholder="Buscar no resumo diário…"
               className="border rounded-md px-3 py-1.5 text-sm w-full"
             />
@@ -645,7 +663,7 @@ const Cashier = () => {
         )}
       </div>
 
-      {/* Tabela — Resumo por dia (usa /cashier/statement -> byDay) */}
+      {/* Tabela — Resumo por dia */}
       <div className="flex items-center justify-between mb-2">
         <div className="text-sm text-gray-600">
           {loadingTable ? 'Carregando…' : `${byDayRows.length} dia(s) no período`}
@@ -701,7 +719,11 @@ const Cashier = () => {
         <div className="p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold">Fechar Caixa — Contagem de Dinheiro</h3>
-            <button onClick={() => setCloseOpenModal(false)} className="p-2 rounded hover:bg-gray-100" aria-label="Fechar">
+            <button
+              onClick={() => setCloseOpenModal(false)}
+              className="p-2 rounded hover:bg-gray-100"
+              aria-label="Fechar"
+            >
               <X size={18} />
             </button>
           </div>
@@ -738,7 +760,11 @@ const Cashier = () => {
             </div>
             <div className="rounded-lg border p-3">
               <div className="text-sm text-gray-600">Diferença</div>
-              <div className={`text-xl font-semibold ${Number(diffTotal) < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+              <div
+                className={`text-xl font-semibold ${
+                  Number(diffTotal) < 0 ? 'text-red-700' : 'text-emerald-700'
+                }`}
+              >
                 {toBRL(diffTotal)}
               </div>
             </div>
