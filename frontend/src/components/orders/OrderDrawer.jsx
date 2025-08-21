@@ -16,9 +16,15 @@ import toast from 'react-hot-toast';
 const currency = (n) =>
   Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const normalizeList = (data) => {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  return [];
+};
+
 const rowDefaults = (remaining = 0, firstMethodId = '') => ({
   paymentMethodId: firstMethodId || '',
-  amount: remaining > 0 ? Number(remaining.toFixed(2)) : 0,
+  amount: remaining > 0 ? Number(Number(remaining).toFixed(2)) : 0,
   installments: 1,
   cardBrand: '',
   insertIntoCashier: true,
@@ -41,9 +47,19 @@ function asValue({ base, value, mode }) {
 }
 
 export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
-  const [paymentMethods, setPaymentMethods] = useState([]);
+  // Normalizações de entrada
+  const safeItems = useMemo(
+    () => (Array.isArray(order?.items) ? order.items : []),
+    [order]
+  );
+  const safeOrderPayments = useMemo(
+    () => (Array.isArray(order?.payments) ? order.payments : []),
+    [order]
+  );
+
+  const [paymentMethods, setPaymentMethods] = useState([]); // sempre array
   const [loading, setLoading] = useState(false);
-  const [payments, setPayments] = useState([]);
+  const [payments, setPayments] = useState([]); // sempre array
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   // Caixa
@@ -52,9 +68,9 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
 
   // Desconto/Gorjeta com R$ | %
   const [discountValue, setDiscountValue] = useState(0);
-  const [discountMode, setDiscountMode] = useState('R$'); // 'R$' | '%'
+  const [discountMode, setDiscountMode] = useState('R$');
   const [tipValue, setTipValue] = useState(0);
-  const [tipMode, setTipMode] = useState('R$'); // 'R$' | '%'
+  const [tipMode, setTipMode] = useState('R$');
 
   // Flags de status
   const isOpen = order?.status === 'OPEN';
@@ -94,7 +110,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
     payments.length > 0 &&
     (isCashierOpen || !payments.some((p) => p.insertIntoCashier));
 
-  // ✅ Ao abrir uma comanda, carrega os dados necessários
+  // Carregar métodos de pagamento e status do caixa ao abrir
   useEffect(() => {
     if (!open) return;
     (async () => {
@@ -104,8 +120,11 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           api.get('/cashier/status'),
         ]);
 
-        if (pmRes.status === 'fulfilled') setPaymentMethods(pmRes.value.data || []);
-        else setPaymentMethods([]);
+        if (pmRes.status === 'fulfilled') {
+          setPaymentMethods(normalizeList(pmRes.value?.data));
+        } else {
+          setPaymentMethods([]);
+        }
 
         if (cashierRes.status === 'fulfilled') {
           const status = cashierRes.value?.data?.status || 'UNKNOWN';
@@ -114,16 +133,17 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           setCashierStatus('UNKNOWN');
         }
 
-        const current = (order?.payments || []).map((p) => ({
-          paymentMethodId: p.paymentMethodId,
-          amount: Number(p.amount),
+        // pagamentos atuais da comanda
+        const current = safeOrderPayments.map((p) => ({
+          paymentMethodId: p.paymentMethodId || '',
+          amount: Number(p.amount || 0),
           installments: p.installments || 1,
           cardBrand: p.cardBrand || '',
           insertIntoCashier: p.insertIntoCashier !== false,
         }));
 
         if (!current.length && isOpen) {
-          const firstMethodId = pmRes.status === 'fulfilled' ? pmRes.value.data?.[0]?.id || '' : '';
+          const firstMethodId = (normalizeList(pmRes.value?.data)[0]?.id) || '';
           setPayments([rowDefaults(total, firstMethodId)]);
           setSelectedIdx(0);
         } else {
@@ -131,7 +151,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           setSelectedIdx(0);
         }
 
-        // ✅ Carrega desconto/gorjeta persistidos quando não estiver ABERTA
+        // Carrega desconto/gorjeta
         if (isOpen) {
           setDiscountValue(0);
           setDiscountMode('R$');
@@ -144,6 +164,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           setTipMode(order?.tipMode || 'R$');
         }
       } catch (e) {
+        // eslint-disable-next-line no-console
         console.error(e);
         toast.error('Erro ao carregar dados da comanda.');
       }
@@ -263,7 +284,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
     return true;
   };
 
-  // ✅ Função de salvar pagamentos agora envia os totais juntos
+  // Salvar pagamentos + totais
   const savePayments = async () => {
     try {
       setLoading(true);
@@ -273,6 +294,13 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
       }
       if (!(await ensureCashierOk())) return;
 
+      // valida método
+      const invalid = payments.find((p) => !p.paymentMethodId);
+      if (invalid) {
+        toast.error('Selecione uma forma de pagamento para todas as linhas.');
+        return;
+      }
+
       const payload = {
         payments: payments.map((p) => ({
           paymentMethodId: p.paymentMethodId,
@@ -281,7 +309,6 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           cardBrand: p.cardBrand || undefined,
           insertIntoCashier: !!p.insertIntoCashier,
         })),
-        // Envia totais para persistir
         discount: Number(discountValue || 0),
         discountMode,
         tip: Number(tipValue || 0),
@@ -305,9 +332,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
       setLoading(true);
       if (!(await ensureCashierOk())) return;
 
-      // Salva pagamentos (que agora inclui os totais) antes de finalizar
-      await savePayments();
-
+      await savePayments(); // inclui totais
       await api.put(`/orders/${order.id}/finish`);
       toast.success('Comanda finalizada!');
       await refreshOrders?.();
@@ -379,7 +404,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
         {/* Header */}
         <div className="flex items-center justify-between border-b p-4">
           <div className="space-y-0.5">
-            <h2 className="text-lg font-semibold">Comanda #{order?.id?.slice(0, 8)}</h2>
+            <h2 className="text-lg font-semibold">Comanda #{order?.id?.slice?.(0, 8) || '—'}</h2>
             <p className="text-xs text-gray-500">
               Cliente: <strong>{order?.client?.name || 'N/A'}</strong> • Colaborador:{' '}
               <strong>{order?.user?.name || 'N/A'}</strong>
@@ -530,14 +555,16 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(order?.items || []).map((it) => {
-                    const desc = it.service?.name || it.product?.name || 'Item';
-                    const subtotal = Number(it.price) * it.quantity;
+                  {safeItems.map((it) => {
+                    const desc = it?.service?.name || it?.product?.name || 'Item';
+                    const price = Number(it?.price || 0);
+                    const qty = Number(it?.quantity || 0);
+                    const subtotal = price * qty;
                     return (
-                      <tr key={it.id} className="border-t hover:bg-gray-50/60">
+                      <tr key={it?.id} className="border-t hover:bg-gray-50/60">
                         <td className="px-3 py-2">{desc}</td>
-                        <td className="px-3 py-2 text-right">{it.quantity}</td>
-                        <td className="px-3 py-2 text-right">{currency(it.price)}</td>
+                        <td className="px-3 py-2 text-right">{qty}</td>
+                        <td className="px-3 py-2 text-right">{currency(price)}</td>
                         <td className="px-3 py-2 text-right">{currency(subtotal)}</td>
                       </tr>
                     );

@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { PlusCircle, X } from 'lucide-react';
 
+const normalizeList = (data) => {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  return [];
+};
+
 const OrderForm = ({ onSave, onCancel }) => {
   const [items, setItems] = useState([{ type: 'service', id: '', quantity: 1 }]);
   const [clientId, setClientId] = useState('');
@@ -18,18 +24,24 @@ const OrderForm = ({ onSave, onCancel }) => {
       try {
         setLoading(true);
         const [clientsRes, staffRes, servicesRes, productsRes] = await Promise.all([
-          api.get('/clients'), // ✅ ROTA CORRIGIDA
+          api.get('/clients'),
           api.get('/staff'),
           api.get('/services'),
           api.get('/products'),
         ]);
-        setAvailableClients(clientsRes.data);
-        setAvailableStaff(staffRes.data);
-        setAvailableServices(servicesRes.data);
-        setAvailableProducts(productsRes.data);
+
+        setAvailableClients(normalizeList(clientsRes.data));
+        setAvailableStaff(normalizeList(staffRes.data));
+        setAvailableServices(normalizeList(servicesRes.data));
+        setAvailableProducts(normalizeList(productsRes.data));
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Erro ao carregar dados:', error);
         alert('Não foi possível carregar os dados necessários.');
+        setAvailableClients([]);
+        setAvailableStaff([]);
+        setAvailableServices([]);
+        setAvailableProducts([]);
       } finally {
         setLoading(false);
       }
@@ -45,20 +57,37 @@ const OrderForm = ({ onSave, onCancel }) => {
   };
 
   const addItem = () => {
-    setItems([...items, { type: 'service', id: '', quantity: 1 }]);
+    setItems((prev) => [...prev, { type: 'service', id: '', quantity: 1 }]);
   };
 
   const removeItem = (index) => {
-    setItems(items.filter((_, i) => i !== index));
+    setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const formattedItems = items.map(item => ({
-      quantity: item.quantity,
+
+    // validações simples
+    if (!clientId) {
+      alert('Selecione um cliente.');
+      return;
+    }
+    if (!userId) {
+      alert('Selecione um colaborador.');
+      return;
+    }
+    const hasInvalid = items.some((it) => !it.id || !it.type || Number(it.quantity) < 1);
+    if (hasInvalid) {
+      alert('Preencha todos os itens corretamente.');
+      return;
+    }
+
+    const formattedItems = items.map((item) => ({
+      quantity: Math.max(1, parseInt(item.quantity || 1, 10)),
       serviceId: item.type === 'service' ? item.id : null,
       productId: item.type === 'product' ? item.id : null,
     }));
+
     onSave({ clientId, userId, items: formattedItems });
   };
 
@@ -78,8 +107,10 @@ const OrderForm = ({ onSave, onCancel }) => {
             className="w-full px-4 py-3 text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Selecione um cliente</option>
-            {availableClients.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {availableClients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </select>
         </div>
@@ -93,8 +124,10 @@ const OrderForm = ({ onSave, onCancel }) => {
             className="w-full px-4 py-3 text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Selecione um colaborador</option>
-            {availableStaff.map(u => (
-              <option key={u.id} value={u.id}>{u.name}</option>
+            {availableStaff.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
             ))}
           </select>
         </div>
@@ -128,12 +161,14 @@ const OrderForm = ({ onSave, onCancel }) => {
               >
                 <option value="">Selecione</option>
                 {item.type === 'service'
-                  ? availableServices.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                  ? availableServices.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
                     ))
-                  : availableProducts.map(p => (
+                  : availableProducts.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} (Estoque: {p.stock})
+                        {p.name} {typeof p.stock === 'number' ? `(Estoque: ${p.stock})` : ''}
                       </option>
                     ))}
               </select>
@@ -144,7 +179,9 @@ const OrderForm = ({ onSave, onCancel }) => {
               <input
                 type="number"
                 value={item.quantity}
-                onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value, 10))}
+                onChange={(e) =>
+                  handleItemChange(index, 'quantity', Math.max(1, parseInt(e.target.value || 1, 10)))
+                }
                 min="1"
                 required
                 className="w-full px-3 py-2 text-sm border rounded"
