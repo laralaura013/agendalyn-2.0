@@ -3,26 +3,45 @@ import {
   listClients,
   createClient,
   updateClient,
-  deleteClient,
   getClientById,
-  // getClientAppointmentHistory,
-  // getClientNotifications,
+  softDeleteClient,
+  restoreClient,
+  hardDeleteClient,
+  bulkSoftDelete,
+  bulkRestore,
+  mergeClients,
+  exportClientsCsv,
+  importClientsCsv,
+  upload,
 } from '../controllers/clientController.js';
 
 import { protect, checkRole } from '../middlewares/authMiddleware.js';
-import { protectClient } from '../middlewares/clientAuthMiddleware.js';
 
 const router = express.Router();
+const guard = [protect, checkRole(['ADMIN', 'OWNER'])];
 
-// Rotas administrativas (prefixo: /api/clients)
-router.get('/', protect, checkRole(['ADMIN', 'OWNER']), listClients);
-router.get('/:id', protect, checkRole(['ADMIN', 'OWNER']), getClientById);
-router.post('/', protect, checkRole(['ADMIN', 'OWNER']), createClient);
-router.put('/:id', protect, checkRole(['ADMIN', 'OWNER']), updateClient);
-router.delete('/:id', protect, checkRole(['ADMIN', 'OWNER']), deleteClient);
+// List / filtros / paginação
+router.get('/', guard, listClients);
+// Export respeitando filtros
+router.get('/export.csv', guard, exportClientsCsv);
+// Import CSV (campo "file")
+router.post('/import.csv', guard, upload.single('file'), importClientsCsv);
 
-// Rotas do cliente autenticado (comentadas até implementação no controller)
-// router.get('/portal/history', protectClient, getClientAppointmentHistory);
-// router.get('/portal/notifications', protectClient, getClientNotifications);
+// CRUD
+router.get('/:id', guard, getClientById);
+router.post('/', guard, createClient);
+router.put('/:id', guard, updateClient);
+
+// Soft delete / restore / hard delete
+router.delete('/:id', guard, softDeleteClient);
+router.post('/:id/restore', guard, restoreClient);
+router.delete('/:id/hard', guard, hardDeleteClient);
+
+// Bulk actions
+router.post('/bulk/soft-delete', guard, bulkSoftDelete);
+router.post('/bulk/restore', guard, bulkRestore);
+
+// Merge
+router.post('/merge', guard, mergeClients);
 
 export default router;

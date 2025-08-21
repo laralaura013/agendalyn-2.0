@@ -90,18 +90,40 @@ model Service {
 }
 
 model Client {
-  id        String    @id @default(cuid())
-  name      String
-  phone     String
+  id    String  @id @default(cuid())
+  name  String
+  email String?
+  phone String
+
+  cpf       String?   @db.VarChar(14)
+  rg        String?
+  gender    Gender?
   birthDate DateTime?
   notes     String?
+
+  avatarUrl String?
+
+  // Endereço
+  zipCode    String? @db.VarChar(10)
+  street     String?
+  number     String?
+  complement String?
+  district   String?
+  city       String?
+  state      String? @db.VarChar(2)
+
+  tags     String[] @default([])
+  isActive Boolean  @default(true)
+
+  // Exclusão suave
+  deletedAt DateTime?
+
   companyId String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   password  String?
 
-  // SPRINT 1: origem do cliente (opcional)
+  // Origem (opcional)
   originId String?
   origin   ClientOrigin? @relation(fields: [originId], references: [id])
 
@@ -114,8 +136,10 @@ model Client {
   Receivable       Receivable[]
 
   @@unique([companyId, email])
+  @@unique([companyId, cpf])
   @@index([companyId])
   @@index([originId])
+  @@index([deletedAt])
 }
 
 model Appointment {
@@ -131,7 +155,6 @@ model Appointment {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  // Integração Google
   googleEventId String?
 
   // SPRINT 1: motivo de cancelamento
@@ -152,7 +175,7 @@ model Appointment {
 
 model Order {
   id        String      @id @default(cuid())
-  total     Decimal     @db.Decimal(10, 2) // Subtotal (soma dos itens)
+  total     Decimal     @db.Decimal(10, 2)
   status    OrderStatus @default(OPEN)
   companyId String
   clientId  String
@@ -160,21 +183,19 @@ model Order {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  // ✅ Totais persistidos p/ desconto & gorjeta
-  discountAmount Decimal @default(0) @db.Decimal(10, 2) // valor de desconto aplicado
-  discountMode   String  @default("R$") // "R$" | "%"
-  tipAmount      Decimal @default(0) @db.Decimal(10, 2) // valor de gorjeta
-  tipMode        String  @default("R$") // "R$" | "%"
-  totalToPay     Decimal @default(0) @db.Decimal(10, 2) // total = total - desconto + gorjeta
-  paidTotal      Decimal @default(0) @db.Decimal(10, 2) // somatório dos pagamentos
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
+  discountMode   String  @default("R$")
+  tipAmount      Decimal @default(0) @db.Decimal(10, 2)
+  tipMode        String  @default("R$")
+  totalToPay     Decimal @default(0) @db.Decimal(10, 2)
+  paidTotal      Decimal @default(0) @db.Decimal(10, 2)
 
   client   Client         @relation(fields: [clientId], references: [id])
   company  Company        @relation(fields: [companyId], references: [id])
   user     User           @relation(fields: [userId], references: [id])
   items    OrderItem[]
-  payments OrderPayment[] // pagamentos por comanda
+  payments OrderPayment[]
 
-  // SPRINT 1: receivable opcional linkado
   receivables Receivable[]
 
   @@index([companyId])
@@ -199,15 +220,14 @@ model OrderItem {
   @@index([productId])
 }
 
-/// Pagamentos de comanda
 model OrderPayment {
   id                String   @id @default(cuid())
   orderId           String
   paymentMethodId   String
   amount            Decimal  @db.Decimal(10, 2)
-  installments      Int      @default(1) // nº de parcelas (>=1)
-  cardBrand         String? // ex.: "VISA", "MASTERCARD"
-  insertIntoCashier Boolean  @default(true) // lançar no caixa a 1ª parcela (ou parcela única)
+  installments      Int      @default(1)
+  cardBrand         String?
+  insertIntoCashier Boolean  @default(true)
   createdAt         DateTime @default(now())
 
   order         Order         @relation(fields: [orderId], references: [id])
@@ -240,7 +260,6 @@ model Transaction {
   cashierSessionId String
   createdAt        DateTime        @default(now())
 
-  // Campos para idempotência de integrações (Caixa)
   sourceType CashSourceType?
   sourceId   String?
 
@@ -557,7 +576,7 @@ model PaymentMethod {
   company       Company        @relation(fields: [companyId], references: [id])
   payables      Payable[]
   receivables   Receivable[]
-  orderPayments OrderPayment[] // relação reversa para pagamentos de comanda
+  orderPayments OrderPayment[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -684,4 +703,10 @@ model Waitlist {
   @@index([clientId])
   @@index([serviceId])
   @@index([professionalId])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
 }
