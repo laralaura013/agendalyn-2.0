@@ -70,13 +70,34 @@ const verifySignatureIfPresent = (req) => {
 /** Converte "DD/MM/AAAA" -> "AAAA-MM-DD"; se já vier ISO, mantém. */
 const normalizeDateToISO = (txt) => {
   const s = String(txt || '').trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // ISO já ok
   const m = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/); // BR
   if (m) {
     const [_, dd, mm, yyyy] = m;
     return `${yyyy}-${mm}-${dd}`;
   }
   return null; // inválido
+};
+
+/** Formata ISO (AAAA-MM-DD) -> "DD/MM/AAAA" */
+const formatBR = (iso) => {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return String(iso || '');
+  const [yyyy, mm, dd] = iso.split('-');
+  return `${dd}/${mm}/${yyyy}`;
+};
+
+/** Gera slots padrão (fallback) — 09:00..18:00 em passos de stepMin */
+const pad2 = (n) => String(n).padStart(2, '0');
+const fallbackSlots = (dateISO, stepMin = 30, openHour = 9, closeHour = 18, serviceMin = 30) => {
+  const list = [];
+  const lastStart = closeHour * 60 - serviceMin; // garante que cabe a duração do serviço
+  for (let m = openHour * 60; m <= lastStart; m += stepMin) {
+    const hh = Math.floor(m / 60);
+    const mm = m % 60;
+    list.push(`${pad2(hh)}:${pad2(mm)}`);
+  }
+  console.log(`🧩 fallbackSlots(${dateISO}) =>`, list);
+  return list;
 };
 
 /** ====== Verify (GET) ====== */
@@ -205,7 +226,7 @@ async function handleIncomingMessage(msg, meta) {
       }
       session.payload.professional = staff[pick];
       session.step = 'ask_date';
-      await sendText(to, 'Informe a data (DD/MM/AAAA). Ex.: 25/08/2025');
+      await sendText(to, 'Informe a data **(DD/MM/AAAA)**. Ex.: 25/08/2025');
       break;
     }
 
@@ -215,7 +236,7 @@ async function handleIncomingMessage(msg, meta) {
         await sendText(to, 'Formato inválido. Use **DD/MM/AAAA**. Ex.: 25/08/2025');
         break;
       }
-      session.payload.date = iso;
+      session.payload.date = iso; // guardamos ISO
       session.step = 'ask_time';
 
       const slots = await listSlots(
@@ -225,27 +246,15 @@ async function handleIncomingMessage(msg, meta) {
       );
 
       if (!slots.length) {
-        console.log('ℹ️ Nenhum slot retornado para', {
-          professionalId: session.payload.professional.id,
-          date: iso,
-          serviceId: session.payload.service.id,
-        });
         await sendText(
           to,
-          'Não encontrei horários neste dia. Envie outra data (DD/MM/AAAA) ou digite "voltar".'
+          `Não encontrei horários em ${formatBR(iso)}. Envie outra data (DD/MM/AAAA) ou digite "voltar".`
         );
         break;
       }
 
       const top = slots.slice(0, 8);
-      if (!top.length) {
-        await sendText(
-          to,
-          'Não encontrei horários exibíveis agora. Tente outra data (DD/MM/AAAA).'
-        );
-        break;
-      }
-      await sendChoices(to, 'Horários disponíveis (escolha um número):', top);
+      await sendChoices(to, `Horários disponíveis para ${formatBR(iso)} (escolha um número):`, top);
       break;
     }
 
@@ -258,25 +267,24 @@ async function handleIncomingMessage(msg, meta) {
       const top = slots.slice(0, 8);
       const pick = parseInt(text, 10) - 1;
       if (!top.length) {
-        await sendText(to, 'Sem horários. Envie outra data (DD/MM/AAAA).');
+        await sendText(to, `Sem horários. Envie outra data (DD/MM/AAAA).`);
         session.step = 'ask_date';
         break;
       }
       if (Number.isNaN(pick) || pick < 0 || pick >= top.length) {
         await sendText(to, 'Escolha um número válido da lista.');
-        await sendChoices(to, 'Horários disponíveis:', top);
+        await sendChoices(to, `Horários disponíveis para ${formatBR(session.payload.date)}:`, top);
         break;
       }
       const hhmm = top[pick];
       session.payload.time = hhmm;
 
-      const brDate = session.payload.date.split('-').reverse().join('/'); // AAAA-MM-DD -> DD/MM/AAAA
       await sendText(
         to,
         `Confirmar agendamento?\n` +
           `Serviço: ${session.payload.service.name}\n` +
           `Profissional: ${session.payload.professional.name}\n` +
-          `Data: ${brDate}\n` +
+          `Data: ${formatBR(session.payload.date)}\n` +
           `Hora: ${hhmm}\n\n` +
           `Responda "sim" para confirmar ou "não" para cancelar.`
       );
@@ -288,10 +296,10 @@ async function handleIncomingMessage(msg, meta) {
       const ok = text.toLowerCase();
       if (ok === 'sim' || ok === 's') {
         const created = await createAppointmentFromSession(client, session.payload);
-        const brDate = session.payload.date.split('-').reverse().join('/');
         await sendText(
           to,
-          `Agendamento criado! Código: ${created.id}\nNos vemos em ${brDate} às ${session.payload.time}.`
+          `Agendamento criado! Código: ${created.id}\n` +
+            `Nos vemos em ${formatBR(session.payload.date)} às ${session.payload.time}.`
         );
         session.step = 'start';
         session.payload = {};
@@ -308,7 +316,7 @@ async function handleIncomingMessage(msg, meta) {
       const n = parseInt(text, 10);
       if (n === 1) {
         session.step = 'ask_date';
-        await sendText(to, 'Informe a data (DD/MM/AAAA).');
+        await sendText(to, 'Informe a data **(DD/MM/AAAA)**.');
       } else {
         session.step = 'start';
         await sendText(to, 'Voltando ao menu inicial.');
@@ -366,7 +374,7 @@ async function listStaff() {
 
 /**
  * Busca horários disponíveis no seu endpoint público com vários fallbacks.
- * Aceita formatos de resposta flexíveis.
+ * Se ainda assim vier vazio, gera fallback local (09:00–18:00).
  */
 async function listSlots(proId, dateISO, serviceId) {
   // tenta usar a duração do serviço
@@ -378,7 +386,7 @@ async function listSlots(proId, dateISO, serviceId) {
     }
   } catch {}
 
-  const base = APP_BASE_URL.replace(/\/$/, '');
+  const base = (APP_BASE_URL || '').replace(/\/$/, '');
   const url = `${base}/public/available-slots`;
 
   const paramSets = [
@@ -396,14 +404,12 @@ async function listSlots(proId, dateISO, serviceId) {
       console.log('🔎 GET', url, 'params=', params);
       const res = await axios.get(url, { params });
       const raw = res.data;
-      console.log('↩️ status', res.status, 'tipo', typeof raw);
 
       let items = [];
       if (Array.isArray(raw)) items = raw;
       else if (Array.isArray(raw?.slots)) items = raw.slots;
       else if (Array.isArray(raw?.data)) items = raw.data;
       else if (raw && typeof raw === 'object') {
-        // tenta extrair de objetos comuns
         const keys = Object.keys(raw);
         const candidateKey = keys.find((k) => Array.isArray(raw[k]));
         if (candidateKey) items = raw[candidateKey];
@@ -418,14 +424,15 @@ async function listSlots(proId, dateISO, serviceId) {
         .filter(Boolean)
         .map((t) => String(t).slice(0, 5));
 
-      console.log('🕒 listSlots =>', hhmm);
-
       if (hhmm.length) return hhmm;
     } catch (e) {
       console.log('⚠️ listSlots falhou', e?.response?.status, e?.response?.data || e.message);
     }
   }
-  return [];
+
+  // Fallback local para não travar o fluxo:
+  console.log('🧯 Nenhum slot remoto. Usando fallback local.');
+  return fallbackSlots(dateISO, 30, 9, 18, svcDuration);
 }
 
 async function upsertClientByPhone(whatsPhone) {
@@ -454,7 +461,7 @@ async function getDefaultCompanyId() {
 }
 
 async function createAppointmentFromSession(client, payload) {
-  const { service, professional, date, time } = payload;
+  const { service, professional, date, time } = payload; // date é ISO interno
   const start = new Date(`${date}T${time}:00`);
   const svc = await prisma.service.findUnique({
     where: { id: service.id },
