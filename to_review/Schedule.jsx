@@ -14,10 +14,13 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
-import { asArray } from "../utils/asArray";
+
+import { asArray } from '../utils/asArray';
+// ❌ NÃO importe FloatingActions aqui — o FAB vem do MobileShell
 
 const DEFAULT_SLOT_MINUTES = 30;
 
@@ -42,7 +45,7 @@ const formatDateInput = (d) =>
 const startOfWeek = (d) => {
   const copy = new Date(d);
   const day = copy.getDay();
-  const diff = (day + 6) % 7; // segunda como início
+  const diff = (day + 6) % 7;
   copy.setDate(copy.getDate() - diff);
   copy.setHours(0, 0, 0, 0);
   return copy;
@@ -89,6 +92,7 @@ export default function Schedule() {
   const [waitlistLoading, setWaitlistLoading] = useState(false);
 
   const loadedOnceRef = useRef(false);
+  const navigate = useNavigate();
 
   /* --------- Params por visão --------- */
   const buildRangeParams = useCallback(
@@ -256,10 +260,10 @@ export default function Schedule() {
   const handleSelectSlot = useCallback(
     (slotInfo) => {
       const { start, end } = slotInfo;
-      const conflito = asArray(blocks).some((b) => {
+      const conflito = (blocks || []).some((b) => {
         const base = new Date(b.date);
-        const [sh, sm] = (b.startTime || "00:00").split(":").map(Number);
-        const [eh, em] = (b.endTime || "00:00").split(":").map(Number);
+        const [sh, sm] = (b.startTime || "00:00").split(":"asArray()).map(Number);
+        const [eh, em] = (b.endTime || "00:00").split(":"asArray()).map(Number);
         const bStart = new Date(base);
         bStart.setHours(sh, sm, 0, 0);
         const bEnd = new Date(base);
@@ -373,10 +377,10 @@ export default function Schedule() {
   }, [date, view]);
 
   const blockEvents = useMemo(() => {
-    return asArray(blocks).map((b) => {
+    return (blocks || [asArray(])).map((b) => {
       const base = new Date(b.date);
-      const [sh, sm] = (b.startTime || "00:00").split(":").map(Number);
-      const [eh, em] = (b.endTime || "00:00").split(":").map(Number);
+      const [sh, sm] = (b.startTime || "00:00").split(":"asArray()).map(Number);
+      const [eh, em] = (b.endTime || "00:00").split(":"asArray()).map(Number);
       const start = new Date(base);
       start.setHours(sh, sm, 0, 0);
       const end = new Date(base);
@@ -398,7 +402,7 @@ export default function Schedule() {
 
   const handlePickAvailableSlot = useCallback(
     (hhmm) => {
-      const [h, m] = String(hhmm).split(":").map(Number);
+      const [h, m] = String(hhmm).split(":"asArray()).map(Number);
       const s = new Date(date);
       s.setHours(h, m, 0, 0);
       const e = new Date(s);
@@ -444,11 +448,6 @@ export default function Schedule() {
   }, [isModalOpen, openSlots, openApptList, openWaitlist, openBlockTime]);
 
   /* ====================== UI ====================== */
-  const proOptions = useMemo(
-    () => asArray(staff).map((s) => ({ id: s.id, name: s.name })),
-    [staff]
-  );
-
   return (
     <>
       <div className="relative w-full">
@@ -475,7 +474,7 @@ export default function Schedule() {
             <ProfessionalsSelect
               value={selectedPro || ""}
               onChange={setSelectedPro}
-              options={proOptions}
+              options={asArray(staff?).map((s) => ({ id: s.id, name: s.name })) || []}
             />
             <div className="flex items-center gap-1">
               <button onClick={goPrev} className="px-2 py-1.5 border rounded hover:bg-gray-50" title="Anterior">
@@ -611,27 +610,14 @@ export default function Schedule() {
               </div>
             </div>
 
-            <Accordion
-              title="Produtos / Serviços"
-              open={openProducts}
-              onToggle={() => setOpenProducts((v) => !v)}
-            >
+            <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
               <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Buscar produto/serviço"
-                  className="border rounded px-2 py-1.5 text-sm w-full"
-                />
+                <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
                 <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
-                  {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
-                    <div
-                      key={item}
-                      className="px-3 py-2 flex items-center justify-between hover:bg-gray-50"
-                    >
+                  {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"asArray(]).map((item) => (
+                    <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
                       <span>{item}</span>
-                      <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">
-                        Adicionar
-                      </button>
+                      <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
                     </div>
                   ))}
                 </div>
@@ -737,7 +723,7 @@ export default function Schedule() {
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
     <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
-      {asArray(options).map((p) => (
+      {(options || [asArray(])).map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
         </option>
@@ -887,11 +873,7 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
       <div className="divide-y border rounded max-h-[60vh] overflow-y-auto">
         {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
         {asArray(filtered).map((ev) => (
-          <button
-            key={ev.id}
-            onClick={() => onOpen?.(ev.id)}
-            className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50"
-          >
+          <button key={ev.id} onClick={() => onOpen?.(ev.id)} className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50">
             <div className="text-sm">
               <div className="font-medium">{ev.title}</div>
               <div className="text-gray-500">
@@ -999,7 +981,7 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
 /* ====== Faixa de dias (mobile) ====== */
 function MobileDaysStrip({ date, onChangeDate }) {
   const start = startOfWeek(date);
-  const days = Array.from({ length: 7 }, (_, i) => {
+  const days = [...Array(asArray(7)]).map((_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     return d;
@@ -1032,4 +1014,3 @@ function MobileDaysStrip({ date, onChangeDate }) {
     </div>
   );
 }
-

@@ -1,0 +1,719 @@
+generator client { 
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id               String   @id @default(cuid())
+  name             String
+  phone            String?
+  address          String?
+  stripeCustomerId String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  isActive         Boolean  @default(true)
+
+  anamnesisForms  AnamnesisForm[]
+  appointments    Appointment[]
+  brands          Brand[]
+  cashierSessions CashierSession[]
+  categories      Category[]
+  clients         Client[]
+  goals           Goal[]
+  orders          Order[]
+  packages        Package[]
+  products        Product[]
+  services        Service[]
+  subscription    Subscription?
+  users           User[]
+  scheduleBlocks  ScheduleBlock[]
+  waitlists       Waitlist[]
+
+  // SPRINT 1
+  suppliers           Supplier[]
+  paymentMethods      PaymentMethod[]
+  financeCategories   FinanceCategory[]
+  payables            Payable[]
+  receivables         Receivable[]
+  cancellationReasons CancellationReason[]
+  clientOrigins       ClientOrigin[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String
+  name          String
+  password      String
+  role          Role     @default(STAFF)
+  commission    Decimal? @db.Decimal(5, 2)
+  workSchedule  Json?
+  phone         String?                      // <— NOVO (opcional)
+  nickname      String?                      // <— NOVO (opcional)
+  companyId     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  showInBooking Boolean  @default(true)
+
+  company              Company               @relation(fields: [companyId], references: [id])
+  appointments         Appointment[]
+  goals                Goal[]
+  orders               Order[]
+  packageSessionUsages PackageSessionUsage[]
+  services             Service[]             @relation("ServiceToUser")
+  scheduleBlocks       ScheduleBlock[]
+  waitlists            Waitlist[]
+  googleIntegration    GoogleIntegration?
+
+  @@index([companyId])
+  @@unique([companyId, email])               // <— Único por empresa (multi-tenant)
+}
+
+model Service {
+  id        String   @id @default(cuid())
+  name      String
+  price     Decimal  @db.Decimal(10, 2)
+  duration  Int
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  appointments Appointment[]
+  goals        Goal[]
+  orderItems   OrderItem[]
+  packages     Package[]     @relation("PackageServices")
+  availableTo  User[]        @relation("ServiceToUser")
+  waitlists    Waitlist[]
+
+  @@index([companyId])
+}
+
+model Client {
+  id    String  @id @default(cuid())
+  name  String
+  email String?
+  phone String
+
+  cpf       String?   @db.VarChar(14)
+  rg        String?
+  gender    Gender?
+  birthDate DateTime?
+  notes     String?
+
+  avatarUrl String?
+
+  // Endereço
+  zipCode    String? @db.VarChar(10)
+  street     String?
+  number     String?
+  complement String?
+  district   String?
+  city       String?
+  state      String? @db.VarChar(2)
+
+  tags     String[] @default([])
+  isActive Boolean  @default(true)
+
+  // Exclusão suave
+  deletedAt DateTime?
+
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  password  String?
+
+  // Origem (opcional)
+  originId String?
+  origin   ClientOrigin? @relation(fields: [originId], references: [id])
+
+  company          Company           @relation(fields: [companyId], references: [id])
+  anamnesisAnswers AnamnesisAnswer[]
+  appointments     Appointment[]
+  packages         ClientPackage[]
+  orders           Order[]
+  waitlists        Waitlist[]
+  Receivable       Receivable[]
+
+  @@unique([companyId, email])
+  @@unique([companyId, cpf])
+  @@index([companyId])
+  @@index([originId])
+  @@index([deletedAt])
+}
+
+model Appointment {
+  id        String            @id @default(cuid())
+  start     DateTime
+  end       DateTime
+  notes     String?
+  status    AppointmentStatus @default(SCHEDULED)
+  companyId String
+  serviceId String
+  userId    String
+  clientId  String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  googleEventId String?
+
+  // SPRINT 1: motivo de cancelamento
+  cancelReasonId String?
+  cancelReason   CancellationReason? @relation(fields: [cancelReasonId], references: [id])
+
+  company             Company               @relation(fields: [companyId], references: [id])
+  service             Service               @relation(fields: [serviceId], references: [id])
+  user                User                  @relation(fields: [userId], references: [id])
+  client              Client                @relation(fields: [clientId], references: [id])
+  anamnesisAnswers    AnamnesisAnswer[]
+  packageSessionUsage PackageSessionUsage[]
+
+  @@index([companyId, start])
+  @@index([userId, start])
+  @@index([clientId, start])
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  total     Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(OPEN)
+  companyId String
+  clientId  String
+  userId    String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
+  discountMode   String  @default("R$")
+  tipAmount      Decimal @default(0) @db.Decimal(10, 2)
+  tipMode        String  @default("R$")
+  totalToPay     Decimal @default(0) @db.Decimal(10, 2)
+  paidTotal      Decimal @default(0) @db.Decimal(10, 2)
+
+  client   Client         @relation(fields: [clientId], references: [id])
+  company  Company        @relation(fields: [companyId], references: [id])
+  user     User           @relation(fields: [userId], references: [id])
+  items    OrderItem[]
+  payments OrderPayment[]
+
+  receivables Receivable[]
+
+  @@index([companyId])
+  @@index([clientId])
+  @@index([userId])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  serviceId String?
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  productId String?
+
+  order   Order    @relation(fields: [orderId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id])
+
+  @@index([orderId])
+  @@index([serviceId])
+  @@index([productId])
+}
+
+model OrderPayment {
+  id                String   @id @default(cuid())
+  orderId           String
+  paymentMethodId   String
+  amount            Decimal  @db.Decimal(10, 2)
+  installments      Int      @default(1)
+  cardBrand         String?
+  insertIntoCashier Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  order         Order         @relation(fields: [orderId], references: [id])
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([orderId])
+  @@index([paymentMethodId])
+}
+
+model CashierSession {
+  id             String        @id @default(cuid())
+  openingBalance Decimal       @db.Decimal(10, 2)
+  closingBalance Decimal?      @db.Decimal(10, 2)
+  openedAt       DateTime      @default(now())
+  closedAt       DateTime?
+  status         CashierStatus @default(OPEN)
+  companyId      String
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  transactions Transaction[]
+
+  @@index([companyId])
+}
+
+model Transaction {
+  id               String          @id @default(cuid())
+  type             TransactionType
+  amount           Decimal         @db.Decimal(10, 2)
+  description      String
+  cashierSessionId String
+  createdAt        DateTime        @default(now())
+
+  sourceType CashSourceType?
+  sourceId   String?
+
+  cashierSession CashierSession @relation(fields: [cashierSessionId], references: [id])
+
+  @@unique([sourceType, sourceId])
+  @@index([cashierSessionId])
+  @@index([cashierSessionId, createdAt])
+  @@index([createdAt])
+}
+
+model Plan {
+  id            String  @id @default(cuid())
+  name          String  @unique
+  price         Decimal @db.Decimal(10, 2)
+  features      Json
+  stripePriceId String  @unique
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  status               SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodEnd     DateTime?
+  companyId            String             @unique
+  planId               String
+  stripeSubscriptionId String?            @unique
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  plan    Plan    @relation(fields: [planId], references: [id])
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  type        GoalType
+  targetValue Decimal  @db.Decimal(10, 2)
+  month       Int
+  year        Int
+  companyId   String
+  userId      String?
+  serviceId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+
+  @@unique([month, year, companyId, userId, serviceId])
+  @@index([companyId])
+  @@index([userId])
+  @@index([serviceId])
+}
+
+model AnamnesisForm {
+  id        String   @id @default(cuid())
+  title     String
+  questions Json
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company           @relation(fields: [companyId], references: [id])
+  answers AnamnesisAnswer[]
+
+  @@index([companyId])
+}
+
+model AnamnesisAnswer {
+  id            String   @id @default(cuid())
+  formId        String
+  clientId      String
+  answers       Json
+  appointmentId String?
+  createdAt     DateTime @default(now())
+
+  form        AnamnesisForm @relation(fields: [formId], references: [id])
+  client      Client        @relation(fields: [clientId], references: [id])
+  appointment Appointment?  @relation(fields: [appointmentId], references: [id])
+
+  @@index([formId])
+  @@index([clientId])
+  @@index([appointmentId])
+}
+
+model Package {
+  id           String   @id @default(cuid())
+  name         String
+  price        Decimal  @db.Decimal(10, 2)
+  sessions     Int
+  validityDays Int
+  companyId    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company        Company         @relation(fields: [companyId], references: [id])
+  clientPackages ClientPackage[]
+  services       Service[]       @relation("PackageServices")
+
+  @@index([companyId])
+}
+
+model ClientPackage {
+  id                String   @id @default(cuid())
+  clientId          String
+  packageId         String
+  sessionsRemaining Int
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  client        Client                @relation(fields: [clientId], references: [id])
+  package       Package               @relation(fields: [packageId], references: [id])
+  sessionUsages PackageSessionUsage[]
+
+  @@index([clientId])
+  @@index([packageId])
+}
+
+model PackageSessionUsage {
+  id              String   @id @default(cuid())
+  clientPackageId String
+  usedAt          DateTime @default(now())
+  appointmentId   String?
+  userId          String
+
+  clientPackage ClientPackage @relation(fields: [clientPackageId], references: [id])
+  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@index([clientPackageId])
+  @@index([appointmentId])
+  @@index([userId])
+}
+
+model Category {
+  id        String @id @default(cuid())
+  name      String
+  companyId String
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  products Product[]
+
+  @@unique([name, companyId])
+  @@index([companyId])
+}
+
+model Brand {
+  id        String @id @default(cuid())
+  name      String
+  companyId String
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  products Product[]
+
+  @@unique([name, companyId])
+  @@index([companyId])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  cost        Decimal? @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  companyId   String
+  categoryId  String?
+  brandId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id])
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  brand      Brand?      @relation(fields: [brandId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([brandId])
+}
+
+model ScheduleBlock {
+  id             String   @id @default(cuid())
+  companyId      String
+  professionalId String?
+  date           DateTime
+  startTime      String
+  endTime        String
+  reason         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company      Company @relation(fields: [companyId], references: [id])
+  professional User?   @relation(fields: [professionalId], references: [id])
+
+  @@index([companyId, date])
+  @@index([professionalId, date])
+}
+
+model GoogleIntegration {
+  id           String @id @default(cuid())
+  staffId      String @unique
+  staff        User   @relation(fields: [staffId], references: [id])
+  googleEmail  String
+  calendarId   String @default("primary")
+  accessToken  String
+  refreshToken String
+  expiryDate   BigInt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  OWNER
+  ADMIN        // <— NOVO
+  MANAGER      // <— NOVO
+  STAFF
+  BARBER       // (opcional, caso use)
+  HAIRDRESSER  // (opcional, caso use)
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CANCELED
+  COMPLETED
+}
+
+enum OrderStatus {
+  OPEN
+  FINISHED
+  CANCELED
+}
+
+enum CashierStatus {
+  OPEN
+  CLOSED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum CashSourceType {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  INCOMPLETE
+  PAST_DUE
+}
+
+enum GoalType {
+  TOTAL
+  BY_USER
+  BY_SERVICE
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  SCHEDULED
+  CANCELLED
+}
+
+// -------------------- SPRINT 1: Financeiro / Configurações --------------------
+
+enum FinanceCategoryType {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum PayableStatus {
+  OPEN
+  PAID
+  CANCELED
+}
+
+enum ReceivableStatus {
+  OPEN
+  RECEIVED
+  CANCELED
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  taxId     String?
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company   @relation(fields: [companyId], references: [id])
+  bills   Payable[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model PaymentMethod {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  payables      Payable[]
+  receivables   Receivable[]
+  orderPayments OrderPayment[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model FinanceCategory {
+  id        String              @id @default(cuid())
+  companyId String
+  name      String
+  type      FinanceCategoryType
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id])
+  payables    Payable[]
+  receivables Receivable[]
+
+  @@unique([companyId, name, type])
+  @@index([companyId])
+}
+
+model Payable {
+  id              String        @id @default(cuid())
+  companyId       String
+  supplierId      String?
+  categoryId      String
+  paymentMethodId String?
+  dueDate         DateTime
+  amount          Decimal       @db.Decimal(10, 2)
+  status          PayableStatus @default(OPEN)
+  paidAt          DateTime?
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  company       Company         @relation(fields: [companyId], references: [id])
+  supplier      Supplier?       @relation(fields: [supplierId], references: [id])
+  category      FinanceCategory @relation(fields: [categoryId], references: [id])
+  paymentMethod PaymentMethod?  @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([companyId, dueDate])
+  @@index([companyId, status, paidAt])
+}
+
+model Receivable {
+  id              String           @id @default(cuid())
+  companyId       String
+  clientId        String?
+  orderId         String?
+  categoryId      String?
+  paymentMethodId String?
+  dueDate         DateTime
+  amount          Decimal          @db.Decimal(10, 2)
+  status          ReceivableStatus @default(OPEN)
+  receivedAt      DateTime?
+  notes           String?
+  createdAt       DateTime         @default(now())
+
+  company       Company          @relation(fields: [companyId], references: [id])
+  client        Client?          @relation(fields: [clientId], references: [id])
+  order         Order?           @relation(fields: [orderId], references: [id])
+  category      FinanceCategory? @relation(fields: [categoryId], references: [id])
+  paymentMethod PaymentMethod?   @relation(fields: [paymentMethodId], references: [id])
+
+  @@index([companyId, dueDate])
+  @@index([companyId, status, receivedAt])
+}
+
+model CancellationReason {
+  id        String  @id @default(cuid())
+  companyId String
+  name      String
+  active    Boolean @default(true)
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  appointments Appointment[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model ClientOrigin {
+  id        String  @id @default(cuid())
+  companyId String
+  name      String
+  active    Boolean @default(true)
+
+  company Company  @relation(fields: [companyId], references: [id])
+  clients Client[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+// -------------------- LISTA DE ESPERA --------------------
+
+model Waitlist {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id])
+
+  professionalId String?
+  professional   User?   @relation(fields: [professionalId], references: [id])
+
+  clientName String?
+  phone      String?
+
+  preferredDate DateTime?
+  preferredTime String?
+  pref          String?
+
+  notes  String?
+  status WaitlistStatus @default(WAITING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([clientId])
+  @@index([serviceId])
+  @@index([professionalId])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
