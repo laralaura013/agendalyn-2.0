@@ -40,7 +40,7 @@ import exportRoutes from './routes/exportRoutes.js';
 // Formas de pagamento (OrderDrawer)
 import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
-// Integração WhatsApp (Cloud API) — usa router dedicado
+// WhatsApp
 import whatsappRoutes from './routes/whatsappRoutes.js';
 
 dotenv.config();
@@ -61,7 +61,7 @@ app.use((req, _res, next) => {
 
 /* ------------------------ Preflight manual ------------------------- */
 const allowOrigin = (origin) => {
-  if (!origin) return true; // server-to-server (ex.: Meta Webhooks não mandam Origin)
+  if (!origin) return true;
   const netlify = /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin) || origin === 'https://frontlyn.netlify.app';
   const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
   const railway = /railway\.app$/i.test(origin);
@@ -96,16 +96,15 @@ app.use(
 );
 
 /**
- * ⚠️ WhatsApp webhook precisa do raw body para validação de assinatura (opcional).
- * Por isso, montamos a rota DO WHATSAPP ANTES do express.json global e com um express.json próprio.
+ * ⚠️ O webhook do WhatsApp precisa do RAW BODY.
+ * Monte a rota de WhatsApp ANTES do express.json global.
  */
 app.use(
   '/api/integrations/whatsapp',
   express.json({
     limit: '2mb',
     verify: (req, _res, buf) => {
-      // Deixa o raw body disponível (Buffer) para validar X-Hub-Signature-256 quando WABA_APP_SECRET estiver setado
-      req.rawBody = buf;
+      req.rawBody = buf; // Buffer para HMAC
     },
   }),
   whatsappRoutes

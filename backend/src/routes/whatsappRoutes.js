@@ -5,20 +5,23 @@ import crypto from 'crypto';
 import prisma from '../prismaClient.js';
 
 const router = express.Router();
-const BOT_VERSION = 'BR-v3';
 
+/** ================== ENV ================== */
 const {
   WABA_VERIFY_TOKEN,
   WABA_ACCESS_TOKEN,
   WABA_PHONE_NUMBER_ID,
   APP_BASE_URL = 'http://localhost:3001/api',
-  WABA_APP_SECRET,
+  WABA_APP_SECRET, // opcional (validação da assinatura do webhook)
 } = process.env;
 
 const GRAPH_URL = `https://graph.facebook.com/v20.0/${WABA_PHONE_NUMBER_ID}/messages`;
+
+/** ================== Sessões em memória (produção: usar Redis) ================== */
 const sessions = new Map();
 
-/* =================== Utils =================== */
+/** ================== Utils ================== */
+/** Normaliza fone para E.164 BR */
 const e164BR = (phone) => {
   if (!phone) return null;
   const only = String(phone).replace(/\D/g, '');
@@ -28,32 +31,54 @@ const e164BR = (phone) => {
   return `+${only}`;
 };
 
-const sendText = async (to, text) => {
+/** "DD/MM/AAAA" ou "DD-MM-AAAA" -> "AAAA-MM-DD". Se já vier ISO, mantém. */
+const toISODate = (s) => {
+  if (!s) return null;
+  const t = String(s).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t; // já está em ISO
+  const m = t.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/); // DD/MM/AAAA
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return null;
+};
+
+/** ISO "AAAA-MM-DD" -> "DD/MM/AAAA" (para exibir ao usuário) */
+const formatBR = (iso) => {
+  if (!iso) return '';
+  const [Y, M, D] = String(iso).split('-');
+  if (!Y || !M || !D) return iso;
+  return `${D}/${M}/${Y}`;
+};
+
+/** Envia texto simples */
+const sendText = async (to, body) => {
   try {
     const { data } = await axios.post(
       GRAPH_URL,
-      { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } },
+      { messaging_product: 'whatsapp', to, type: 'text', text: { body } },
       { headers: { Authorization: `Bearer ${WABA_ACCESS_TOKEN}` } }
     );
-    console.log('✅ Enviado com sucesso. ID:', data?.messages?.[0]?.id);
+    const msgId = data?.messages?.[0]?.id;
+    console.log('✅ Enviado:', msgId || '(sem id)');
   } catch (err) {
-    console.error('❌ Erro ao enviar mensagem:', err?.response?.data || err.message);
+    console.error('❌ Erro ao enviar texto:', err?.response?.data || err.message);
   }
 };
 
+/** Lista simples "1. Opção" */
 const sendChoices = async (to, title, options = []) => {
-  const opts = Array.isArray(options) ? options.filter(Boolean) : [];
-  if (!opts.length) return sendText(to, `${title}\n(não há itens para selecionar)`);
-  const body = [title, ...opts.map((o, i) => `${i + 1}. ${o}`)].join('\n');
-  return sendText(to, body);
+  const lines = [title, ...options.map((o, i) => `${i + 1}. ${o}`)];
+  return sendText(to, lines.join('\n'));
 };
 
-const verifySignatureIfPresent = (req) => {
+/** (Opcional) valida a assinatura do webhook se WABA_APP_SECRET estiver setado */
+const isValidSignature = (req) => {
   if (!WABA_APP_SECRET) return true;
   const sigHeader = req.get('x-hub-signature-256');
   if (!sigHeader) return true;
+  const raw =
+    typeof req.rawBody === 'string' ? Buffer.from(req.rawBody, 'utf8') : req.rawBody;
   const hmac = crypto.createHmac('sha256', WABA_APP_SECRET);
-  hmac.update(req.rawBody);
+  hmac.update(raw);
   const expected = `sha256=${hmac.digest('hex')}`;
   try {
     return crypto.timingSafeEqual(Buffer.from(sigHeader), Buffer.from(expected));
@@ -62,39 +87,7 @@ const verifySignatureIfPresent = (req) => {
   }
 };
 
-/** "DD/MM/AAAA" ou "DD-MM-AAAA" -> "AAAA-MM-DD". Se já vier ISO, mantém. */
-const normalizeDateToISO = (txt) => {
-  const s = String(txt || '').trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // já ISO
-  const m = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
-  if (m) {
-    const [_, dd, mm, yyyy] = m;
-    return `${yyyy}-${mm}-${dd}`;
-  }
-  return null;
-};
-
-/** ISO "AAAA-MM-DD" -> "DD/MM/AAAA" */
-const formatBR = (iso) => {
-  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return String(iso || '');
-  const [yyyy, mm, dd] = iso.split('-');
-  return `${dd}/${mm}/${yyyy}`;
-};
-
-const pad2 = (n) => String(n).padStart(2, '0');
-const fallbackSlots = (dateISO, stepMin = 30, openHour = 9, closeHour = 18, serviceMin = 30) => {
-  const list = [];
-  const lastStart = closeHour * 60 - serviceMin;
-  for (let m = openHour * 60; m <= lastStart; m += stepMin) {
-    const hh = Math.floor(m / 60);
-    const mm = m % 60;
-    list.push(`${pad2(hh)}:${pad2(mm)}`);
-  }
-  console.log(`🧩 fallbackSlots(${dateISO}) =>`, list);
-  return list;
-};
-
-/* =================== Webhook Verify =================== */
+/** ================== VERIFY (GET) ================== */
 router.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -105,27 +98,32 @@ router.get('/webhook', (req, res) => {
   return res.sendStatus(403);
 });
 
-/* =================== Webhook Receiver =================== */
+/** ================== RECEIVER (POST) ================== */
 router.post('/webhook', async (req, res) => {
   try {
-    if (!verifySignatureIfPresent(req)) {
+    if (!isValidSignature(req)) {
       console.warn('⚠️ Assinatura inválida');
       return res.sendStatus(403);
     }
+
     const entry = req.body?.entry?.[0];
     const change = entry?.changes?.[0];
+
+    // Log útil para depuração
+    console.log('📩 Webhook change:', JSON.stringify(change, null, 2));
+
     const value = change?.value;
     const messages = value?.messages;
 
-    console.log('📩 Webhook change:', JSON.stringify(change, null, 2));
-
+    // Ignora eventos de status (sent, delivered, read)
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.sendStatus(200);
     }
 
     for (const msg of messages) {
-      await handleIncomingMessage(msg, value?.metadata);
+      await handleIncomingMessage(msg);
     }
+
     return res.sendStatus(200);
   } catch (err) {
     console.error('WhatsApp webhook error:', err?.response?.data || err);
@@ -133,39 +131,34 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
-/* =================== Conversa =================== */
-async function handleIncomingMessage(msg, meta) {
-  const from = `+${msg.from}`.replace('++', '+');
-  const to = e164BR(from);
+/** ================== Conversa (FSM simples) ================== */
+async function handleIncomingMessage(msg) {
+  const to = e164BR(`+${msg.from}`.replace('++', '+'));
   const kind = msg.type;
-  const rawText =
+  const text =
     msg.text?.body?.trim() ||
     msg.interactive?.list_reply?.title ||
     msg.button?.text ||
     '';
-  const text = rawText.toLowerCase();
 
-  console.log(`👤 ${msg.from} disse: "${rawText}" (tipo ${kind})`);
-
-  // reset explícito
-  if (['reiniciar', 'reset', 'menu', 'início', 'inicio', '0'].includes(text)) {
-    sessions.delete(to);
-  }
+  console.log(`👤 ${msg.from} disse: "${text}" (tipo ${kind})`);
 
   const session = sessions.get(to) || { step: 'start', payload: {} };
-  const client = await upsertClientByPhone(to);
 
-  // compat: se sessão antiga tiver só "date", compute dateBR/dateISO
-  if (session.payload?.date && !session.payload.dateISO) {
-    session.payload.dateISO = session.payload.date;
-    session.payload.dateBR = formatBR(session.payload.date);
+  // Comandos globais
+  if (['voltar', 'menu'].includes(text.toLowerCase())) {
+    session.step = 'start';
+    session.payload = {};
   }
+
+  // Garante cliente no banco
+  const client = await upsertClientByPhone(to);
 
   switch (session.step) {
     case 'start': {
       await sendText(
         to,
-        `Olá${client?.name ? `, ${client.name}` : ''}! Eu sou o assistente de agendamentos. (${BOT_VERSION})`
+        `Olá${client?.name ? `, ${client.name}` : ''}! Eu sou o assistente de agendamentos.`
       );
       await sendChoices(to, 'O que você deseja?', [
         'Agendar atendimento',
@@ -177,10 +170,10 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'menu': {
-      const n = parseInt(rawText, 10);
+      const n = parseInt(text, 10);
       if (n === 1) {
         session.step = 'ask_service';
-        await askService(to, session);
+        await askService(to);
       } else if (n === 2) {
         session.step = 'reschedule_code';
         await sendText(to, 'Informe o código do agendamento (ou digite "voltar").');
@@ -194,93 +187,86 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'ask_service': {
-      const pick = parseInt(rawText, 10) - 1;
       const services = await listServices();
+      const idx = parseInt(text, 10) - 1;
       if (!services.length) {
         await sendText(to, 'Não há serviços cadastrados no sistema.');
         session.step = 'start';
         break;
       }
-      if (Number.isNaN(pick) || pick < 0 || pick >= services.length) {
+      if (Number.isNaN(idx) || idx < 0 || idx >= services.length) {
         await sendText(to, 'Escolha um número válido da lista.');
-        await askService(to, session);
+        await askService(to);
         break;
       }
-      session.payload.service = services[pick];
+      session.payload.service = services[idx];
       session.step = 'ask_professional';
-      await askProfessional(to, session);
+      await askProfessional(to);
       break;
     }
 
     case 'ask_professional': {
-      const pick = parseInt(rawText, 10) - 1;
       const staff = await listStaff();
+      const idx = parseInt(text, 10) - 1;
       if (!staff.length) {
         await sendText(to, 'Nenhum profissional disponível para agendamento.');
         session.step = 'start';
         break;
       }
-      if (Number.isNaN(pick) || pick < 0 || pick >= staff.length) {
+      if (Number.isNaN(idx) || idx < 0 || idx >= staff.length) {
         await sendText(to, 'Escolha um número válido da lista.');
-        await askProfessional(to, session);
+        await askProfessional(to);
         break;
       }
-      session.payload.professional = staff[pick];
+      session.payload.professional = staff[idx];
       session.step = 'ask_date';
-      await sendText(to, 'Informe a data **(DD/MM/AAAA)**. Ex.: 25/08/2025');
+      await sendText(to, 'Informe a data (DD/MM/AAAA). Ex.: 25/08/2025');
       break;
     }
 
     case 'ask_date': {
-      const iso = normalizeDateToISO(rawText);
+      const iso = toISODate(text); // aceita "25/08/2025" ou "25-08-2025"
       if (!iso) {
-        await sendText(to, 'Formato inválido. Use **DD/MM/AAAA** (ex.: 25/08/2025)');
+        await sendText(to, 'Formato inválido. Use DD/MM/AAAA. Ex.: 25/08/2025');
         break;
       }
-      session.payload.dateISO = iso;          // para cálculos
-      session.payload.dateBR = formatBR(iso); // para mensagens
-
+      session.payload.date = iso;
       session.step = 'ask_time';
 
       const slots = await listSlots(
         session.payload.professional.id,
-        session.payload.dateISO,
+        iso,
         session.payload.service.id
       );
-
       if (!slots.length) {
         await sendText(
           to,
-          `Não encontrei horários em ${session.payload.dateBR}. Envie outra data (DD/MM/AAAA) ou digite "voltar".`
+          'Não encontrei horários neste dia. Envie outra data (DD/MM/AAAA) ou digite "voltar".'
         );
         break;
       }
-
-      const top = slots.slice(0, 8);
-      await sendChoices(to, `Horários disponíveis para ${session.payload.dateBR} (escolha um número):`, top);
+      await sendChoices(
+        to,
+        `Horários disponíveis (${formatBR(iso)}):`,
+        slots.slice(0, 8)
+      );
       break;
     }
 
     case 'ask_time': {
       const slots = await listSlots(
         session.payload.professional.id,
-        session.payload.dateISO,
+        session.payload.date,
         session.payload.service.id
       );
       const top = slots.slice(0, 8);
-      const pick = parseInt(rawText, 10) - 1;
-
-      if (!top.length) {
-        await sendText(to, `Sem horários. Envie outra data (DD/MM/AAAA).`);
-        session.step = 'ask_date';
-        break;
-      }
-      if (Number.isNaN(pick) || pick < 0 || pick >= top.length) {
+      const idx = parseInt(text, 10) - 1;
+      if (Number.isNaN(idx) || idx < 0 || idx >= top.length) {
         await sendText(to, 'Escolha um número válido da lista.');
-        await sendChoices(to, `Horários disponíveis para ${session.payload.dateBR}:`, top);
+        await sendChoices(to, `Horários disponíveis (${formatBR(session.payload.date)}):`, top);
         break;
       }
-      const hhmm = top[pick];
+      const hhmm = top[idx];
       session.payload.time = hhmm;
 
       await sendText(
@@ -288,7 +274,7 @@ async function handleIncomingMessage(msg, meta) {
         `Confirmar agendamento?\n` +
           `Serviço: ${session.payload.service.name}\n` +
           `Profissional: ${session.payload.professional.name}\n` +
-          `Data: ${session.payload.dateBR}\n` +
+          `Data: ${formatBR(session.payload.date)}\n` +
           `Hora: ${hhmm}\n\n` +
           `Responda "sim" para confirmar ou "não" para cancelar.`
       );
@@ -297,20 +283,21 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'confirm': {
-      if (text === 'sim' || text === 's') {
-        const created = await createAppointmentFromSession(client, {
-          ...session.payload,
-          date: session.payload.dateISO, // ISO interno
-        });
+      const ok = text.toLowerCase();
+      if (ok === 'sim' || ok === 's') {
+        const created = await createAppointmentFromSession(client, session.payload);
         await sendText(
           to,
           `Agendamento criado! Código: ${created.id}\n` +
-            `Nos vemos em ${session.payload.dateBR} às ${session.payload.time}.`
+            `Nos vemos em ${formatBR(session.payload.date)} às ${session.payload.time}.`
         );
         session.step = 'start';
         session.payload = {};
-      } else if (['não', 'nao', 'n'].includes(text)) {
-        await sendText(to, 'Ok, não confirmei. Quer tentar outro horário?\n(1) Sim\n(2) Voltar ao menu');
+      } else if (ok === 'não' || ok === 'nao' || ok === 'n') {
+        await sendText(
+          to,
+          'Ok, não confirmei. Quer tentar outro horário?\n(1) Sim\n(2) Voltar ao menu'
+        );
         session.step = 'post_decline';
       } else {
         await sendText(to, 'Responda "sim" ou "não".');
@@ -319,10 +306,10 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'post_decline': {
-      const n = parseInt(rawText, 10);
+      const n = parseInt(text, 10);
       if (n === 1) {
         session.step = 'ask_date';
-        await sendText(to, 'Informe a data **(DD/MM/AAAA)**.');
+        await sendText(to, 'Informe a data (DD/MM/AAAA).');
       } else {
         session.step = 'start';
         await sendText(to, 'Voltando ao menu inicial.');
@@ -331,7 +318,7 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'reschedule_code': {
-      if (text === 'voltar') {
+      if (text.toLowerCase() === 'voltar') {
         session.step = 'start';
         await sendText(to, 'Voltei ao menu.');
         break;
@@ -341,22 +328,22 @@ async function handleIncomingMessage(msg, meta) {
       break;
     }
 
-    default:
+    default: {
       session.step = 'start';
       await sendText(to, 'Vamos começar novamente.');
+    }
   }
 
   sessions.set(to, session);
 }
 
-/* =================== Backend access =================== */
+/** ================== Acesso ao seu backend/banco ================== */
 async function listServices() {
   try {
-    const rows = await prisma.service.findMany({
+    return await prisma.service.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, duration: true },
+      select: { id: true, name: true },
     });
-    return rows;
   } catch (e) {
     console.error('Erro listServices:', e.message);
     return [];
@@ -365,100 +352,71 @@ async function listServices() {
 
 async function listStaff() {
   try {
-    const rows = await prisma.user.findMany({
+    return await prisma.user.findMany({
       where: { showInBooking: true },
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     });
-    return rows;
   } catch (e) {
     console.error('Erro listStaff:', e.message);
     return [];
   }
 }
 
-async function listSlots(proId, dateISO, serviceId) {
-  let svcDuration = 30;
+/** Busca horários disponíveis no seu endpoint público */
+async function listSlots(proId, isoDate, serviceId) {
   try {
-    if (serviceId) {
-      const svc = await prisma.service.findUnique({ where: { id: serviceId }, select: { duration: true } });
-      if (svc?.duration) svcDuration = svc.duration;
-    }
-  } catch {}
-
-  const base = (APP_BASE_URL || '').replace(/\/$/, '');
-  const url = `${base}/public/available-slots`;
-
-  const paramSets = [
-    { staffId: proId, date: dateISO, serviceId, duration: svcDuration },
-    { userId: proId, date: dateISO, serviceId, duration: svcDuration },
-    { professionalId: proId, date: dateISO, serviceId, duration: svcDuration },
-    { staffId: proId, date: dateISO, duration: svcDuration },
-    { date: dateISO, serviceId, duration: svcDuration },
-    { date: dateISO, duration: svcDuration },
-    { date: dateISO },
-  ];
-
-  for (const params of paramSets) {
-    try {
-      console.log('🔎 GET', url, 'params=', params);
-      const res = await axios.get(url, { params });
-      const raw = res.data;
-
-      let items = [];
-      if (Array.isArray(raw)) items = raw;
-      else if (Array.isArray(raw?.slots)) items = raw.slots;
-      else if (Array.isArray(raw?.data)) items = raw.data;
-      else if (raw && typeof raw === 'object') {
-        const keys = Object.keys(raw);
-        const candidateKey = keys.find((k) => Array.isArray(raw[k]));
-        if (candidateKey) items = raw[candidateKey];
-      }
-
-      const hhmm = (items || [])
-        .map((s) => {
-          if (typeof s === 'string') return s;
-          if (!s || typeof s !== 'object') return null;
-          return s.formatted || s.time || s.hour || s.hhmm || s.start || null;
-        })
-        .filter(Boolean)
-        .map((t) => String(t).slice(0, 5));
-
-      if (hhmm.length) return hhmm;
-    } catch (e) {
-      console.log('⚠️ listSlots falhou', e?.response?.status, e?.response?.data || e.message);
-    }
+    const res = await axios.get(`${APP_BASE_URL}/public/available-slots`, {
+      params: { staffId: proId, date: isoDate, serviceId },
+    });
+    return (Array.isArray(res.data) ? res.data : [])
+      .map((s) => (typeof s === 'string' ? s : s?.formatted || s?.time))
+      .filter(Boolean);
+  } catch (e) {
+    console.error('Erro ao buscar slots:', e?.response?.data || e.message);
+    return [];
   }
-
-  console.log('🧯 Nenhum slot remoto. Usando fallback local.');
-  return fallbackSlots(dateISO, 30, 9, 18, svcDuration);
 }
 
+/** Cria/atualiza cliente por telefone */
 async function upsertClientByPhone(whatsPhone) {
-  const phone = String(whatsPhone).replace('+', '');
+  const phone = String(whatsPhone).replace('+', ''); // seu schema guarda sem '+'
   let c = await prisma.client.findFirst({ where: { phone } });
   if (!c) {
     const companyId = await getDefaultCompanyId();
     c = await prisma.client.create({
-      data: { name: 'Cliente WhatsApp', phone, companyId, isActive: true },
+      data: {
+        name: 'Cliente WhatsApp',
+        phone,
+        companyId,
+        isActive: true,
+      },
     });
   }
   return c;
 }
 
 async function getDefaultCompanyId() {
-  const comp = await prisma.company.findFirst({ orderBy: { createdAt: 'asc' }, select: { id: true } });
+  const comp = await prisma.company.findFirst({
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
   return comp?.id;
 }
 
+/** Cria agendamento a partir do payload da sessão */
 async function createAppointmentFromSession(client, payload) {
-  const { service, professional, date, time } = payload; // date = ISO
+  const { service, professional, date, time } = payload; // date em ISO (AAAA-MM-DD)
+  // Usa horário local do servidor; ajuste timezone se necessário (ex.: date-fns-tz).
   const start = new Date(`${date}T${time}:00`);
-  const svc = await prisma.service.findUnique({ where: { id: service.id }, select: { duration: true } });
+  const svc = await prisma.service.findUnique({
+    where: { id: service.id },
+    select: { duration: true },
+  });
   const duration = svc?.duration || 60;
   const end = new Date(start.getTime() + duration * 60000);
 
-  const created = await prisma.appointment.create({
+  return prisma.appointment.create({
     data: {
       companyId: client.companyId,
       clientId: client.id,
@@ -471,28 +429,6 @@ async function createAppointmentFromSession(client, payload) {
     },
     select: { id: true },
   });
-  return created;
-}
-
-/* =================== Passos auxiliares =================== */
-async function askService(to, session) {
-  const services = await listServices();
-  if (!services.length) {
-    await sendText(to, 'Não há serviços cadastrados.');
-    session.step = 'start';
-    return;
-  }
-  await sendChoices(to, 'Escolha o serviço:', services.map((s) => s.name));
-}
-
-async function askProfessional(to, session) {
-  const staff = await listStaff();
-  if (!staff.length) {
-    await sendText(to, 'Nenhum profissional disponível.');
-    session.step = 'start';
-    return;
-  }
-  await sendChoices(to, 'Escolha o profissional:', staff.map((s) => s.name));
 }
 
 export default router;
