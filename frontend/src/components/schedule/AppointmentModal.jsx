@@ -1,10 +1,118 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../dashboard/Modal';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-
-
 import { asArray } from '../../utils/asArray';
+
+/** =================== ClientSelect (com busca e debounce) =================== */
+function ClientSelect({ value, onChange, initialClients = [] }) {
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState(asArray(initialClients));
+  const [pagination, setPagination] = useState({ skip: 0, take: 20, total: 0, hasMore: false });
+  const abortRef = useRef();
+
+  const fetchClients = async ({ q = '', skip = 0, take = 20, append = false } = {}) => {
+    if (abortRef.current) abortRef.current.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setLoading(true);
+    try {
+      const res = await api.get('/clients/min', {
+        params: { q, skip, take },
+        signal: ctrl.signal,
+      });
+      const data = res.data || {};
+      setOptions((prev) => (append ? [...prev, ...asArray(data.items)] : asArray(data.items)));
+      setPagination({
+        skip,
+        take,
+        total: Number(data.total || 0),
+        hasMore: Boolean(data.hasMore),
+      });
+    } catch (e) {
+      if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
+        console.error('Erro ao carregar clientes (min):', e);
+        toast.error('Não foi possível carregar clientes.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // carrega na abertura (ou quando initialClients muda)
+  useEffect(() => {
+    if (asArray(initialClients).length > 0) {
+      setOptions(asArray(initialClients));
+      setPagination((p) => ({ ...p, total: asArray(initialClients).length, hasMore: false }));
+    } else {
+      fetchClients({ q: '', skip: 0, take: 20, append: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // debounce da busca
+  useEffect(() => {
+    const id = setTimeout(() => {
+      fetchClients({ q: query, skip: 0, take: 20, append: false });
+    }, 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  const onLoadMore = () => {
+    if (!pagination.hasMore || loading) return;
+    const nextSkip = pagination.skip + pagination.take;
+    fetchClients({ q: query, skip: nextSkip, take: pagination.take, append: true });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Buscar por nome, telefone, e-mail..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full p-2 border rounded"
+        />
+      </div>
+
+      <select
+        name="clientId"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full p-2 border rounded"
+        required
+      >
+        <option value="">Selecione um cliente</option>
+        {options.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name} {c.phone ? `— ${c.phone}` : c.email ? `— ${c.email}` : ''}
+          </option>
+        ))}
+      </select>
+
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-gray-500">
+          {loading ? 'Carregando...' : `${options.length} de ${pagination.total}`}
+        </span>
+        {pagination.hasMore && (
+          <button
+            type="button"
+            onClick={onLoadMore}
+            className="px-3 py-1 border rounded hover:bg-gray-50"
+            disabled={loading}
+          >
+            Carregar mais
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** =================== AppointmentModal =================== */
 const AppointmentModal = ({
   isOpen,
   onClose,
@@ -27,12 +135,13 @@ const AppointmentModal = ({
     status: 'SCHEDULED',
   });
 
+  // pré-preenche dados ao abrir
   useEffect(() => {
     if (event) {
       setFormData({
         clientId: event.clientId || '',
         serviceId: event.serviceId || '',
-        professionalId: event.userId || '', // ✅ mapeia para userId no payload
+        professionalId: event.userId || '', // backend usa userId
         start: new Date(event.start),
         end: new Date(event.end),
         notes: event.notes || '',
@@ -48,6 +157,10 @@ const AppointmentModal = ({
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((p) => ({ ...p, [name]: value }));
+  };
+
+  const handleClientChange = (clientId) => {
+    setFormData((p) => ({ ...p, clientId }));
   };
 
   const handleDateChange = (e) => {
@@ -69,7 +182,7 @@ const AppointmentModal = ({
   const buildPayload = () => ({
     clientId: formData.clientId,
     serviceId: formData.serviceId,
-    userId: formData.professionalId || null, // ✅ backend usa userId
+    userId: formData.professionalId || null, // backend usa userId
     start: formData.start.toISOString(),
     end: formData.end.toISOString(),
     notes: formData.notes || '',
@@ -123,21 +236,14 @@ const AppointmentModal = ({
           {event ? 'Editar Agendamento' : 'Novo Agendamento'}
         </h2>
 
-        {/* Cliente */}
+        {/* Cliente (com busca) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-          <select
-            name="clientId"
+          <ClientSelect
             value={formData.clientId}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
-          >
-            <option value="">Selecione um cliente</option>
-            {asArray(clients).map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+            onChange={handleClientChange}
+            initialClients={clients}
+          />
         </div>
 
         {/* Data e Hora */}

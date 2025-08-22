@@ -113,12 +113,13 @@ export default function Schedule() {
 
   /* --------- Loads --------- */
   const loadShared = useCallback(async (signal) => {
+    // ⚠️ usa a lista leve de clientes para o select (id/name/phone/email)
     const [c, s, st] = await Promise.all([
-      api.get("/clients", { signal }),
+      api.get("/clients/min", { params: { take: 50 }, signal }),
       api.get("/services", { signal }),
       api.get("/staff", { signal }),
     ]);
-    setClients(c.data || []);
+    setClients(c.data?.items || c.data || []);
     setServices(s.data || []);
     setStaff(st.data || []);
   }, []);

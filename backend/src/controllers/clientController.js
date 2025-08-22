@@ -104,15 +104,12 @@ const normalizeGender = (v) => {
   if (!v && v !== 0) return null;
   const s = String(v).trim().toLowerCase();
 
-  // Mapas comuns
   if (['m', 'masculino', 'male', 'homem', 'masc'].includes(s)) return 'MALE';
   if (['f', 'feminino', 'female', 'mulher', 'fem'].includes(s)) return 'FEMALE';
   if (['o', 'outro', 'other', 'nao binario', 'não binário', 'nb'].includes(s)) return 'OTHER';
 
-  // Já pode estar em maiúsculas
   if (['MALE', 'FEMALE', 'OTHER'].includes(String(v).toUpperCase())) return String(v).toUpperCase();
 
-  // Valor desconhecido -> null
   return null;
 };
 
@@ -145,6 +142,56 @@ const baseClientSelect = {
   originId: true,
 };
 
+/* =======================================================================
+ * LISTA MINIMAL para selects/autocomplete (rápida)
+ * GET /api/clients/min?q=jo&take=20&skip=0
+ * ======================================================================= */
+export const listClientsMin = async (req, res) => {
+  try {
+    const companyId = req.company.id;
+    const q = (req.query.q || '').toString().trim();
+    const take = Math.min(Number(req.query.take) || 20, 50);
+    const skip = Number(req.query.skip) || 0;
+
+    const where = {
+      companyId,
+      deletedAt: null,
+      ...(q
+        ? {
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+              { phone: { contains: q, mode: 'insensitive' } },
+              { cpf: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      prisma.client.findMany({
+        where,
+        orderBy: [{ name: 'asc' }, { createdAt: 'desc' }],
+        select: { id: true, name: true, phone: true, email: true },
+        skip,
+        take,
+      }),
+      prisma.client.count({ where }),
+    ]);
+
+    return res.status(200).json({
+      items,
+      total,
+      skip,
+      take,
+      hasMore: skip + take < total,
+    });
+  } catch (error) {
+    console.error('❌ Erro ao listar clientes (min):', error);
+    res.status(500).json({ message: 'Erro interno do servidor.' });
+  }
+};
+
 /* =============== LIST (filtros + paginação + stats) =============== */
 export const listClients = async (req, res) => {
   try {
@@ -158,7 +205,6 @@ export const listClients = async (req, res) => {
       includeDeleted: truthy(req.query.includeDeleted),
     });
 
-    // select seguro: só inclui gender se a feature estiver ligada
     const select = { ...baseClientSelect, ...(ENABLE_GENDER ? { gender: true } : {}) };
 
     const [total, baseItems] = await Promise.all([
@@ -202,7 +248,6 @@ export const getClientById = async (req, res) => {
 
     const includeDeleted = truthy(req.query.includeDeleted);
 
-    // select seguro no GET também
     const select = { ...baseClientSelect, ...(ENABLE_GENDER ? { gender: true } : {}) };
 
     const client = await prisma.client.findFirst({
@@ -491,7 +536,7 @@ export const exportClientsCsv = async (req, res) => {
 
     const lines = clients.map((c) => {
       const s = statsMap[c.id] || { appointmentsCount: 0, lastVisit: null };
-      const genderText = ENABLE_GENDER ? (c.gender ?? '') : ''; // evita erro quando coluna não existe
+      const genderText = ENABLE_GENDER ? (c.gender ?? '') : '';
       return [
         csvEscape(c.name),
         csvEscape(c.email ?? ''),

@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   listClients,
+  listClientsMin,     // <--- NOVO
   createClient,
   updateClient,
   getClientById,
@@ -20,10 +21,16 @@ import { protect, checkRole } from '../middlewares/authMiddleware.js';
 const router = express.Router();
 const guard = [protect, checkRole(['ADMIN', 'OWNER'])];
 
+// Lista MIN para selects/autocomplete (rápida)
+// GET /api/clients/min?q=jo&take=20&skip=0
+router.get('/min', guard, listClientsMin);
+
 // List / filtros / paginação
 router.get('/', guard, listClients);
+
 // Export respeitando filtros
 router.get('/export.csv', guard, exportClientsCsv);
+
 // Import CSV (campo "file")
 router.post('/import.csv', guard, upload.single('file'), importClientsCsv);
 
