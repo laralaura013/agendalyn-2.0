@@ -15,9 +15,8 @@ import {
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import CashierControll from '../components/cashier/CashierControll';
-
-
 import { asArray } from '../utils/asArray';
+
 /* =========================================================================
  * Helpers
  * ========================================================================= */
@@ -112,10 +111,10 @@ const BarChartByMethod = ({ data }) => {
   const barW = 22;
   const gap = 20;
 
-  const maxY = Math.max(
-    1,
-    asArray(...data).map((d) => Math.max(Number(d.entries || 0), Number(d.exits || 0)))
+  const yVals = asArray(data).map((d) =>
+    Math.max(Number(d.entries || 0), Number(d.exits || 0))
   );
+  const maxY = Math.max(1, ...yVals);
 
   return (
     <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
@@ -141,7 +140,7 @@ const BarChartByMethod = ({ data }) => {
 };
 
 /* =========================================================================
- * Modal simples (inline) — Fechamento com contagem
+ * Modal simples (inline)
  * ========================================================================= */
 const Modal = ({ open, onClose, children }) => {
   if (!open) return null;
@@ -182,8 +181,8 @@ const Cashier = () => {
   const [date, setDate] = useState(todayISO());
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
-  const [methodId, setMethodId] = useState(''); // reservado p/ futura filtragem server-side
-  const [userId, setUserId] = useState(''); // reservado p/ futura filtragem server-side
+  const [methodId, setMethodId] = useState('');
+  const [userId, setUserId] = useState('');
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [staff, setStaff] = useState([]);
 
@@ -192,7 +191,7 @@ const Cashier = () => {
     entries: 0,
     exits: 0,
     balance: 0,
-    byMethod: [], // [{name, entries, exits}]
+    byMethod: [],
   });
   const [byDayRows, setByDayRows] = useState([]); // [{date, income, expense, balance}]
   const [loadingTable, setLoadingTable] = useState(true);
@@ -202,7 +201,9 @@ const Cashier = () => {
   // ---- Modal Fechamento com contagem
   const [closeOpenModal, setCloseOpenModal] = useState(false);
   const DENOMS = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05];
-  const [counts, setCounts] = useState(Object.fromEntries(asArray(DENOMS).map((v) => [String(v), 0])));
+  const [counts, setCounts] = useState(
+    Object.fromEntries(asArray(DENOMS).map((v) => [String(v), 0]))
+  );
   const [closeNote, setCloseNote] = useState('');
 
   const countedTotal = useMemo(
@@ -241,8 +242,7 @@ const Cashier = () => {
       const normalized = normalizeStatus(res.data || {});
       setView(normalized);
 
-      // 🔧 Mantém o CashierControll sempre em sincronia com o status real,
-      // independentemente do "modo" retornado pelo backend.
+      // Mantém o CashierControll em sincronia com o status real
       if (normalized.isOpen) {
         setLegacySession({
           status: 'OPEN',
@@ -262,7 +262,7 @@ const Cashier = () => {
     }
   }, []);
 
-  /* ---------------- Summary (alinhado com seu backend) ---------------- */
+  /* ---------------- Summary ---------------- */
   const loadSummary = useCallback(async () => {
     try {
       const from = `${date}T00:00:00.000`;
@@ -271,13 +271,13 @@ const Cashier = () => {
       const r = await api.get('/cashier/summary', { params: { from, to } });
       const totals = r?.data?.totals || { income: 0, expense: 0, balance: 0 };
 
-      // Monta “por método” combinando receivables (entradas) e payables (saídas)
-      const recvPM = normalizeList(asArray(r?.data?.receivables?.byPaymentMethod)).map((x) => ({
+      // “por método” combinando receivables (entradas) e payables (saídas)
+      const recvPM = normalizeList(r?.data?.receivables?.byPaymentMethod).map((x) => ({
         id: x.paymentMethodId || null,
         name: x.name || '—',
         entries: Number(x.amount || 0),
       }));
-      const payPM = normalizeList(asArray(r?.data?.payables?.byPaymentMethod)).map((x) => ({
+      const payPM = normalizeList(r?.data?.payables?.byPaymentMethod).map((x) => ({
         id: x.paymentMethodId || null,
         name: x.name || '—',
         exits: Number(x.amount || 0),
@@ -313,43 +313,40 @@ const Cashier = () => {
     }
   }, [date, view.expense, view.income]);
 
-  /* ---------------- Tabela por dia (usa /cashier/statement) ---------------- */
-  const loadByDay = useCallback(
-    async () => {
-      try {
-        setLoadingTable(true);
-        const from = `${date}T00:00:00.000`;
-        const to = `${date}T23:59:59.999`;
+  /* ---------------- Tabela por dia ---------------- */
+  const loadByDay = useCallback(async () => {
+    try {
+      setLoadingTable(true);
+      const from = `${date}T00:00:00.000`;
+      const to = `${date}T23:59:59.999`;
 
-        const r = await api.get('/cashier/statement', { params: { from, to } });
-        const arr = normalizeList(r?.data?.byDay);
+      const r = await api.get('/cashier/statement', { params: { from, to } });
+      const arr = normalizeList(r?.data?.byDay);
 
-        // Filtros simples na UI (tipo)
-        const filtered = arr.filter((row) => {
-          if (!type) return true;
-          if (type === 'INCOME') return Number(row.income || 0) > 0;
-          if (type === 'EXPENSE') return Number(row.expense || 0) > 0;
-          return true;
-        });
+      // Filtros simples (tipo)
+      const filtered = arr.filter((row) => {
+        if (!type) return true;
+        if (type === 'INCOME') return Number(row.income || 0) > 0;
+        if (type === 'EXPENSE') return Number(row.expense || 0) > 0;
+        return true;
+      });
 
-        // Filtro texto (q)
-        const filteredQ = q
-          ? filtered.filter((row) => {
-              const s = `${row.date} ${row.income} ${row.expense} ${row.balance}`.toLowerCase();
-              return s.includes(q.toLowerCase());
-            })
-          : filtered;
+      // Filtro texto (q)
+      const filteredQ = q
+        ? filtered.filter((row) => {
+            const s = `${row.date} ${row.income} ${row.expense} ${row.balance}`.toLowerCase();
+            return s.includes(q.toLowerCase());
+          })
+        : filtered;
 
-        setByDayRows(filteredQ);
-      } catch (e) {
-        console.error(e);
-        setByDayRows([]);
-      } finally {
-        setLoadingTable(false);
-      }
-    },
-    [date, q, type]
-  );
+      setByDayRows(filteredQ);
+    } catch (e) {
+      console.error(e);
+      setByDayRows([]);
+    } finally {
+      setLoadingTable(false);
+    }
+  }, [date, q, type]);
 
   /* ---------------- init & refresh ---------------- */
   useEffect(() => {
@@ -418,7 +415,7 @@ const Cashier = () => {
         countedTotal: Number(countedTotal),
         expectedTotal: Number(expectedTotal),
         diff: Number(diffTotal),
-        denominations: Object.entries(asArray(counts)).map(([denom, qtd]) => ({
+        denominations: Object.entries(counts).map(([denom, qtd]) => ({
           denom: Number(denom),
           qty: Number(qtd || 0),
           total: Number((Number(qtd || 0) * Number(denom)).toFixed(2)),
@@ -445,7 +442,7 @@ const Cashier = () => {
 
   const exportDaily = () => {
     const header = ['Data;Entradas;Saídas;Saldo acumulado'];
-    const lines = (Array.isArray(byDayRows) ? byDayRows : [asArray(])).map((row) => {
+    const lines = asArray(byDayRows).map((row) => {
       const dt = row.date;
       const inc = Number(row.income || 0).toFixed(2).replace('.', ',');
       const exp = Number(row.expense || 0).toFixed(2).replace('.', ',');
@@ -691,7 +688,7 @@ const Cashier = () => {
             </tr>
           </thead>
           <tbody>
-            {(Array.isArray(byDayRows) ? byDayRows : [asArray(])).map((row, i) => {
+            {asArray(byDayRows).map((row, i) => {
               const dt = row.date;
               const inc = Number(row.income || 0);
               const exp = Number(row.expense || 0);
@@ -705,7 +702,7 @@ const Cashier = () => {
                 </tr>
               );
             })}
-            {!loadingTable && (!byDayRows || byDayRows.length === 0) && (
+            {!loadingTable && asArray(byDayRows).length === 0 && (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-gray-500">
                   Nenhum registro encontrado para o dia selecionado.

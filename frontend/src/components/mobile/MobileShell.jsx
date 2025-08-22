@@ -1,4 +1,4 @@
-Ôªøimport React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
@@ -6,8 +6,8 @@ import BottomTabs from "./BottomTabs";
 import FloatingActions from "./FloatingActions";
 
 /**
- * Moldura principal (mobile): conte√∫do + abas inferiores.
- * O FAB (bot√£o flutuante) aparece apenas na Agenda (/dashboard/schedule),
+ * Moldura principal (mobile): conte˙do + abas inferiores.
+ * O FAB (bot„o flutuante) aparece apenas na Agenda (/dashboard/schedule),
  * e some automaticamente quando um modal da Agenda estiver aberto.
  */
 export default function MobileShell() {
@@ -17,10 +17,10 @@ export default function MobileShell() {
   const isOnSchedule = location.pathname.startsWith("/dashboard/schedule");
   const [fabVisible, setFabVisible] = useState(true);
 
-  // Escuta eventos disparados pela p√°gina Schedule para esconder/mostrar o FAB
+  // Escuta eventos disparados pela p·gina Schedule para esconder/mostrar o FAB
   useEffect(() => {
     const onToggle = (ev) => {
-      // detail: boolean -> true = FAB vis√≠vel | false = FAB escondido
+      // detail: boolean -> true = FAB visÌvel | false = FAB escondido
       if (typeof ev.detail === "boolean") setFabVisible(ev.detail);
     };
     window.addEventListener("fab:toggle", onToggle);
@@ -28,7 +28,7 @@ export default function MobileShell() {
   }, []);
 
   // Abre modal de agendamento vazio na Agenda.
-  // Se n√£o estivermos na Agenda, navega pra l√° e dispara o evento logo em seguida.
+  // Se n„o estivermos na Agenda, navega pra l· e dispara o evento logo em seguida.
   const openEmptyAppointment = useCallback(() => {
     const fire = () => {
       try {
@@ -57,7 +57,7 @@ export default function MobileShell() {
       await navigator.clipboard?.writeText(link);
       toast.success("Link de agendamento copiado!");
     } catch {
-      toast.error("N√£o foi poss√≠vel copiar o link.");
+      toast.error("N„o foi possÌvel copiar o link.");
     }
   }, []);
 
@@ -67,10 +67,10 @@ export default function MobileShell() {
         <Outlet />
       </main>
 
-      {/* FAB somente na Agenda (e apenas 1 inst√¢ncia: remova do Schedule.jsx) */}
+      {/* FAB somente na Agenda (e apenas 1 inst‚ncia: remova do Schedule.jsx) */}
       {isOnSchedule && fabVisible && (
         <FloatingActions
-          // deixa o FAB acima das abas (64px) + respiro de 16px, encostado √† direita
+          // deixa o FAB acima das abas (64px) + respiro de 16px, encostado ‡ direita
           bottomClass="bottom-[calc(64px+16px)] right-4"
           onCreateAppointment={openEmptyAppointment}
           onOpenOrder={openOrder}

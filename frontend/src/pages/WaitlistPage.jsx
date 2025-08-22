@@ -230,7 +230,7 @@ function WaitlistPage() {
   // -> calcula start/end
   // -> abre AppointmentModal pré-preenchido (em vez de salvar direto)
   const handlePickSlot = (hhmm) => {
-    const [h, m] = String(hhmm).split(":"asArray()).map(Number);
+    const [h, m] = String(hhmm).split(":").map(Number);
     const start = new Date(slotDate);
     start.setHours(h, m, 0, 0);
     const end = new Date(start);
