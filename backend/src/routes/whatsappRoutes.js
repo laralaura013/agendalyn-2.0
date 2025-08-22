@@ -301,7 +301,7 @@ async function handleIncomingMessage(msg, meta) {
       if (ok === 'sim' || ok === 's') {
         const created = await createAppointmentFromSession(client, {
           ...session.payload,
-          date: session.payload.dateISO, // função espera 'date' ISO
+          date: session.payload.dateISO, // garantir ISO internamente
         });
         await sendText(
           to,
