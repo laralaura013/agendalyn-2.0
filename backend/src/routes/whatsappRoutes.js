@@ -5,22 +5,20 @@ import crypto from 'crypto';
 import prisma from '../prismaClient.js';
 
 const router = express.Router();
+const BOT_VERSION = 'BR-v3';
 
-/** ====== ENV ====== */
 const {
   WABA_VERIFY_TOKEN,
   WABA_ACCESS_TOKEN,
   WABA_PHONE_NUMBER_ID,
   APP_BASE_URL = 'http://localhost:3001/api',
-  WABA_APP_SECRET, // opcional: validação de assinatura
+  WABA_APP_SECRET,
 } = process.env;
 
 const GRAPH_URL = `https://graph.facebook.com/v20.0/${WABA_PHONE_NUMBER_ID}/messages`;
-
-// Estado de conversa simples em memória (produção: use Redis)
 const sessions = new Map();
 
-/** ====== Utils ====== */
+/* =================== Utils =================== */
 const e164BR = (phone) => {
   if (!phone) return null;
   const only = String(phone).replace(/\D/g, '');
@@ -55,7 +53,6 @@ const verifySignatureIfPresent = (req) => {
   const sigHeader = req.get('x-hub-signature-256');
   if (!sigHeader) return true;
   const hmac = crypto.createHmac('sha256', WABA_APP_SECRET);
-  // req.rawBody foi setado no server.js
   hmac.update(req.rawBody);
   const expected = `sha256=${hmac.digest('hex')}`;
   try {
@@ -65,11 +62,11 @@ const verifySignatureIfPresent = (req) => {
   }
 };
 
-/** Converte "DD/MM/AAAA" -> "AAAA-MM-DD"; se já vier ISO, mantém. */
+/** "DD/MM/AAAA" ou "DD-MM-AAAA" -> "AAAA-MM-DD". Se já vier ISO, mantém. */
 const normalizeDateToISO = (txt) => {
   const s = String(txt || '').trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // ISO já ok
-  const m = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/); // BR
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // já ISO
+  const m = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
   if (m) {
     const [_, dd, mm, yyyy] = m;
     return `${yyyy}-${mm}-${dd}`;
@@ -77,14 +74,13 @@ const normalizeDateToISO = (txt) => {
   return null;
 };
 
-/** Formata ISO (AAAA-MM-DD) -> "DD/MM/AAAA" */
+/** ISO "AAAA-MM-DD" -> "DD/MM/AAAA" */
 const formatBR = (iso) => {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return String(iso || '');
   const [yyyy, mm, dd] = iso.split('-');
   return `${dd}/${mm}/${yyyy}`;
 };
 
-/** Gera slots padrão (fallback) — 09:00..18:00 em passos de stepMin */
 const pad2 = (n) => String(n).padStart(2, '0');
 const fallbackSlots = (dateISO, stepMin = 30, openHour = 9, closeHour = 18, serviceMin = 30) => {
   const list = [];
@@ -98,7 +94,7 @@ const fallbackSlots = (dateISO, stepMin = 30, openHour = 9, closeHour = 18, serv
   return list;
 };
 
-/** ====== Verify (GET) ====== */
+/* =================== Webhook Verify =================== */
 router.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -109,14 +105,13 @@ router.get('/webhook', (req, res) => {
   return res.sendStatus(403);
 });
 
-/** ====== Receiver (POST) ====== */
+/* =================== Webhook Receiver =================== */
 router.post('/webhook', async (req, res) => {
   try {
     if (!verifySignatureIfPresent(req)) {
       console.warn('⚠️ Assinatura inválida');
       return res.sendStatus(403);
     }
-
     const entry = req.body?.entry?.[0];
     const change = entry?.changes?.[0];
     const value = change?.value;
@@ -131,41 +126,46 @@ router.post('/webhook', async (req, res) => {
     for (const msg of messages) {
       await handleIncomingMessage(msg, value?.metadata);
     }
-
-    return res.sendStatus(200); // WhatsApp exige 200 sempre
+    return res.sendStatus(200);
   } catch (err) {
     console.error('WhatsApp webhook error:', err?.response?.data || err);
     return res.sendStatus(200);
   }
 });
 
-/** ====== Conversa ====== */
+/* =================== Conversa =================== */
 async function handleIncomingMessage(msg, meta) {
-  const from = `+${msg.from}`.replace('++', '+'); // vem sem '+'
+  const from = `+${msg.from}`.replace('++', '+');
   const to = e164BR(from);
   const kind = msg.type;
-  const text =
+  const rawText =
     msg.text?.body?.trim() ||
     msg.interactive?.list_reply?.title ||
     msg.button?.text ||
     '';
+  const text = rawText.toLowerCase();
 
-  console.log(`👤 ${msg.from} disse: "${text}" (tipo ${kind})`);
+  console.log(`👤 ${msg.from} disse: "${rawText}" (tipo ${kind})`);
 
-  // carrega/abre sessão
+  // reset explícito
+  if (['reiniciar', 'reset', 'menu', 'início', 'inicio', '0'].includes(text)) {
+    sessions.delete(to);
+  }
+
   const session = sessions.get(to) || { step: 'start', payload: {} };
-
-  // garante cliente no banco
   const client = await upsertClientByPhone(to);
 
-  // helper para pegar sempre BR na resposta
-  const dateBR = () => formatBR(session.payload.dateISO || '');
+  // compat: se sessão antiga tiver só "date", compute dateBR/dateISO
+  if (session.payload?.date && !session.payload.dateISO) {
+    session.payload.dateISO = session.payload.date;
+    session.payload.dateBR = formatBR(session.payload.date);
+  }
 
   switch (session.step) {
     case 'start': {
       await sendText(
         to,
-        `Olá${client?.name ? `, ${client.name}` : ''}! Eu sou o assistente de agendamentos.`
+        `Olá${client?.name ? `, ${client.name}` : ''}! Eu sou o assistente de agendamentos. (${BOT_VERSION})`
       );
       await sendChoices(to, 'O que você deseja?', [
         'Agendar atendimento',
@@ -177,7 +177,7 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'menu': {
-      const n = parseInt(text, 10);
+      const n = parseInt(rawText, 10);
       if (n === 1) {
         session.step = 'ask_service';
         await askService(to, session);
@@ -194,7 +194,7 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'ask_service': {
-      const pick = parseInt(text, 10) - 1;
+      const pick = parseInt(rawText, 10) - 1;
       const services = await listServices();
       if (!services.length) {
         await sendText(to, 'Não há serviços cadastrados no sistema.');
@@ -213,7 +213,7 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'ask_professional': {
-      const pick = parseInt(text, 10) - 1;
+      const pick = parseInt(rawText, 10) - 1;
       const staff = await listStaff();
       if (!staff.length) {
         await sendText(to, 'Nenhum profissional disponível para agendamento.');
@@ -232,13 +232,12 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'ask_date': {
-      const iso = normalizeDateToISO(text);
+      const iso = normalizeDateToISO(rawText);
       if (!iso) {
-        await sendText(to, 'Formato inválido. Use **DD/MM/AAAA**. Ex.: 25/08/2025');
+        await sendText(to, 'Formato inválido. Use **DD/MM/AAAA** (ex.: 25/08/2025)');
         break;
       }
-      // Guardamos SEMPRE as duas formas
-      session.payload.dateISO = iso;          // para cálculos/requests
+      session.payload.dateISO = iso;          // para cálculos
       session.payload.dateBR = formatBR(iso); // para mensagens
 
       session.step = 'ask_time';
@@ -269,7 +268,8 @@ async function handleIncomingMessage(msg, meta) {
         session.payload.service.id
       );
       const top = slots.slice(0, 8);
-      const pick = parseInt(text, 10) - 1;
+      const pick = parseInt(rawText, 10) - 1;
+
       if (!top.length) {
         await sendText(to, `Sem horários. Envie outra data (DD/MM/AAAA).`);
         session.step = 'ask_date';
@@ -297,11 +297,10 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'confirm': {
-      const ok = text.toLowerCase();
-      if (ok === 'sim' || ok === 's') {
+      if (text === 'sim' || text === 's') {
         const created = await createAppointmentFromSession(client, {
           ...session.payload,
-          date: session.payload.dateISO, // garantir ISO internamente
+          date: session.payload.dateISO, // ISO interno
         });
         await sendText(
           to,
@@ -310,7 +309,7 @@ async function handleIncomingMessage(msg, meta) {
         );
         session.step = 'start';
         session.payload = {};
-      } else if (ok === 'não' || ok === 'nao' || ok === 'n') {
+      } else if (['não', 'nao', 'n'].includes(text)) {
         await sendText(to, 'Ok, não confirmei. Quer tentar outro horário?\n(1) Sim\n(2) Voltar ao menu');
         session.step = 'post_decline';
       } else {
@@ -320,7 +319,7 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'post_decline': {
-      const n = parseInt(text, 10);
+      const n = parseInt(rawText, 10);
       if (n === 1) {
         session.step = 'ask_date';
         await sendText(to, 'Informe a data **(DD/MM/AAAA)**.');
@@ -332,7 +331,7 @@ async function handleIncomingMessage(msg, meta) {
     }
 
     case 'reschedule_code': {
-      if (text.toLowerCase() === 'voltar') {
+      if (text === 'voltar') {
         session.step = 'start';
         await sendText(to, 'Voltei ao menu.');
         break;
@@ -350,8 +349,7 @@ async function handleIncomingMessage(msg, meta) {
   sessions.set(to, session);
 }
 
-/** ====== Acesso ao seu backend/banco ====== */
-
+/* =================== Backend access =================== */
 async function listServices() {
   try {
     const rows = await prisma.service.findMany({
@@ -379,10 +377,6 @@ async function listStaff() {
   }
 }
 
-/**
- * Busca horários disponíveis no seu endpoint público com vários fallbacks.
- * Se ainda assim vier vazio, gera fallback local (09:00–18:00).
- */
 async function listSlots(proId, dateISO, serviceId) {
   let svcDuration = 30;
   try {
@@ -453,20 +447,14 @@ async function upsertClientByPhone(whatsPhone) {
 }
 
 async function getDefaultCompanyId() {
-  const comp = await prisma.company.findFirst({
-    orderBy: { createdAt: 'asc' },
-    select: { id: true },
-  });
+  const comp = await prisma.company.findFirst({ orderBy: { createdAt: 'asc' }, select: { id: true } });
   return comp?.id;
 }
 
 async function createAppointmentFromSession(client, payload) {
-  const { service, professional, date, time } = payload; // date é ISO
+  const { service, professional, date, time } = payload; // date = ISO
   const start = new Date(`${date}T${time}:00`);
-  const svc = await prisma.service.findUnique({
-    where: { id: service.id },
-    select: { duration: true },
-  });
+  const svc = await prisma.service.findUnique({ where: { id: service.id }, select: { duration: true } });
   const duration = svc?.duration || 60;
   const end = new Date(start.getTime() + duration * 60000);
 
@@ -486,7 +474,7 @@ async function createAppointmentFromSession(client, payload) {
   return created;
 }
 
-/** ====== telas auxiliares ====== */
+/* =================== Passos auxiliares =================== */
 async function askService(to, session) {
   const services = await listServices();
   if (!services.length) {
