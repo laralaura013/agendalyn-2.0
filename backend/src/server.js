@@ -41,7 +41,7 @@ import exportRoutes from './routes/exportRoutes.js';
 import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
 // Integração WhatsApp (Cloud API) — usa router dedicado
-import whatsappRoutes from './integrations/whatsapp/router.js';
+import whatsappRoutes from './routes/whatsappRoutes.js';
 
 dotenv.config();
 
