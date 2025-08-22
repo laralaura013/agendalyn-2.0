@@ -7,7 +7,6 @@ import {
   ArrowUp, ArrowDown
 } from 'lucide-react';
 
-
 import { asArray } from '../../utils/asArray';
 const STATUSES = ['OPEN', 'RECEIVED', 'CANCELED'];
 
@@ -567,7 +566,7 @@ export default function ReceivablesPage() {
               value={pageSize}
               onChange={(e)=>{ setPage(1); setPageSize(parseInt(e.target.value, 10)); }}
             >
-              {[10,20,50,asArray(100]).map(n => <option key={n} value={n}>{n}/página</option>)}
+              {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}/página</option>)}
             </select>
             <button
               className="px-3 py-1 text-sm border rounded disabled:opacity-50"
