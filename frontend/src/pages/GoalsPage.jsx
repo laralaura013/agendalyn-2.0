@@ -3,6 +3,8 @@ import api from '../services/api';
 import Modal from '../components/dashboard/Modal';
 import GoalForm from '../components/forms/GoalForm';
 import GoalProgress from '../components/goals/GoalProgress';
+
+import { asArray } from '../utils/asArray';
 // // REMOVIDO
 
 const GoalsPage = () => {
@@ -54,7 +56,7 @@ const GoalsPage = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {goals.length > 0 ? (
-            goals.map(goal => (
+            asArray(goals).map(goal => (
               <GoalProgress key={goal.id} goal={goal} />
             ))
           ) : (

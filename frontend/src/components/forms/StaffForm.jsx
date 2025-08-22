@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
+
+import { asArray } from '../../utils/asArray';
 /* ========================= Constantes ========================= */
 const ROLES = [
   { value: 'STAFF', label: 'Colaborador(a)' },
@@ -227,7 +229,7 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
             { id: 'main', label: 'Dados Pessoais' },
             { id: 'schedule', label: 'Horário de Trabalho' },
             { id: 'options', label: 'Opções' },
-          ].map((t) => (
+          asArray(]).map((t) => (
             <button
               key={t.id}
               type="button"
@@ -278,7 +280,7 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
               onChange={handleChange}
               className="mt-1 block w-full p-2 border rounded"
             >
-              {ROLES.map((r) => (
+              {asArray(ROLES).map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
@@ -431,7 +433,7 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
 
           {/* Lista de dias */}
           <div className="space-y-3">
-            {weekDays.map((day) => {
+            {asArray(weekDays).map((day) => {
               const d = workSchedule[day.key] || { active: false, start: '', end: '' };
               const err = scheduleErrors[day.key];
               return (

@@ -1,5 +1,7 @@
 import React from 'react';
 
+
+import { asArray } from '../../utils/asArray';
 const PlanCard = ({ plan, onChoosePlan }) => {
   return (
     <div className="border rounded-lg p-6 flex flex-col shadow-lg bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
@@ -8,7 +10,7 @@ const PlanCard = ({ plan, onChoosePlan }) => {
         R$ {plan.price}<span className="text-lg font-normal text-gray-500">/mês</span>
       </p>
       <ul className="space-y-3 mb-6 flex-grow">
-        {plan.features.map((feature, index) => (
+        {asArray(plan.features).map((feature, index) => (
           <li key={index} className="flex items-center text-gray-600">
             <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
             {feature}

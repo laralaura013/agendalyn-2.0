@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+
+import { asArray } from '../../utils/asArray';
 const AnamnesisFormBuilder = ({ onSave, onCancel }) => {
   const [title, setTitle] = useState('');
   const [questions, setQuestions] = useState([{ id: Date.now(), text: '', type: 'text' }]);
@@ -13,7 +15,7 @@ const AnamnesisFormBuilder = ({ onSave, onCancel }) => {
   };
 
   const handleQuestionTextChange = (id, newText) => {
-    setQuestions(questions.map(q => q.id === id ? { ...q, text: newText } : q));
+    setQuestions(asArray(questions).map(q => q.id === id ? { ...q, text: newText } : q));
   };
 
   const handleSubmit = (e) => {
@@ -44,7 +46,7 @@ const AnamnesisFormBuilder = ({ onSave, onCancel }) => {
       <div>
         <label className="block text-sm font-medium text-gray-700">Perguntas</label>
         <div className="space-y-3 mt-2 p-3 border rounded-md bg-gray-50">
-          {questions.map((q, index) => (
+          {asArray(questions).map((q, index) => (
             <div key={q.id} className="flex items-center gap-2">
               <span className="text-gray-500">{index + 1}.</span>
               <input

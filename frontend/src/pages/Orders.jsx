@@ -7,6 +7,8 @@ import OrderForm from '../components/forms/OrderForm';
 import OrderDrawer from '../components/orders/OrderDrawer';
 import api from '../services/api';
 
+
+import { asArray } from '../utils/asArray';
 const statusMap = {
   OPEN: { text: 'ABERTA', style: 'bg-yellow-100 text-yellow-800' },
   FINISHED: { text: 'FINALIZADA', style: 'bg-green-100 text-green-800' },
@@ -200,7 +202,7 @@ const Orders = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {orders.map((order) => (
+          {asArray(orders).map((order) => (
             <OrderCard
               key={order.id}
               order={order}

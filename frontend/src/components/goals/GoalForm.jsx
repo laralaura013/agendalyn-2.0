@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+
+import { asArray } from '../../utils/asArray';
 const GoalForm = ({ initialData, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     type: 'TOTAL',
@@ -61,7 +63,7 @@ const GoalForm = ({ initialData, onSave, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700">Colaborador</label>
           <select name="userId" value={formData.userId} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required>
             <option value="">Selecione um colaborador</option>
-            {availableStaff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {asArray(availableStaff).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
       )}
@@ -71,7 +73,7 @@ const GoalForm = ({ initialData, onSave, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700">Serviço</label>
           <select name="serviceId" value={formData.serviceId} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required>
             <option value="">Selecione um serviço</option>
-            {availableServices.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {asArray(availableServices).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
       )}

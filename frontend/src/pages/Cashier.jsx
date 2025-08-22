@@ -16,6 +16,8 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 import CashierControll from '../components/cashier/CashierControll';
 
+
+import { asArray } from '../utils/asArray';
 /* =========================================================================
  * Helpers
  * ========================================================================= */
@@ -112,7 +114,7 @@ const BarChartByMethod = ({ data }) => {
 
   const maxY = Math.max(
     1,
-    ...data.map((d) => Math.max(Number(d.entries || 0), Number(d.exits || 0)))
+    asArray(...data).map((d) => Math.max(Number(d.entries || 0), Number(d.exits || 0)))
   );
 
   return (
@@ -120,7 +122,7 @@ const BarChartByMethod = ({ data }) => {
       <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#e5e7eb" />
       <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#e5e7eb" />
 
-      {data.map((d, i) => {
+      {asArray(data).map((d, i) => {
         const x0 = padding + i * (barW * 2 + gap);
         const entriesH = (Number(d.entries || 0) * (height - 2 * padding)) / maxY;
         const exitsH = (Number(d.exits || 0) * (height - 2 * padding)) / maxY;
@@ -200,7 +202,7 @@ const Cashier = () => {
   // ---- Modal Fechamento com contagem
   const [closeOpenModal, setCloseOpenModal] = useState(false);
   const DENOMS = [200, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05];
-  const [counts, setCounts] = useState(Object.fromEntries(DENOMS.map((v) => [String(v), 0])));
+  const [counts, setCounts] = useState(Object.fromEntries(asArray(DENOMS).map((v) => [String(v), 0])));
   const [closeNote, setCloseNote] = useState('');
 
   const countedTotal = useMemo(
@@ -270,12 +272,12 @@ const Cashier = () => {
       const totals = r?.data?.totals || { income: 0, expense: 0, balance: 0 };
 
       // Monta “por método” combinando receivables (entradas) e payables (saídas)
-      const recvPM = normalizeList(r?.data?.receivables?.byPaymentMethod).map((x) => ({
+      const recvPM = normalizeList(asArray(r?.data?.receivables?.byPaymentMethod)).map((x) => ({
         id: x.paymentMethodId || null,
         name: x.name || '—',
         entries: Number(x.amount || 0),
       }));
-      const payPM = normalizeList(r?.data?.payables?.byPaymentMethod).map((x) => ({
+      const payPM = normalizeList(asArray(r?.data?.payables?.byPaymentMethod)).map((x) => ({
         id: x.paymentMethodId || null,
         name: x.name || '—',
         exits: Number(x.amount || 0),
@@ -416,7 +418,7 @@ const Cashier = () => {
         countedTotal: Number(countedTotal),
         expectedTotal: Number(expectedTotal),
         diff: Number(diffTotal),
-        denominations: Object.entries(counts).map(([denom, qtd]) => ({
+        denominations: Object.entries(asArray(counts)).map(([denom, qtd]) => ({
           denom: Number(denom),
           qty: Number(qtd || 0),
           total: Number((Number(qtd || 0) * Number(denom)).toFixed(2)),
@@ -426,14 +428,14 @@ const Cashier = () => {
 
       await api.post('/cashier/close', details);
       setCloseOpenModal(false);
-      setCounts(Object.fromEntries(DENOMS.map((v) => [String(v), 0])));
+      setCounts(Object.fromEntries(asArray(DENOMS).map((v) => [String(v), 0])));
       setCloseNote('');
       await Promise.all([fetchCashierStatus(), loadSummary(), loadByDay()]);
       toast.success('Caixa fechado!');
     } catch (error) {
       // Fallback local
       setCloseOpenModal(false);
-      setCounts(Object.fromEntries(DENOMS.map((v) => [String(v), 0])));
+      setCounts(Object.fromEntries(asArray(DENOMS).map((v) => [String(v), 0])));
       setCloseNote('');
       setLegacySession({ status: 'CLOSED', openingBalance: 0, transactions: [] });
       setView((v) => ({ ...v, isOpen: false }));
@@ -443,7 +445,7 @@ const Cashier = () => {
 
   const exportDaily = () => {
     const header = ['Data;Entradas;Saídas;Saldo acumulado'];
-    const lines = (Array.isArray(byDayRows) ? byDayRows : []).map((row) => {
+    const lines = (Array.isArray(byDayRows) ? byDayRows : [asArray(])).map((row) => {
       const dt = row.date;
       const inc = Number(row.income || 0).toFixed(2).replace('.', ',');
       const exp = Number(row.expense || 0).toFixed(2).replace('.', ',');
@@ -579,7 +581,7 @@ const Cashier = () => {
               }}
               className="border rounded-md px-3 py-1.5 text-sm w-full"
             >
-              {TYPE_OPTIONS.map((o) => (
+              {asArray(TYPE_OPTIONS).map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -595,7 +597,7 @@ const Cashier = () => {
             className="border rounded-md px-3 py-1.5 text-sm w-full"
           >
             <option value="">Método de pagamento (todos)</option>
-            {paymentMethods.map((m) => (
+            {asArray(paymentMethods).map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>
@@ -610,7 +612,7 @@ const Cashier = () => {
             className="border rounded-md px-3 py-1.5 text-sm w-full"
           >
             <option value="">Usuário (todos)</option>
-            {staff.map((u) => (
+            {asArray(staff).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
               </option>
@@ -636,7 +638,7 @@ const Cashier = () => {
             <div className="rounded-xl border p-3">
               <div className="text-sm font-semibold mb-2">Resumo por método</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {summary.byMethod.map((bm, idx) => (
+                {asArray(summary.byMethod).map((bm, idx) => (
                   <div key={idx} className="rounded-lg border p-3">
                     <div className="text-xs text-gray-500">Método</div>
                     <div className="font-semibold">{bm.name || '—'}</div>
@@ -689,7 +691,7 @@ const Cashier = () => {
             </tr>
           </thead>
           <tbody>
-            {(Array.isArray(byDayRows) ? byDayRows : []).map((row, i) => {
+            {(Array.isArray(byDayRows) ? byDayRows : [asArray(])).map((row, i) => {
               const dt = row.date;
               const inc = Number(row.income || 0);
               const exp = Number(row.expense || 0);
@@ -732,7 +734,7 @@ const Cashier = () => {
           </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {DENOMS.map((v) => (
+            {asArray(DENOMS).map((v) => (
               <div key={v} className="rounded-lg border p-3 flex flex-col gap-1">
                 <span className="text-xs text-gray-500">R$ {v.toFixed(2)}</span>
                 <input

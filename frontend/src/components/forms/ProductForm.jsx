@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 
+
+import { asArray } from '../../utils/asArray';
 const ProductForm = ({ initialData, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -62,14 +64,14 @@ const ProductForm = ({ initialData, onSave, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700">Categoria (Opcional)</label>
           <select name="categoryId" value={formData.categoryId} onChange={handleChange} className="mt-1 block w-full p-2 border rounded">
             <option value="">Nenhuma</option>
-            {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+            {asArray(categories).map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
           </select>
         </div>
         <div className="flex-1">
           <label className="block text-sm font-medium text-gray-700">Marca (Opcional)</label>
           <select name="brandId" value={formData.brandId} onChange={handleChange} className="mt-1 block w-full p-2 border rounded">
             <option value="">Nenhuma</option>
-            {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+            {asArray(brands).map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
           </select>
         </div>
       </div>

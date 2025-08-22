@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
+
+import { asArray } from '../../utils/asArray';
 const AnamnesisHistoryModal = ({ client, onClose }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,14 +31,14 @@ const AnamnesisHistoryModal = ({ client, onClose }) => {
         <h2 className="text-2xl font-bold mb-4">Histórico de Anamnese de {client.name}</h2>
         <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
           {loading ? <p>A carregar...</p> : history.length > 0 ? (
-            history.map(item => (
+            asArray(history).map(item => (
               <div key={item.id} className="p-4 border rounded-md bg-gray-50">
                 <p className="font-semibold">{item.form.title}</p>
                 <p className="text-xs text-gray-500 mb-3">
                   Respondido em: {new Date(item.createdAt).toLocaleString('pt-BR')}
                 </p>
                 <div className="space-y-2">
-                  {Object.entries(item.answers).map(([questionId, answer]) => (
+                  {Object.entries(asArray(item.answers)).map(([questionId, answer]) => (
                     <div key={questionId} className="text-sm">
                       {/* Precisaríamos buscar a pergunta original, mas por agora exibimos a resposta */}
                       <p className="text-gray-800">{answer || <span className="italic text-gray-400">Não respondido</span>}</p>

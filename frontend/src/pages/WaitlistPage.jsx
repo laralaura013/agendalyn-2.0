@@ -7,6 +7,8 @@ import {
 import api from "../services/api";
 import toast from "react-hot-toast";
 
+
+import { asArray } from '../utils/asArray';
 // 👉 Ajuste o caminho abaixo se necessário
 import AppointmentModal from "../components/schedule/AppointmentModal";
 
@@ -148,7 +150,7 @@ function WaitlistPage() {
     toast.promise(api.post(`/waitlist/${id}/notify`), {
       loading: "Notificando...",
       success: () => {
-        setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: "NOTIFIED" } : x)));
+        setItems((prev) => asArray(prev).map((x) => (x.id === id ? { ...x, status: "NOTIFIED" } : x)));
         return "Cliente marcado como notificado.";
       },
       error: "Erro ao notificar.",
@@ -158,7 +160,7 @@ function WaitlistPage() {
     toast.promise(api.put(`/waitlist/${id}`, { status: next }), {
       loading: "Atualizando status...",
       success: () => {
-        setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: next } : x)));
+        setItems((prev) => asArray(prev).map((x) => (x.id === id ? { ...x, status: next } : x)));
         return "Status atualizado.";
       },
       error: "Erro ao atualizar status.",
@@ -228,7 +230,7 @@ function WaitlistPage() {
   // -> calcula start/end
   // -> abre AppointmentModal pré-preenchido (em vez de salvar direto)
   const handlePickSlot = (hhmm) => {
-    const [h, m] = String(hhmm).split(":").map(Number);
+    const [h, m] = String(hhmm).split(":"asArray()).map(Number);
     const start = new Date(slotDate);
     start.setHours(h, m, 0, 0);
     const end = new Date(start);
@@ -254,7 +256,7 @@ function WaitlistPage() {
         if (activeWaitItem?.id) {
           try {
             await api.put(`/waitlist/${activeWaitItem.id}`, { status: "SCHEDULED" });
-            setItems((prev) => prev.map((x) => (x.id === activeWaitItem.id ? { ...x, status: "SCHEDULED" } : x)));
+            setItems((prev) => asArray(prev).map((x) => (x.id === activeWaitItem.id ? { ...x, status: "SCHEDULED" } : x)));
           } catch (e) {
             console.warn("Agendamento criado, mas não foi possível atualizar waitlist:", e);
           }
@@ -325,7 +327,7 @@ function WaitlistPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="">Todos</option>
-              {STATUS_OPTIONS.map((s) => (
+              {asArray(STATUS_OPTIONS).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
@@ -373,7 +375,7 @@ function WaitlistPage() {
                 </tr>
               )}
               {!loading &&
-                filtered.map((it) => (
+                asArray(filtered).map((it) => (
                   <tr key={it.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2">
                       <div className="font-medium">{it.client?.name || it.clientName || "—"}</div>
@@ -417,7 +419,7 @@ function WaitlistPage() {
                           onChange={(e) => onStatus(it.id, e.target.value)}
                           title="Alterar status"
                         >
-                          {STATUS_OPTIONS.map((s) => (
+                          {asArray(STATUS_OPTIONS).map((s) => (
                             <option key={s.id} value={s.id}>
                               {s.label}
                             </option>
@@ -453,7 +455,7 @@ function WaitlistPage() {
           onSaved={(saved, isEdit) => {
             setOpenForm(false);
             setItems((prev) => {
-              if (isEdit) return prev.map((x) => (x.id === saved.id ? saved : x));
+              if (isEdit) return asArray(prev).map((x) => (x.id === saved.id ? saved : x));
               return [saved, ...prev];
             });
           }}
@@ -608,7 +610,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                   }}
                 >
                   <option value="">— Selecionar —</option>
-                  {(clients || []).map((c) => (
+                  {(clients || [asArray(])).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} {c.phone ? `(${c.phone})` : ""}
                     </option>
@@ -650,7 +652,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                   onChange={(e) => setServiceId(e.target.value)}
                 >
                   <option value="">— Qualquer —</option>
-                  {(services || []).map((s) => (
+                  {(services || [asArray(])).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
@@ -665,7 +667,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                   onChange={(e) => setProfessionalId(e.target.value)}
                 >
                   <option value="">— Qualquer —</option>
-                  {(staff || []).map((s) => (
+                  {(staff || [asArray(])).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
@@ -718,7 +720,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
               <div>
                 <label className="text-xs text-gray-600">Status</label>
                 <select className="border rounded px-2 py-2 w-full" value={status} onChange={(e) => setStatus(e.target.value)}>
-                  {STATUS_OPTIONS.map((s) => (
+                  {asArray(STATUS_OPTIONS).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.label}
                     </option>
@@ -793,7 +795,7 @@ function SlotsContent({
             onChange={(e) => setProId(e.target.value)}
           >
             <option value="">— Qualquer —</option>
-            {(staff || []).map((p) => (
+            {(staff || [asArray(])).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -808,7 +810,7 @@ function SlotsContent({
             onChange={(e) => setServiceId(e.target.value)}
           >
             <option value="">— Não usar —</option>
-            {(services || []).map((s) => (
+            {(services || [asArray(])).map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -843,7 +845,7 @@ function SlotsContent({
         <div className="text-sm text-gray-500">Sem horários disponíveis para os filtros selecionados.</div>
       ) : (
         <div className="grid grid-cols-3 gap-2">
-          {slots.map((s) => (
+          {asArray(slots).map((s) => (
             <button key={s} onClick={() => onPick(s)} className="px-3 py-2 rounded border bg-white hover:bg-gray-50">
               {s}
             </button>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 
+
+import { asArray } from '../../utils/asArray';
 const SellPackageForm = ({ pkg, onSave, onCancel }) => {
   const [clientId, setClientId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH'); // valor padrão
@@ -57,7 +59,7 @@ const SellPackageForm = ({ pkg, onSave, onCancel }) => {
           className="mt-1 block w-full p-2 border rounded-md"
         >
           <option value="">-- Selecione um cliente --</option>
-          {availableClients.map(c => (
+          {asArray(availableClients).map(c => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>

@@ -3,6 +3,8 @@ import Modal from '../components/dashboard/Modal';
 import AnamnesisFormBuilder from '../components/anamnesis/AnamnesisFormBuilder';
 import AnamnesisViewer from '../components/anamnesis/AnamnesisViewer';
 import api from '../services/api';
+
+import { asArray } from '../utils/asArray';
 // // REMOVIDO
 
 const AnamnesisPage = () => {
@@ -73,7 +75,7 @@ const AnamnesisPage = () => {
         ) : (
           <ul className="space-y-3">
             {forms.length > 0 ? (
-              forms.map(form => (
+              asArray(forms).map(form => (
                 <li key={form.id} className="p-4 border rounded-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
                     <span className="font-medium text-gray-800">{form.title}</span>

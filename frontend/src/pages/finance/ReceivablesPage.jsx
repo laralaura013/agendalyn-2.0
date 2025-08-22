@@ -7,6 +7,8 @@ import {
   ArrowUp, ArrowDown
 } from 'lucide-react';
 
+
+import { asArray } from '../../utils/asArray';
 const STATUSES = ['OPEN', 'RECEIVED', 'CANCELED'];
 
 const toIsoNoon = (d) => (d ? `${d}T12:00:00` : null);
@@ -77,7 +79,7 @@ export default function ReceivablesPage() {
     [rows]
   );
 
-  const allPageIds = useMemo(() => rows.map(r => r.id), [rows]);
+  const allPageIds = useMemo(() => asArray(rows).map(r => r.id), [rows]);
   const allPageSelected = allPageIds.length > 0 && allPageIds.every(id => selected.has(id));
 
   // ========= LOAD OPTIONS =========
@@ -262,7 +264,7 @@ export default function ReceivablesPage() {
     if (selected.size === 0) return;
     try {
       const ids = [...selected];
-      const ops = ids.map(id =>
+      const ops = asArray(ids).map(id =>
         api.put(`/finance/receivables/${id}`, { status: newStatus })
       );
       const results = await Promise.allSettled(ops);
@@ -283,7 +285,7 @@ export default function ReceivablesPage() {
     if (!window.confirm(`Excluir ${selected.size} registro(s)?`)) return;
     try {
       const ids = [...selected];
-      const ops = ids.map(id => api.delete(`/finance/receivables/${id}`));
+      const ops = asArray(ids).map(id => api.delete(`/finance/receivables/${id}`));
       const results = await Promise.allSettled(ops);
       const fails = results.filter(r => r.status === 'rejected').length;
       if (fails === 0) toast.success(`Excluído(s) ${ids.length} registro(s).`);
@@ -388,7 +390,7 @@ export default function ReceivablesPage() {
           <div className="text-sm text-gray-500">Total (filtro)</div>
           <div className="text-lg font-semibold">{currency(summary.amountSum)}</div>
         </div>
-        {STATUSES.map((st) => (
+        {asArray(STATUSES).map((st) => (
           <div key={st} className="p-4 rounded-xl bg-white shadow">
             <div className="text-sm text-gray-500">{st}</div>
             <div className="text-sm text-gray-700">
@@ -402,7 +404,7 @@ export default function ReceivablesPage() {
       <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-9 gap-3 bg-white p-4 rounded border">
         <select name="status" value={filters.status} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Todos status</option>
-          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          {asArray(STATUSES).map(s => <option key={s} value={s}>{s}</option>)}
         </select>
 
         <input type="date" name="date_from" value={filters.date_from} onChange={onChangeFilter} className="border rounded px-2 py-2" />
@@ -410,17 +412,17 @@ export default function ReceivablesPage() {
 
         <select name="clientId" value={filters.clientId} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Cliente: todos</option>
-          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {asArray(clients).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
         <select name="categoryId" value={filters.categoryId} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Categoria: todas</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {asArray(categories).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
         <select name="paymentMethodId" value={filters.paymentMethodId} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Pagamento: todos</option>
-          {methods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {asArray(methods).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
 
         <input
@@ -508,7 +510,7 @@ export default function ReceivablesPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {asArray(rows).map((r) => {
                 const isSel = selected.has(r.id);
                 return (
                   <tr key={r.id} className="border-t">
@@ -565,7 +567,7 @@ export default function ReceivablesPage() {
               value={pageSize}
               onChange={(e)=>{ setPage(1); setPageSize(parseInt(e.target.value, 10)); }}
             >
-              {[10,20,50,100].map(n => <option key={n} value={n}>{n}/página</option>)}
+              {[10,20,50,asArray(100]).map(n => <option key={n} value={n}>{n}/página</option>)}
             </select>
             <button
               className="px-3 py-1 text-sm border rounded disabled:opacity-50"
@@ -603,7 +605,7 @@ export default function ReceivablesPage() {
                     className="border rounded px-2 py-2 w-full"
                   >
                     <option value="">Nenhum</option>
-                    {clients.map((c) => (
+                    {asArray(clients).map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
@@ -626,7 +628,7 @@ export default function ReceivablesPage() {
                     className="border rounded px-2 py-2 w-full"
                   >
                     <option value="">Nenhuma</option>
-                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {asArray(categories).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -637,7 +639,7 @@ export default function ReceivablesPage() {
                     className="border rounded px-2 py-2 w-full"
                   >
                     <option value="">Nenhuma</option>
-                    {methods.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    {asArray(methods).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </div>
                 <div>

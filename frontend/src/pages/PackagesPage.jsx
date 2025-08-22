@@ -3,6 +3,8 @@ import Modal from '../components/dashboard/Modal';
 import PackageForm from '../components/forms/PackageForm';
 import SellPackageForm from '../components/forms/SellPackageForm';
 import api from '../services/api';
+
+import { asArray } from '../utils/asArray';
 // // REMOVIDO
 
 const PackageCard = ({ pkg, onSell }) => (
@@ -17,7 +19,7 @@ const PackageCard = ({ pkg, onSell }) => (
       <div className="mt-3 pt-3 border-t">
         <h4 className="font-semibold text-xs text-gray-500 uppercase mb-2">Serviços Inclusos:</h4>
         <ul className="list-disc list-inside text-sm text-gray-700">
-          {pkg.services.map(service => <li key={service.name}>{service.name}</li>)}
+          {asArray(pkg.services).map(service => <li key={service.name}>{service.name}</li>)}
         </ul>
       </div>
     </div>
@@ -98,7 +100,7 @@ const PackagesPage = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {packages.length > 0 ? (
-            packages.map(pkg => (
+            asArray(packages).map(pkg => (
               <PackageCard key={pkg.id} pkg={pkg} onSell={handleSellClick} />
             ))
           ) : (

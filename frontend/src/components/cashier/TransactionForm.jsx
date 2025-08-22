@@ -2,7 +2,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../../services/api'; // <-- caminho corrigido (duas pastas acima)
+import api from '../../services/api'; 
+import { asArray } from '../../utils/asArray';
+// <-- caminho corrigido (duas pastas acima)
 
 // transforma "1.234,56" -> 1234.56
 const toNumber = (v) => {
@@ -106,7 +108,7 @@ const TransactionForm = ({ type: typeProp = 'INCOME', onSave, onCancel }) => {
               onChange={(e) => setType(e.target.value)}
               className="border rounded-md px-2 py-1 text-sm"
             >
-              {TYPE_OPTIONS.map((o) => (
+              {asArray(TYPE_OPTIONS).map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -155,7 +157,7 @@ const TransactionForm = ({ type: typeProp = 'INCOME', onSave, onCancel }) => {
           className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
         >
           <option value="">Selecione…</option>
-          {methods.map((m) => (
+          {asArray(methods).map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
             </option>

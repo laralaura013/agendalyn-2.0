@@ -27,6 +27,8 @@ import {
   Layers,
 } from "lucide-react";
 
+
+import { asArray } from '../utils/asArray';
 /**
  * MENU (MOBILE)
  * - Seções em acordeão com ícones
@@ -150,7 +152,7 @@ export default function Menu() {
 
       {/* Conteúdo */}
       <div className="p-3 space-y-4">
-        {GROUPS.map((group) => {
+        {asArray(GROUPS).map((group) => {
           const meta = GROUP_META[group.id] || {};
           const GroupIcon = meta.Icon || LayoutDashboard;
           const tint = meta.tint || "bg-gray-100 text-gray-700";
@@ -179,7 +181,7 @@ export default function Menu() {
               {/* Lista de itens */}
               {isOpen && (
                 <div className="divide-y">
-                  {group.items.map(({ label, to, Icon }) => (
+                  {asArray(group.items).map(({ label, to, Icon }) => (
                     <button
                       key={label}
                       onClick={() => navigate(to)}

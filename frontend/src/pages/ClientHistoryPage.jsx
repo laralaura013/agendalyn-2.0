@@ -4,6 +4,8 @@ import { CalendarDays, User, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+
+import { asArray } from '../utils/asArray';
 const statusMap = {
   CONFIRMED: 'Confirmado',
   FINISHED: 'Finalizado',
@@ -45,7 +47,7 @@ const ClientHistoryPage = () => {
         <p className="text-center text-gray-500">Nenhum agendamento encontrado.</p>
       ) : (
         <ul className="space-y-4">
-          {appointments.map((apt) => (
+          {asArray(appointments).map((apt) => (
             <li
               key={apt.id}
               className="border rounded-xl p-4 shadow-sm bg-white flex flex-col gap-2"

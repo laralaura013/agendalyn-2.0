@@ -15,6 +15,8 @@ import Modal from '../components/dashboard/Modal';
 import StaffForm from '../components/forms/StaffForm';
 import api from '../services/api';
 
+
+import { asArray } from '../utils/asArray';
 /**
  * Página de Colaboradores — versão “parruda”
  * - Busca com debounce (nome/email)
@@ -38,7 +40,7 @@ const toCSV = (rows) => {
     'showInBooking',
   ];
   const header = cols.join(',');
-  const lines = rows.map((r) =>
+  const lines = asArray(rows).map((r) =>
     cols
       .map((c) => {
         const val = r?.[c] ?? '';
@@ -158,13 +160,13 @@ const Staff = () => {
     const next = !row.showInBooking;
     const id = row.id;
 
-    setStaff((prev) => prev.map((r) => (r.id === id ? { ...r, showInBooking: next } : r)));
+    setStaff((prev) => asArray(prev).map((r) => (r.id === id ? { ...r, showInBooking: next } : r)));
 
     try {
       await api.patch(`/staff/${id}/visibility`, { showInBooking: next });
       toast.success(next ? 'Visível no agendamento.' : 'Oculto do agendamento.');
     } catch (e) {
-      setStaff((prev) => prev.map((r) => (r.id === id ? { ...r, showInBooking: !next } : r)));
+      setStaff((prev) => asArray(prev).map((r) => (r.id === id ? { ...r, showInBooking: !next } : r)));
       const msg = e?.response?.data?.message || 'Não foi possível alterar a visibilidade.';
       toast.error(msg);
     }
@@ -293,7 +295,7 @@ const Staff = () => {
             className="px-3 py-2 rounded-lg border border-gray-200 bg-white"
           >
             <option value="ALL">Todas as funções</option>
-            {ROLES.map((r) => (
+            {asArray(ROLES).map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>

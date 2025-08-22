@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 
+
+import { asArray } from '../../utils/asArray';
 const PackageForm = ({ onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -72,7 +74,7 @@ const PackageForm = ({ onSave, onCancel }) => {
       <div>
         <label className="block text-sm font-medium">Serviços Incluídos no Pacote</label>
         <div className="mt-2 p-3 border rounded-md max-h-40 overflow-y-auto space-y-2 bg-gray-50">
-          {availableServices.length > 0 ? availableServices.map(service => (
+          {availableServices.length > 0 ? asArray(availableServices).map(service => (
             <div key={service.id} className="flex items-center">
               <input
                 type="checkbox"

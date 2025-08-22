@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
+
+import { asArray } from '../../utils/asArray';
 const ClientPackagesModal = ({ client, onClose }) => {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +43,7 @@ const ClientPackagesModal = ({ client, onClose }) => {
         <h2 className="text-2xl font-bold mb-4">Pacotes de {client.name}</h2>
         <div className="space-y-4 max-h-96 overflow-y-auto">
           {loading ? <p>A carregar...</p> : packages.length > 0 ? (
-            packages.map(cp => (
+            asArray(packages).map(cp => (
               <div key={cp.id} className="p-4 border rounded-md flex justify-between items-center">
                 <div>
                   <p className="font-semibold">{cp.package.name}</p>

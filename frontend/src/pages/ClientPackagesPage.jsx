@@ -3,6 +3,8 @@ import { getMyPackages } from '../services/clientService';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 
+
+import { asArray } from '../utils/asArray';
 const ClientPackagesPage = () => {
   const [packages, setPackages] = useState([]);
 
@@ -25,7 +27,7 @@ const ClientPackagesPage = () => {
         <p className="text-gray-500 text-sm">Você não possui pacotes ativos.</p>
       ) : (
         <ul className="space-y-4">
-          {packages.map((pkg) => (
+          {asArray(packages).map((pkg) => (
             <li key={pkg.id} className="p-4 bg-white rounded-lg shadow">
               <p className="font-semibold">{pkg.package.name}</p>
               <p className="text-xs text-gray-500">

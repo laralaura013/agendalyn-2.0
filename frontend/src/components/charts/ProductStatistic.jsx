@@ -1,9 +1,11 @@
 import React from 'react'
 import Chart from 'react-apexcharts'
 
+
+import { asArray } from '../../utils/asArray';
 const ProductStatistic = ({ data }) => {
-  const labels = data.map(item => item.label)
-  const series = data.map(item => item.value)
+  const labels = asArray(data).map(item => item.label)
+  const series = asArray(data).map(item => item.value)
 
   const options = {
     chart: { type: 'donut' },

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+
+import { asArray } from '../utils/asArray';
 // // REMOVIDO
 
 const CommissionsPage = () => {
@@ -53,7 +55,7 @@ const CommissionsPage = () => {
             className="mt-1 block w-full p-2 border rounded-md"
           >
             <option value="">Selecione um colaborador</option>
-            {staffList.map(staff => (
+            {asArray(staffList).map(staff => (
               <option key={staff.id} value={staff.id}>{staff.name}</option>
             ))}
           </select>
@@ -119,7 +121,7 @@ const CommissionsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {report.orders.map(order => (
+                {asArray(report.orders).map(order => (
                   <tr key={order.id} className="border-b">
                     <td className="py-2 px-4">{new Date(order.updatedAt).toLocaleDateString('pt-BR')}</td>
                     <td className="py-2 px-4">#{order.id.substring(0, 8)}</td>

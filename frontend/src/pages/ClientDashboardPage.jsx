@@ -12,6 +12,8 @@ import {
 import { format, parseISO, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+
+import { asArray } from '../utils/asArray';
 const ClientDashboardPage = () => {
   const navigate = useNavigate();
   const [clientData, setClientData] = useState(null);
@@ -90,7 +92,7 @@ const ClientDashboardPage = () => {
           <p className="text-gray-500 text-sm">Você não tem agendamentos futuros.</p>
         ) : (
           <ul className="space-y-4">
-            {upcoming.map((appt) => (
+            {asArray(upcoming).map((appt) => (
               <li key={appt.id} className="border p-4 rounded-lg">
                 <p className="font-medium">{appt.service?.name}</p>
                 <p className="text-sm text-gray-500">{appt.user?.name}</p>
@@ -116,7 +118,7 @@ const ClientDashboardPage = () => {
           <p className="text-gray-500 text-sm">Nenhum agendamento anterior encontrado.</p>
         ) : (
           <ul className="space-y-4">
-            {history.map((appt) => (
+            {asArray(history).map((appt) => (
               <li key={appt.id} className="border p-4 rounded-lg bg-gray-50">
                 <p className="font-medium">{appt.service?.name}</p>
                 <p className="text-sm text-gray-500">{appt.user?.name}</p>
@@ -139,7 +141,7 @@ const ClientDashboardPage = () => {
           <p className="text-gray-500 text-sm">Você não possui pacotes ativos.</p>
         ) : (
           <ul className="space-y-2">
-            {packages.map((pkg) => (
+            {asArray(packages).map((pkg) => (
               <li key={pkg.id} className="border p-3 rounded-md">
                 <p className="font-medium">{pkg.package.name}</p>
                 <p className="text-xs text-gray-500">

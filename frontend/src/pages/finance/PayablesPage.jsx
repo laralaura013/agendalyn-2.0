@@ -7,6 +7,8 @@ import {
   ArrowUp, ArrowDown
 } from 'lucide-react';
 
+
+import { asArray } from '../../utils/asArray';
 const STATUSES = ['OPEN', 'PAID', 'CANCELED'];
 
 // Helpers visuais
@@ -72,7 +74,7 @@ export default function PayablesPage() {
     [rows]
   );
 
-  const allPageIds = useMemo(() => rows.map(r => r.id), [rows]);
+  const allPageIds = useMemo(() => asArray(rows).map(r => r.id), [rows]);
   const allPageSelected = allPageIds.length > 0 && allPageIds.every(id => selected.has(id));
 
   // ========= LOAD OPTIONS =========
@@ -252,7 +254,7 @@ export default function PayablesPage() {
     if (selected.size === 0) return;
     try {
       const ids = [...selected];
-      const ops = ids.map(id =>
+      const ops = asArray(ids).map(id =>
         api.put(`/finance/payables/${id}`, { status: newStatus })
       );
       const results = await Promise.allSettled(ops);
@@ -272,7 +274,7 @@ export default function PayablesPage() {
     if (!window.confirm(`Excluir ${selected.size} registro(s)?`)) return;
     try {
       const ids = [...selected];
-      const ops = ids.map(id => api.delete(`/finance/payables/${id}`));
+      const ops = asArray(ids).map(id => api.delete(`/finance/payables/${id}`));
       const results = await Promise.allSettled(ops);
       const fails = results.filter(r => r.status === 'rejected').length;
       if (fails === 0) toast.success(`Excluído(s) ${ids.length} registro(s).`);
@@ -375,7 +377,7 @@ export default function PayablesPage() {
           <div className="text-sm text-gray-500">Total (filtro)</div>
           <div className="text-lg font-semibold">{currency(summary.amountSum)}</div>
         </div>
-        {STATUSES.map((st) => (
+        {asArray(STATUSES).map((st) => (
           <div key={st} className="p-4 rounded-xl bg-white shadow">
             <div className="text-sm text-gray-500">{st}</div>
             <div className="text-sm text-gray-700">
@@ -389,22 +391,22 @@ export default function PayablesPage() {
       <form onSubmit={applyFilters} className="grid grid-cols-1 md:grid-cols-8 gap-3 bg-white p-4 rounded border">
         <select name="status" value={filters.status} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Todos status</option>
-          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          {asArray(STATUSES).map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <input type="date" name="date_from" value={filters.date_from} onChange={onChangeFilter} className="border rounded px-2 py-2" />
         <input type="date" name="date_to" value={filters.date_to} onChange={onChangeFilter} className="border rounded px-2 py-2" />
 
         <select name="supplierId" value={filters.supplierId} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Fornecedor: todos</option>
-          {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          {asArray(suppliers).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <select name="categoryId" value={filters.categoryId} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Categoria: todas</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {asArray(categories).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <select name="paymentMethodId" value={filters.paymentMethodId} onChange={onChangeFilter} className="border rounded px-2 py-2">
           <option value="">Pagamento: todos</option>
-          {methods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {asArray(methods).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
 
         <div className="flex items-center gap-2">
@@ -483,7 +485,7 @@ export default function PayablesPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {asArray(rows).map((r) => {
                 const isSel = selected.has(r.id);
                 return (
                   <tr key={r.id} className="border-t">
@@ -540,7 +542,7 @@ export default function PayablesPage() {
               value={pageSize}
               onChange={(e)=>{ setPage(1); setPageSize(parseInt(e.target.value, 10)); }}
             >
-              {[10,20,50,100].map(n => <option key={n} value={n}>{n}/página</option>)}
+              {[10,20,50,asArray(100]).map(n => <option key={n} value={n}>{n}/página</option>)}
             </select>
             <button
               className="px-3 py-1 text-sm border rounded disabled:opacity-50"
@@ -578,7 +580,7 @@ export default function PayablesPage() {
                     className="border rounded px-2 py-2 w-full"
                   >
                     <option value="">Nenhum</option>
-                    {suppliers.map((s) => (
+                    {asArray(suppliers).map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
@@ -593,7 +595,7 @@ export default function PayablesPage() {
                     required
                   >
                     <option value="">Selecione</option>
-                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {asArray(categories).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
 
@@ -605,7 +607,7 @@ export default function PayablesPage() {
                     className="border rounded px-2 py-2 w-full"
                   >
                     <option value="">Nenhuma</option>
-                    {methods.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    {asArray(methods).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </div>
 

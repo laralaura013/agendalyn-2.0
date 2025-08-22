@@ -13,6 +13,8 @@ import {
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
+
+import { asArray } from '../../utils/asArray';
 const currency = (n) =>
   Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -134,7 +136,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
         }
 
         // pagamentos atuais da comanda
-        const current = safeOrderPayments.map((p) => ({
+        const current = asArray(safeOrderPayments).map((p) => ({
           paymentMethodId: p.paymentMethodId || '',
           amount: Number(p.amount || 0),
           installments: p.installments || 1,
@@ -175,7 +177,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
   const disabled = !isOpen;
 
   const updateRow = (idx, patch) => {
-    setPayments((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+    setPayments((prev) => asArray(prev).map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   };
 
   const addRow = () => {
@@ -212,7 +214,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
     const share = Math.floor((rest * 100) / n) / 100;
     const remainder = Number((rest - share * (n - 1)).toFixed(2));
     setPayments((prev) =>
-      prev.map((p, i) => ({
+      asArray(prev).map((p, i) => ({
         ...p,
         amount: Number((Number(p.amount || 0) + (i === n - 1 ? remainder : share)).toFixed(2)),
       }))
@@ -232,7 +234,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
       return;
     }
     setPayments((prev) =>
-      prev.map((p, i) =>
+      asArray(prev).map((p, i) =>
         i === selectedIdx ? { ...p, amount: Number((Number(p.amount || 0) + diff).toFixed(2)) } : p
       )
     );
@@ -302,7 +304,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
       }
 
       const payload = {
-        payments: payments.map((p) => ({
+        payments: asArray(payments).map((p) => ({
           paymentMethodId: p.paymentMethodId,
           amount: Number(Number(p.amount || 0).toFixed(2)),
           installments: Math.max(1, parseInt(p.installments || 1, 10)),
@@ -555,7 +557,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {safeItems.map((it) => {
+                  {asArray(safeItems).map((it) => {
                     const desc = it?.service?.name || it?.product?.name || 'Item';
                     const price = Number(it?.price || 0);
                     const qty = Number(it?.quantity || 0);
@@ -622,7 +624,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
             )}
 
             <div className="space-y-3">
-              {payments.map((p, idx) => {
+              {asArray(payments).map((p, idx) => {
                 const method = paymentMethods.find((m) => m.id === p.paymentMethodId);
                 const methodName = method?.name || '—';
                 const showCardBrand =
@@ -661,7 +663,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
                           onChange={(e) => updateRow(idx, { paymentMethodId: e.target.value })}
                           className="w-full px-3 py-2 text-sm border rounded-md"
                         >
-                          {paymentMethods.map((m) => (
+                          {asArray(paymentMethods).map((m) => (
                             <option key={m.id} value={m.id}>
                               {m.name}
                             </option>

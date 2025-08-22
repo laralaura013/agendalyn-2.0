@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { PlusCircle, X } from 'lucide-react';
 
+
+import { asArray } from '../../utils/asArray';
 const normalizeList = (data) => {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.items)) return data.items;
@@ -82,7 +84,7 @@ const OrderForm = ({ onSave, onCancel }) => {
       return;
     }
 
-    const formattedItems = items.map((item) => ({
+    const formattedItems = asArray(items).map((item) => ({
       quantity: Math.max(1, parseInt(item.quantity || 1, 10)),
       serviceId: item.type === 'service' ? item.id : null,
       productId: item.type === 'product' ? item.id : null,
@@ -107,7 +109,7 @@ const OrderForm = ({ onSave, onCancel }) => {
             className="w-full px-4 py-3 text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Selecione um cliente</option>
-            {availableClients.map((c) => (
+            {asArray(availableClients).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -124,7 +126,7 @@ const OrderForm = ({ onSave, onCancel }) => {
             className="w-full px-4 py-3 text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Selecione um colaborador</option>
-            {availableStaff.map((u) => (
+            {asArray(availableStaff).map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
               </option>
@@ -137,7 +139,7 @@ const OrderForm = ({ onSave, onCancel }) => {
       <h3 className="text-lg font-semibold text-gray-700">Itens</h3>
 
       <div className="space-y-4">
-        {items.map((item, index) => (
+        {asArray(items).map((item, index) => (
           <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
             <div className="sm:col-span-3">
               <label className="text-xs font-medium">Tipo</label>
@@ -161,12 +163,12 @@ const OrderForm = ({ onSave, onCancel }) => {
               >
                 <option value="">Selecione</option>
                 {item.type === 'service'
-                  ? availableServices.map((s) => (
+                  ? asArray(availableServices).map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
                       </option>
                     ))
-                  : availableProducts.map((p) => (
+                  : asArray(availableProducts).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} {typeof p.stock === 'number' ? `(Estoque: ${p.stock})` : ''}
                       </option>

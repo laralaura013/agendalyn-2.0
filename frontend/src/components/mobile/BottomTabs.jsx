@@ -9,6 +9,8 @@ import {
   Menu as MenuIcon,
 } from "lucide-react";
 
+
+import { asArray } from '../../utils/asArray';
 /**
  * BottomTabs (mobile)
  * Troca a última aba de "Perfil" para "Menu" e aponta para /dashboard/menu.
@@ -34,7 +36,7 @@ export default function BottomTabs({ area = "admin" }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t">
       <div className="mx-auto max-w-screen-sm grid grid-cols-5 gap-1 px-2 py-2">
-        {items.map(({ to, label, Icon }) => {
+        {asArray(items).map(({ to, label, Icon }) => {
           const active = pathname === to || pathname.startsWith(to + "/");
           return (
             <button

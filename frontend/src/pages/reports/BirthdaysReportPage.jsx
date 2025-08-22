@@ -3,6 +3,8 @@ import api from '../../services/api';
 import ExportCsvButton from '../../components/common/ExportCsvButton';
 import toast from 'react-hot-toast';
 
+
+import { asArray } from '../../utils/asArray';
 export default function BirthdaysReportPage() {
   const [month, setMonth] = useState('');
   const [items, setItems] = useState([]);
@@ -30,14 +32,14 @@ export default function BirthdaysReportPage() {
         <label className="text-sm">Mês:</label>
         <select className="border rounded px-3 py-2" value={month} onChange={e=>setMonth(e.target.value)}>
           <option value="">Todos</option>
-          {[...Array(12)].map((_,i)=> <option key={i+1} value={i+1}>{i+1}</option>)}
+          {[...Array(asArray(12)]).map((_,i)=> <option key={i+1} value={i+1}>{i+1}</option>)}
         </select>
       </div>
       <div className="bg-white p-4 rounded-md shadow">
         <table className="w-full text-sm">
           <thead><tr className="text-left border-b"><th className="py-2">Nome</th><th>Telefone</th><th>E-mail</th><th>Nascimento</th></tr></thead>
           <tbody>
-            {items.map(it=>(
+            {asArray(items).map(it=>(
               <tr key={it.id} className="border-b">
                 <td className="py-2">{it.name}</td>
                 <td>{it.phone || '-'}</td>

@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 
+
+import { asArray } from '../utils/asArray';
 const fmtPhone = (v) => {
   const s = String(v || "").replace(/\D/g, "");
   if (!s) return "—";
@@ -358,7 +360,7 @@ export default function Clients() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {items.map((c) => {
+                {asArray(items).map((c) => {
                   const isSelected = selected.has(c.id);
                   const mergeSelected = mergeIds.includes(c.id);
                   return (
@@ -466,7 +468,7 @@ export default function Clients() {
 
             {/* Cards mobile (opcional) */}
             <div className="sm:hidden p-2 space-y-2">
-              {items.map((c) => (
+              {asArray(items).map((c) => (
                 <div key={`m-${c.id}`} className={`border rounded p-3 ${c.deletedAt ? "opacity-60" : ""}`}>
                   <div className="font-medium">{c.name || "—"}</div>
                   <div className="text-xs text-gray-600">{c.email || "—"} • {fmtPhone(c.phone)}</div>

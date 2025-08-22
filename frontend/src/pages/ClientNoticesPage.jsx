@@ -4,6 +4,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Bell, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
+
+import { asArray } from '../utils/asArray';
 const iconMap = {
   success: <CheckCircle className="text-green-600" />,
   warning: <AlertTriangle className="text-yellow-600" />,
@@ -47,7 +49,7 @@ const ClientNoticesPage = () => {
         <p className="text-center text-gray-500">Nenhuma notificação.</p>
       ) : (
         <ul className="space-y-4">
-          {notices.map((n) => (
+          {asArray(notices).map((n) => (
             <li key={n.id} className="bg-white rounded-xl p-4 shadow flex gap-3 items-start">
               <div className="pt-1">{iconMap[n.type] || <Bell className="text-purple-600" />}</div>
               <div className="flex-1">

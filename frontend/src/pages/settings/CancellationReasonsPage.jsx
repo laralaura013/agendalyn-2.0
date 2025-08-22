@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
+
+import { asArray } from '../../utils/asArray';
 export default function CancellationReasonsPage() {
   const [reasons, setReasons] = useState([]);
   const [input, setInput] = useState("");
@@ -45,7 +47,7 @@ export default function CancellationReasonsPage() {
         {reasons.length === 0 && (
           <li className="p-4 text-sm text-gray-500">Nenhum motivo cadastrado.</li>
         )}
-        {reasons.map((r) => (
+        {asArray(reasons).map((r) => (
           <li key={r.id} className="flex items-center justify-between p-4">
             <span>{r.name}</span>
             <div className="flex items-center gap-2">

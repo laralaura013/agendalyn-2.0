@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 
+
+import { asArray } from '../../utils/asArray';
 const AnamnesisViewer = ({ form, onSave, onCancel }) => {
     const [answers, setAnswers] = useState({});
     const [clientId, setClientId] = useState('');
@@ -45,12 +47,12 @@ const AnamnesisViewer = ({ form, onSave, onCancel }) => {
                 <label className="block text-sm font-medium text-gray-700">Selecione o Cliente</label>
                 <select value={clientId} onChange={e => setClientId(e.target.value)} className="mt-1 block w-full p-2 border rounded-md" required>
                     <option value="">-- Escolha um cliente --</option>
-                    {availableClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {asArray(availableClients).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
             </div>
             
             <div className="space-y-4 pt-4 border-t">
-                {form.questions.map((q, index) => (
+                {asArray(form.questions).map((q, index) => (
                     <div key={q.id}>
                         <label className="block text-sm font-medium text-gray-900">{index + 1}. {q.text}</label>
                         <textarea

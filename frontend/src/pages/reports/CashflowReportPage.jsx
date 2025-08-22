@@ -4,6 +4,8 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { RefreshCw, Download, CalendarDays } from 'lucide-react';
 
+
+import { asArray } from '../../utils/asArray';
 const currency = (n) =>
   Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -194,7 +196,7 @@ export default function CashflowReportPage() {
           <select name="paymentMethodId" value={filters.paymentMethodId} onChange={onChangeFilter}
                   className="border rounded px-2 py-2 w-full">
             <option value="">Todas</option>
-            {methodOptions.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            {asArray(methodOptions).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </div>
         <div>
@@ -273,7 +275,7 @@ export default function CashflowReportPage() {
               </tr>
             </thead>
             <tbody>
-              {(Array.isArray(data?.days) ? data.days : []).map((d) => (
+              {(Array.isArray(data?.days) ? data.days : [asArray(])).map((d) => (
                 <tr key={d.date} className="border-t">
                   <td className="p-2">{new Date(`${d.date}T12:00:00`).toLocaleDateString()}</td>
                   <td className="p-2 text-right">{currency(d.income)}</td>

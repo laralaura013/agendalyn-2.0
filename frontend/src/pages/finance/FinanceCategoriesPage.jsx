@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
+
+import { asArray } from '../../utils/asArray';
 const TYPE_LABEL = { PAYABLE: 'Pagar', RECEIVABLE: 'Receber' };
 
 export default function FinanceCategoriesPage() {
@@ -157,7 +159,7 @@ export default function FinanceCategoriesPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((it) => (
+                {asArray(items).map((it) => (
                   <tr key={it.id} className="border-b">
                     <td className="py-2 pr-4">
                       {editingId === it.id ? (
@@ -201,7 +203,7 @@ export default function FinanceCategoriesPage() {
           <button className="px-3 py-1 border rounded" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Anterior</button>
           <button className="px-3 py-1 border rounded" disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Próxima</button>
           <select className="ml-auto border rounded px-2 py-1" value={pageSize} onChange={e=> (setPageSize(parseInt(e.target.value,10)), setPage(1))}>
-            {[10,20,50,100].map(n => <option key={n} value={n}>{n}/página</option>)}
+            {[10,20,50,asArray(100]).map(n => <option key={n} value={n}>{n}/página</option>)}
           </select>
         </div>
       </div>

@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Plus, CalendarDays, Link as LinkIcon, Receipt, List as ListIcon, X } from "lucide-react";
 
+
+import { asArray } from '../../utils/asArray';
 /**
  * FloatingActions (MOBILE)
  *
@@ -98,7 +100,7 @@ export default function FloatingActions({
           open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
         }`}
       >
-        {actions.map((a) => (
+        {asArray(actions).map((a) => (
           <button
             key={a.id}
             onClick={() => {

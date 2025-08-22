@@ -1,5 +1,7 @@
 import React from 'react';
 
+
+import { asArray } from '../../utils/asArray';
 const ResourceTable = ({ columns, data, onEdit, onDelete }) => {
   if (!data || data.length === 0) {
     return <div className="bg-white p-6 rounded-lg shadow text-center text-gray-500">Nenhum item encontrado.</div>;
@@ -15,7 +17,7 @@ const ResourceTable = ({ columns, data, onEdit, onDelete }) => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              {columns.map((col) => (
+              {asArray(columns).map((col) => (
                 <th key={col.header} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {col.header}
                 </th>
@@ -28,9 +30,9 @@ const ResourceTable = ({ columns, data, onEdit, onDelete }) => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((item) => (
+            {asArray(data).map((item) => (
               <tr key={item.id} className="hover:bg-gray-50">
-                {columns.map((col) => {
+                {asArray(columns).map((col) => {
                   const value = getNestedValue(item, col.accessor);
                   return (
                     <td key={col.accessor} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">

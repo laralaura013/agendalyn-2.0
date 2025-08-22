@@ -3,6 +3,8 @@ import Modal from '../dashboard/Modal';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
+
+import { asArray } from '../../utils/asArray';
 const AppointmentModal = ({
   isOpen,
   onClose,
@@ -132,7 +134,7 @@ const AppointmentModal = ({
             required
           >
             <option value="">Selecione um cliente</option>
-            {clients.map((c) => (
+            {asArray(clients).map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -173,7 +175,7 @@ const AppointmentModal = ({
             required
           >
             <option value="">Selecione um serviço</option>
-            {services.map((s) => (
+            {asArray(services).map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
@@ -190,7 +192,7 @@ const AppointmentModal = ({
             required
           >
             <option value="">Selecione um profissional</option>
-            {staff.map((s) => (
+            {asArray(staff).map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>

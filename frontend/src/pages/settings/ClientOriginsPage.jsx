@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
+
+import { asArray } from '../../utils/asArray';
 export default function ClientOriginsPage() {
   const [items, setItems] = useState([]);
   const [name, setName] = useState('');
@@ -41,7 +43,7 @@ export default function ClientOriginsPage() {
       <div className="bg-white p-4 rounded-md shadow">
         <h2 className="text-lg font-semibold mb-3">Origens</h2>
         <ul className="list-disc pl-5">
-          {items.map(it => <li key={it.id}>{it.name} {it.active ? '' : '(inativo)'}</li>)}
+          {asArray(items).map(it => <li key={it.id}>{it.name} {it.active ? '' : '(inativo)'}</li>)}
           {!items.length && <p className="text-gray-500">Nenhum registro</p>}
         </ul>
       </div>

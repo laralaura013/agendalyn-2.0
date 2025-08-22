@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import api from '../services/api';
 import PlanCard from '../components/subscription/PlanCard';
+
+import { asArray } from '../utils/asArray';
 // // REMOVIDO
 
 const SubscriptionPage = () => {
@@ -48,7 +50,7 @@ const SubscriptionPage = () => {
 
       <div className="w-full max-w-md mx-auto">
         <div className="grid grid-cols-1 gap-6">
-          {plans.map(plan => (
+          {asArray(plans).map(plan => (
             <PlanCard key={plan.name} plan={plan} onChoosePlan={handleChoosePlan} />
           ))}
         </div>

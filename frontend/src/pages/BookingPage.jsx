@@ -7,6 +7,8 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
 
+
+import { asArray } from '../utils/asArray';
 /* -------- Helpers seguros -------- */
 const asArray = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
 
@@ -231,7 +233,7 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Serviço</h2>
               </div>
               <ul className="space-y-3">
-                {asArray(companyData.services).map((service) => (
+                {asArray(asArray(companyData.services)).map((service) => (
                   <li key={service.id || service.name}>
                     <button
                       onClick={() => handleSelectService(service)}
@@ -270,7 +272,7 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Profissional</h2>
               </div>
               <ul className="space-y-3">
-                {asArray(companyData.staff).map((staffMember) => (
+                {asArray(asArray(companyData.staff)).map((staffMember) => (
                   <li key={staffMember.id || staffMember.name}>
                     <button
                       onClick={() => handleSelectStaff(staffMember)}
@@ -321,7 +323,7 @@ const BookingPage = () => {
                 {loadingSlots ? (
                   <p className="col-span-full text-center py-4">Carregando horários...</p>
                 ) : normalizedSlots.length > 0 ? (
-                  normalizedSlots.map((hhmm) => (
+                  asArray(normalizedSlots).map((hhmm) => (
                     <button
                       key={hhmm}
                       onClick={() => handleSelectSlot(hhmm)}

@@ -2,6 +2,8 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown } from 'lucide-react';
 
+
+import { asArray } from '../../utils/asArray';
 function cls(...xs) {
   return xs.filter(Boolean).join(' ');
 }
@@ -34,7 +36,7 @@ export default function ServerDataGrid({
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              {columns.map((col) => (
+              {asArray(columns).map((col) => (
                 <th
                   key={col.key}
                   onClick={() => handleHeaderClick(col)}
@@ -68,9 +70,9 @@ export default function ServerDataGrid({
                 </td>
               </tr>
             ) : (
-              rows.map((row, i) => (
+              asArray(rows).map((row, i) => (
                 <tr key={row.id || i} className="hover:bg-gray-50">
-                  {columns.map((col) => (
+                  {asArray(columns).map((col) => (
                     <td key={col.key} className="px-4 py-3 whitespace-nowrap text-gray-800">
                       {col.render ? col.render(row) : row[col.key]}
                     </td>
@@ -91,7 +93,7 @@ export default function ServerDataGrid({
             value={pageSize}
             onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
           >
-            {[5, 10, 20, 50, 100].map((n) => (
+            {[5, 10, 20, 50, asArray(100]).map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>

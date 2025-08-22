@@ -20,6 +20,8 @@ import {
   TrendingUp
 } from 'lucide-react'
 
+
+import { asArray } from '../utils/asArray';
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -125,11 +127,11 @@ const Dashboard = () => {
   ]
 
   const barData = {
-    labels: monthly.map(d => d.month),
+    labels: asArray(monthly).map(d => d.month),
     datasets: [
       {
         label: 'Faturamento',
-        data: monthly.map(d => d.value),
+        data: asArray(monthly).map(d => d.value),
         backgroundColor: '#7C3AED',
         borderRadius: 8,
         barThickness: 30
@@ -155,10 +157,10 @@ const Dashboard = () => {
     Array.isArray(summary.productStats) && summary.productStats.length > 0
 
   const doughnutData = {
-    labels: summary.productStats.map(p => p.label),
+    labels: asArray(summary.productStats).map(p => p.label),
     datasets: [
       {
-        data: summary.productStats.map(p => p.value),
+        data: asArray(summary.productStats).map(p => p.value),
         backgroundColor: ['#7C3AED', '#FBBF24', '#10B981']
       }
     ]
@@ -179,7 +181,7 @@ const Dashboard = () => {
 
       {/* Cards de métricas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {cards.map(c => (
+        {asArray(cards).map(c => (
           <motion.div
             key={c.label}
             initial={{ opacity: 0, y: 20 }}

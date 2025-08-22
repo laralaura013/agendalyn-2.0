@@ -1,5 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+
+import { asArray } from '../../utils/asArray';
 import './client-bottom-nav.css';
 
 const navItems = [
@@ -16,7 +18,7 @@ const ClientBottomNav = () => {
   return (
     <div className="client-nav-wrapper">
       <ul>
-        {navItems.map((item) => {
+        {asArray(navItems).map((item) => {
           const isActive = location.pathname === item.to;
           return (
             <li key={item.to} className={isActive ? 'active' : ''}>
