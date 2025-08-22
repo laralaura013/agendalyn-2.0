@@ -7,8 +7,7 @@ import {
 import api from "../services/api";
 import toast from "react-hot-toast";
 
-
-import { asArray } from '../utils/asArray';
+import { asArray } from "../utils/asArray";
 // 👉 Ajuste o caminho abaixo se necessário
 import AppointmentModal from "../components/schedule/AppointmentModal";
 
@@ -30,7 +29,11 @@ function Badge({ status }) {
     CANCELLED: "bg-rose-50 text-rose-700 border-rose-200",
   };
   const label = STATUS_OPTIONS.find((s) => s.id === status)?.label || status;
-  return <span className={`text-xs px-2 py-1 rounded border ${map[status] || "bg-gray-50 text-gray-700 border-gray-200"}`}>{label}</span>;
+  return (
+    <span className={`text-xs px-2 py-1 rounded border ${map[status] || "bg-gray-50 text-gray-700 border-gray-200"}`}>
+      {label}
+    </span>
+  );
 }
 function formatDate(d) {
   if (!d) return "—";
@@ -181,10 +184,9 @@ function WaitlistPage() {
         // 1ª tentativa: com duration
         let res = await api.get("/public/available-slots", {
           params: { ...baseParams, duration: minutes },
-          
         });
 
-        const items = (res.data || [])
+        let items = (res.data || [])
           .map((s) => (typeof s === "string" ? s : s?.time))
           .filter(Boolean);
 
@@ -193,15 +195,13 @@ function WaitlistPage() {
         if ((!items || items.length === 0) && fallbackServiceId) {
           res = await api.get("/public/available-slots", {
             params: { ...baseParams, serviceId: fallbackServiceId },
-            
           });
-          const items2 = (res.data || [])
+          items = (res.data || [])
             .map((s) => (typeof s === "string" ? s : s?.time))
             .filter(Boolean);
-          setAvailableSlots(items2);
-        } else {
-          setAvailableSlots(items);
         }
+
+        setAvailableSlots(items);
       } catch (e) {
         console.error("Erro ao carregar horários disponíveis:", e);
         toast.error("Erro ao carregar horários disponíveis.");
@@ -256,7 +256,9 @@ function WaitlistPage() {
         if (activeWaitItem?.id) {
           try {
             await api.put(`/waitlist/${activeWaitItem.id}`, { status: "SCHEDULED" });
-            setItems((prev) => asArray(prev).map((x) => (x.id === activeWaitItem.id ? { ...x, status: "SCHEDULED" } : x)));
+            setItems((prev) =>
+              asArray(prev).map((x) => (x.id === activeWaitItem.id ? { ...x, status: "SCHEDULED" } : x))
+            );
           } catch (e) {
             console.warn("Agendamento criado, mas não foi possível atualizar waitlist:", e);
           }
@@ -610,7 +612,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                   }}
                 >
                   <option value="">— Selecionar —</option>
-                  {(clients || [asArray(])).map((c) => (
+                  {asArray(clients).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} {c.phone ? `(${c.phone})` : ""}
                     </option>
@@ -652,7 +654,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                   onChange={(e) => setServiceId(e.target.value)}
                 >
                   <option value="">— Qualquer —</option>
-                  {(services || [asArray(])).map((s) => (
+                  {asArray(services).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
@@ -667,7 +669,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                   onChange={(e) => setProfessionalId(e.target.value)}
                 >
                   <option value="">— Qualquer —</option>
-                  {(staff || [asArray(])).map((s) => (
+                  {asArray(staff).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
@@ -795,7 +797,7 @@ function SlotsContent({
             onChange={(e) => setProId(e.target.value)}
           >
             <option value="">— Qualquer —</option>
-            {(staff || [asArray(])).map((p) => (
+            {asArray(staff).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -810,7 +812,7 @@ function SlotsContent({
             onChange={(e) => setServiceId(e.target.value)}
           >
             <option value="">— Não usar —</option>
-            {(services || [asArray(])).map((s) => (
+            {asArray(services).map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -861,4 +863,3 @@ function SlotsContent({
 }
 
 export default WaitlistPage;
-
