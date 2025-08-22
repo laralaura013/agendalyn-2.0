@@ -1,25 +1,30 @@
+// src/routes/appointmentRoutes.js
 import express from 'express';
-import { protect } from '../middlewares/authMiddleware.js';
+import { protect, checkRole } from '../middlewares/authMiddleware.js';
 import {
-  createAppointment,
   listAppointments,
+  getAppointment,
+  createAppointment,
   updateAppointment,
   deleteAppointment,
 } from '../controllers/appointmentController.js';
 
 const router = express.Router();
 
-// Todas as rotas protegidas
+// todas as rotas exigem token válido
 router.use(protect);
 
-// Lista (GET) e cria (POST)
-router.route('/')
-  .get(listAppointments)
-  .post(createAppointment);
+// listar (com filtros) e criar
+router
+  .route('/')
+  .get(checkRole(['OWNER', 'ADMIN', 'STAFF']), listAppointments)
+  .post(checkRole(['OWNER', 'ADMIN']), createAppointment);
 
-// Atualiza (PUT) e exclui (DELETE) por ID
-router.route('/:id')
-  .put(updateAppointment)
-  .delete(deleteAppointment);
+// obter por id, atualizar e excluir
+router
+  .route('/:id')
+  .get(checkRole(['OWNER', 'ADMIN', 'STAFF']), getAppointment)
+  .put(checkRole(['OWNER', 'ADMIN']), updateAppointment)
+  .delete(checkRole(['OWNER', 'ADMIN']), deleteAppointment);
 
 export default router;
