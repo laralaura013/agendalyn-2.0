@@ -166,7 +166,7 @@ export default function OrderDrawer({ order, open, onClose, refreshOrders }) {
           setTipMode(order?.tipMode || 'R$');
         }
       } catch (e) {
-        // eslint-disable-next-line no-console
+         
         console.error(e);
         toast.error('Erro ao carregar dados da comanda.');
       }

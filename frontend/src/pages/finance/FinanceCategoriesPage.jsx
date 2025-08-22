@@ -41,8 +41,8 @@ export default function FinanceCategoriesPage() {
     }
   }
 
-  useEffect(() => { fetchData(1); /* eslint-disable-next-line */ }, [sortBy, sortOrder, pageSize, typeFilter]);
-  useEffect(() => { fetchData(page); /* eslint-disable-next-line */ }, [page]);
+  useEffect(() => { fetchData(1);   }, [sortBy, sortOrder, pageSize, typeFilter]);
+  useEffect(() => { fetchData(page);   }, [page]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -203,7 +203,7 @@ export default function FinanceCategoriesPage() {
           <button className="px-3 py-1 border rounded" disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Anterior</button>
           <button className="px-3 py-1 border rounded" disabled={page>=totalPages} onClick={()=>setPage(p=>p+1)}>Próxima</button>
           <select className="ml-auto border rounded px-2 py-1" value={pageSize} onChange={e=> (setPageSize(parseInt(e.target.value,10)), setPage(1))}>
-            {[10,20,50,asArray(100]).map(n => <option key={n} value={n}>{n}/página</option>)}
+            {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}/página</option>)}
           </select>
         </div>
       </div>

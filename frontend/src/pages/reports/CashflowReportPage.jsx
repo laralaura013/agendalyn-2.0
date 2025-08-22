@@ -275,7 +275,7 @@ export default function CashflowReportPage() {
               </tr>
             </thead>
             <tbody>
-              {(Array.isArray(data?.days) ? data.days : [asArray(])).map((d) => (
+              {asArray(data?.days).map((d) => (
                 <tr key={d.date} className="border-t">
                   <td className="p-2">{new Date(`${d.date}T12:00:00`).toLocaleDateString()}</td>
                   <td className="p-2 text-right">{currency(d.income)}</td>

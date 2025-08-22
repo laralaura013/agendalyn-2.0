@@ -262,8 +262,8 @@ export default function Schedule() {
       const { start, end } = slotInfo;
       const conflito = (blocks || []).some((b) => {
         const base = new Date(b.date);
-        const [sh, sm] = (b.startTime || "00:00").split(":"asArray()).map(Number);
-        const [eh, em] = (b.endTime || "00:00").split(":"asArray()).map(Number);
+        const [sh, sm] = (b.startTime || "00:00").split(":").map(Number);
+        const [eh, em] = (b.endTime || "00:00").split(":").map(Number);
         const bStart = new Date(base);
         bStart.setHours(sh, sm, 0, 0);
         const bEnd = new Date(base);
@@ -377,10 +377,10 @@ export default function Schedule() {
   }, [date, view]);
 
   const blockEvents = useMemo(() => {
-    return (blocks || [asArray(])).map((b) => {
+    return asArray(blocks).map((b) => {
       const base = new Date(b.date);
-      const [sh, sm] = (b.startTime || "00:00").split(":"asArray()).map(Number);
-      const [eh, em] = (b.endTime || "00:00").split(":"asArray()).map(Number);
+      const [sh, sm] = (b.startTime || "00:00").split(":").map(Number);
+      const [eh, em] = (b.endTime || "00:00").split(":").map(Number);
       const start = new Date(base);
       start.setHours(sh, sm, 0, 0);
       const end = new Date(base);
@@ -402,7 +402,7 @@ export default function Schedule() {
 
   const handlePickAvailableSlot = useCallback(
     (hhmm) => {
-      const [h, m] = String(hhmm).split(":"asArray()).map(Number);
+      const [h, m] = String(hhmm).split(":").map(Number);
       const s = new Date(date);
       s.setHours(h, m, 0, 0);
       const e = new Date(s);
@@ -474,7 +474,7 @@ export default function Schedule() {
             <ProfessionalsSelect
               value={selectedPro || ""}
               onChange={setSelectedPro}
-              options={asArray(staff?).map((s) => ({ id: s.id, name: s.name })) || []}
+              options={asArray(staff).map((s) => ({ id: s.id, name: s.name })) || []}
             />
             <div className="flex items-center gap-1">
               <button onClick={goPrev} className="px-2 py-1.5 border rounded hover:bg-gray-50" title="Anterior">
@@ -614,7 +614,7 @@ export default function Schedule() {
               <div className="space-y-2">
                 <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
                 <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
-                  {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"asArray(]).map((item) => (
+                  {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
                     <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
                       <span>{item}</span>
                       <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
@@ -723,7 +723,7 @@ export default function Schedule() {
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
     <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
-      {(options || [asArray(])).map((p) => (
+      {asArray(options).map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
         </option>
@@ -981,7 +981,7 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
 /* ====== Faixa de dias (mobile) ====== */
 function MobileDaysStrip({ date, onChangeDate }) {
   const start = startOfWeek(date);
-  const days = [...Array(asArray(7)]).map((_, i) => {
+  const days = [...Array(7)].map((_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     return d;

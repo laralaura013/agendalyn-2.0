@@ -32,7 +32,7 @@ export default function BirthdaysReportPage() {
         <label className="text-sm">Mês:</label>
         <select className="border rounded px-3 py-2" value={month} onChange={e=>setMonth(e.target.value)}>
           <option value="">Todos</option>
-          {[...Array(asArray(12)]).map((_,i)=> <option key={i+1} value={i+1}>{i+1}</option>)}
+          {[...Array(12)].map((_,i)=> <option key={i+1} value={i+1}>{i+1}</option>)}
         </select>
       </div>
       <div className="bg-white p-4 rounded-md shadow">

@@ -9,8 +9,10 @@ import toast from "react-hot-toast";
 
 
 import { asArray } from '../utils/asArray';
+
 /* -------- Helpers seguros -------- */
-const asArray = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
+// A linha abaixo foi removida pois 'asArray' já foi importado acima.
+// const asArray = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
 
 function toDateISO(dateStr /* YYYY-MM-DD */, hhmm /* HH:mm */) {
   const [h = "00", m = "00"] = String(hhmm || "").split(":");
@@ -233,7 +235,7 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Serviço</h2>
               </div>
               <ul className="space-y-3">
-                {asArray(asArray(companyData.services)).map((service) => (
+                {asArray(companyData.services).map((service) => (
                   <li key={service.id || service.name}>
                     <button
                       onClick={() => handleSelectService(service)}
@@ -272,7 +274,7 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Profissional</h2>
               </div>
               <ul className="space-y-3">
-                {asArray(asArray(companyData.staff)).map((staffMember) => (
+                {asArray(companyData.staff).map((staffMember) => (
                   <li key={staffMember.id || staffMember.name}>
                     <button
                       onClick={() => handleSelectStaff(staffMember)}

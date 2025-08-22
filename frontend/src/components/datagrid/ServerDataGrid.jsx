@@ -93,7 +93,7 @@ export default function ServerDataGrid({
             value={pageSize}
             onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
           >
-            {[5, 10, 20, 50, asArray(100]).map((n) => (
+            {[5, 10, 20, 50, 100].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>

@@ -37,7 +37,7 @@ const OrderForm = ({ onSave, onCancel }) => {
         setAvailableServices(normalizeList(servicesRes.data));
         setAvailableProducts(normalizeList(productsRes.data));
       } catch (error) {
-        // eslint-disable-next-line no-console
+         
         console.error('Erro ao carregar dados:', error);
         alert('Não foi possível carregar os dados necessários.');
         setAvailableClients([]);

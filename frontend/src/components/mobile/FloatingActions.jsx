@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Plus, CalendarDays, Link as LinkIcon, Receipt, List as ListIcon, X } from "lucide-react";
 
 
@@ -37,15 +37,13 @@ export default function FloatingActions({
     return () => document.removeEventListener("click", onDocClick, true);
   }, [open]);
 
-  if (hidden) return null; // não renderiza quando houver modal/drawer aberto
-
-  const runCreateAppointment = () => {
+  const runCreateAppointment = useCallback(() => {
     onCreateAppointment?.();
     try {
       // evento global extra (caso o Schedule esteja escutando)
       window?.dispatchEvent?.(new Event("openEmptyAppointment"));
     } catch {}
-  };
+  }, [onCreateAppointment]);
 
   const actions = useMemo(
     () => [
@@ -86,8 +84,11 @@ export default function FloatingActions({
         run: () => onOpenWaitlist?.(),
       },
     ],
-    [onOpenOrder, onOpenWaitlist, onShowBookingLink]
+    [onOpenOrder, onOpenWaitlist, onShowBookingLink, runCreateAppointment]
   );
+
+  // A condição de retorno agora vem DEPOIS de todos os Hooks
+  if (hidden) return null;
 
   return (
     <div
