@@ -51,8 +51,8 @@ model User {
   role          Role     @default(STAFF)
   commission    Decimal? @db.Decimal(5, 2)
   workSchedule  Json?
-  phone         String?                      // <— NOVO (opcional)
-  nickname      String?                      // <— NOVO (opcional)
+  phone         String?  @unique                // <— AGORA É ÚNICO
+  nickname      String?
   companyId     String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -481,11 +481,11 @@ model GoogleIntegration {
 
 enum Role {
   OWNER
-  ADMIN        // <— NOVO
-  MANAGER      // <— NOVO
+  ADMIN
+  MANAGER
   STAFF
-  BARBER       // (opcional, caso use)
-  HAIRDRESSER  // (opcional, caso use)
+  BARBER
+  HAIRDRESSER
 }
 
 enum AppointmentStatus {
@@ -535,8 +535,6 @@ enum WaitlistStatus {
   SCHEDULED
   CANCELLED
 }
-
-// -------------------- SPRINT 1: Financeiro / Configurações --------------------
 
 enum FinanceCategoryType {
   PAYABLE
@@ -676,8 +674,6 @@ model ClientOrigin {
   @@unique([companyId, name])
   @@index([companyId])
 }
-
-// -------------------- LISTA DE ESPERA --------------------
 
 model Waitlist {
   id        String  @id @default(cuid())
