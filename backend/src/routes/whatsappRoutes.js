@@ -44,7 +44,11 @@ const sendText = async (to, text) => {
 };
 
 const sendChoices = async (to, title, options = []) => {
-  const body = [title, ...options.map((o, i) => `${i + 1}. ${o}`)].join('\n');
+  const opts = Array.isArray(options) ? options.filter(Boolean) : [];
+  if (!opts.length) {
+    return sendText(to, `${title}\n(não há itens para selecionar)`);
+  }
+  const body = [title, ...opts.map((o, i) => `${i + 1}. ${o}`)].join('\n');
   return sendText(to, body);
 };
 
@@ -66,10 +70,8 @@ const verifySignatureIfPresent = (req) => {
 /** Converte "DD/MM/AAAA" -> "AAAA-MM-DD"; se já vier ISO, mantém. */
 const normalizeDateToISO = (txt) => {
   const s = String(txt || '').trim();
-  // ISO já válido
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  // BR
-  const m = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // ISO
+  const m = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/); // BR
   if (m) {
     const [_, dd, mm, yyyy] = m;
     return `${yyyy}-${mm}-${dd}`;
@@ -236,6 +238,13 @@ async function handleIncomingMessage(msg, meta) {
       }
 
       const top = slots.slice(0, 8);
+      if (!top.length) {
+        await sendText(
+          to,
+          'Não encontrei horários exibíveis agora. Tente outra data (DD/MM/AAAA).'
+        );
+        break;
+      }
       await sendChoices(to, 'Horários disponíveis (escolha um número):', top);
       break;
     }
@@ -248,6 +257,11 @@ async function handleIncomingMessage(msg, meta) {
       );
       const top = slots.slice(0, 8);
       const pick = parseInt(text, 10) - 1;
+      if (!top.length) {
+        await sendText(to, 'Sem horários. Envie outra data (DD/MM/AAAA).');
+        session.step = 'ask_date';
+        break;
+      }
       if (Number.isNaN(pick) || pick < 0 || pick >= top.length) {
         await sendText(to, 'Escolha um número válido da lista.');
         await sendChoices(to, 'Horários disponíveis:', top);
@@ -327,7 +341,7 @@ async function listServices() {
   try {
     const rows = await prisma.service.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, name: true },
+      select: { id: true, name: true, duration: true },
     });
     return rows;
   } catch (e) {
@@ -355,46 +369,60 @@ async function listStaff() {
  * Aceita formatos de resposta flexíveis.
  */
 async function listSlots(proId, dateISO, serviceId) {
-  // Tenta com diferentes combinações de parâmetros
+  // tenta usar a duração do serviço
+  let svcDuration = 30;
+  try {
+    if (serviceId) {
+      const svc = await prisma.service.findUnique({ where: { id: serviceId }, select: { duration: true } });
+      if (svc?.duration) svcDuration = svc.duration;
+    }
+  } catch {}
+
+  const base = APP_BASE_URL.replace(/\/$/, '');
+  const url = `${base}/public/available-slots`;
+
   const paramSets = [
-    { staffId: proId, date: dateISO, serviceId, duration: 30 },
-    { userId: proId, date: dateISO, serviceId, duration: 30 },
-    { professionalId: proId, date: dateISO, serviceId, duration: 30 },
-    { staffId: proId, date: dateISO, duration: 30 },
-    { date: dateISO, serviceId, duration: 30 },
-    { date: dateISO, duration: 30 },
+    { staffId: proId, date: dateISO, serviceId, duration: svcDuration },
+    { userId: proId, date: dateISO, serviceId, duration: svcDuration },
+    { professionalId: proId, date: dateISO, serviceId, duration: svcDuration },
+    { staffId: proId, date: dateISO, duration: svcDuration },
+    { date: dateISO, serviceId, duration: svcDuration },
+    { date: dateISO, duration: svcDuration },
+    { date: dateISO }, // último recurso
   ];
 
   for (const params of paramSets) {
     try {
-      const url = `${APP_BASE_URL.replace(/\/$/, '')}/public/available-slots`;
+      console.log('🔎 GET', url, 'params=', params);
       const res = await axios.get(url, { params });
       const raw = res.data;
+      console.log('↩️ status', res.status, 'tipo', typeof raw);
 
       let items = [];
       if (Array.isArray(raw)) items = raw;
       else if (Array.isArray(raw?.slots)) items = raw.slots;
       else if (Array.isArray(raw?.data)) items = raw.data;
+      else if (raw && typeof raw === 'object') {
+        // tenta extrair de objetos comuns
+        const keys = Object.keys(raw);
+        const candidateKey = keys.find((k) => Array.isArray(raw[k]));
+        if (candidateKey) items = raw[candidateKey];
+      }
 
-      const hhmm = items
-        .map((s) =>
-          typeof s === 'string'
-            ? s
-            : s?.formatted || s?.time || s?.hour || s?.hhmm
-        )
+      const hhmm = (items || [])
+        .map((s) => {
+          if (typeof s === 'string') return s;
+          if (!s || typeof s !== 'object') return null;
+          return s.formatted || s.time || s.hour || s.hhmm || s.start || null;
+        })
         .filter(Boolean)
         .map((t) => String(t).slice(0, 5));
 
-      console.log('🕒 listSlots params', params, '->', hhmm.length, 'slots');
+      console.log('🕒 listSlots =>', hhmm);
 
       if (hhmm.length) return hhmm;
     } catch (e) {
-      console.log(
-        '⚠️ listSlots falhou p/ params',
-        params,
-        e?.response?.status,
-        e?.response?.data || e.message
-      );
+      console.log('⚠️ listSlots falhou', e?.response?.status, e?.response?.data || e.message);
     }
   }
   return [];
@@ -427,7 +455,6 @@ async function getDefaultCompanyId() {
 
 async function createAppointmentFromSession(client, payload) {
   const { service, professional, date, time } = payload;
-  // Monta horário local; ajuste se precisar timezone fixo
   const start = new Date(`${date}T${time}:00`);
   const svc = await prisma.service.findUnique({
     where: { id: service.id },
