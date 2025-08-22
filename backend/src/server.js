@@ -40,8 +40,8 @@ import exportRoutes from './routes/exportRoutes.js';
 // Formas de pagamento (OrderDrawer)
 import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
-// Integração WhatsApp (Webhook simples)
-import whatsappRoutes from './routes/whatsappRoutes.js';
+// Integração WhatsApp (Cloud API) — usa router dedicado
+import whatsappRoutes from './integrations/whatsapp/router.js';
 
 dotenv.config();
 
@@ -104,8 +104,8 @@ app.use(
   express.json({
     limit: '2mb',
     verify: (req, _res, buf) => {
-      // Disponibiliza o raw body como STRING para verificar X-Hub-Signature-256 (se WABA_APP_SECRET estiver setado)
-      req.rawBody = buf.toString('utf8');
+      // Deixa o raw body disponível (Buffer) para validar X-Hub-Signature-256 quando WABA_APP_SECRET estiver setado
+      req.rawBody = buf;
     },
   }),
   whatsappRoutes
