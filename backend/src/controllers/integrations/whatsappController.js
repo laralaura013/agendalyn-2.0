@@ -25,11 +25,11 @@ export const verifyWebhook = (req, res) => {
 
 /**
  * (Opcional) valida a assinatura do POST da Meta quando WABA_APP_SECRET estiver setado.
- * Funciona se o server tiver sido configurado com req.rawBody (veja ajuste no server.js).
+ * Requer req.rawBody (já configurado no server.js).
  */
 function isValidSignature(req) {
   const appSecret = (process.env.WABA_APP_SECRET || '').trim();
-  if (!appSecret) return true; // sem secret, não valida
+  if (!appSecret) return true; // sem secret, pula validação
 
   try {
     const signature = req.get('x-hub-signature-256') || '';
@@ -53,11 +53,12 @@ function isValidSignature(req) {
  * POST /webhook — recebe eventos (mensagens/status)
  */
 export const receiveWebhook = (req, res) => {
-  // Responde 200 imediatamente (Meta reenvia se não for 200)
   if (!isValidSignature(req)) {
     console.log('⚠️ Assinatura inválida do webhook');
     return res.sendStatus(401);
   }
+
+  // responda 200 imediatamente (evita re-tentativas)
   res.sendStatus(200);
 
   try {
@@ -66,10 +67,8 @@ export const receiveWebhook = (req, res) => {
     for (const e of entries) {
       const changes = e.changes || [];
       for (const ch of changes) {
-        // Log completo do evento
         console.log('📩 Webhook change:', JSON.stringify(ch, null, 2));
 
-        // Se vier mensagem
         const value = ch.value || {};
         const messages = value.messages || [];
         if (messages.length) {
@@ -88,11 +87,9 @@ export const receiveWebhook = (req, res) => {
             }
 
             console.log(`👤 ${from} disse: "${text}" (tipo ${type})`);
-            // 👉 aqui você pode enfileirar/rotear para seu chatbot
           }
         }
 
-        // Se vier status de mensagem
         const statuses = value.statuses || [];
         if (statuses.length) {
           for (const s of statuses) {
