@@ -1,4 +1,4 @@
-// ✅ ARQUIVO: src/pages/BookingPage.jsx (corrigido)
+// ✅ ARQUIVO: src/pages/BookingPage.jsx (robusto contra map em não-array)
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "../services/api";
@@ -7,8 +7,10 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
 
+/* -------- Helpers seguros -------- */
+const asArray = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
+
 function toDateISO(dateStr /* YYYY-MM-DD */, hhmm /* HH:mm */) {
-  // monta um ISO local para exibir no passo 4
   const [h = "00", m = "00"] = String(hhmm || "").split(":");
   const d = new Date(`${dateStr}T00:00:00`);
   d.setHours(Number(h), Number(m), 0, 0);
@@ -16,7 +18,7 @@ function toDateISO(dateStr /* YYYY-MM-DD */, hhmm /* HH:mm */) {
 }
 
 function normalizeSlots(list) {
-  return (list || [])
+  return asArray(list)
     .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time || s?.label || ""))
     .filter(Boolean);
 }
@@ -62,7 +64,17 @@ const BookingPage = () => {
       try {
         setLoading(true);
         const { data } = await api.get(`/public/booking-page/${companyId}`, { signal: ac.signal });
-        setCompanyData(data || { company: null, services: [], staff: [] });
+
+        // 🔒 Blindagem: garanta arrays sempre
+        const services = asArray(data?.services);
+        // Opcional: só mostra quem é visível
+        const staff = asArray(data?.staff).filter((s) => s?.showInBooking !== false);
+
+        setCompanyData({
+          company: data?.company ?? null,
+          services,
+          staff,
+        });
       } catch (err) {
         if (err?.code === "ERR_CANCELED") return;
         setError("Não foi possível carregar a página de agendamento. Verifique o link e tente novamente.");
@@ -136,8 +148,8 @@ const BookingPage = () => {
       companyId,
       serviceId: selectedService.id,
       staffId: selectedStaff.id,
-      date: selectedDate,          // opcional — se o backend usa junto com slotTime
-      slotTime: selectedSlot,      // "HH:mm" (como seu fluxo público)
+      date: selectedDate,     // opcional — se o backend usa junto com slotTime
+      slotTime: selectedSlot, // "HH:mm"
       clientName: customerDetails.name,
       clientPhone: customerDetails.phone,
       clientEmail: customerDetails.email,
@@ -219,8 +231,8 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Serviço</h2>
               </div>
               <ul className="space-y-3">
-                {companyData.services.map((service) => (
-                  <li key={service.id}>
+                {asArray(companyData.services).map((service) => (
+                  <li key={service.id || service.name}>
                     <button
                       onClick={() => handleSelectService(service)}
                       className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition"
@@ -258,8 +270,8 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Profissional</h2>
               </div>
               <ul className="space-y-3">
-                {companyData.staff.map((staffMember) => (
-                  <li key={staffMember.id}>
+                {asArray(companyData.staff).map((staffMember) => (
+                  <li key={staffMember.id || staffMember.name}>
                     <button
                       onClick={() => handleSelectStaff(staffMember)}
                       className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition"
