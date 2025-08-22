@@ -16,6 +16,7 @@ const {
 } = process.env;
 
 const GRAPH_URL = `https://graph.facebook.com/v20.0/${WABA_PHONE_NUMBER_ID}/messages`;
+const DEFAULT_SLOT_MINUTES = 30; // fallback quando a API pública pedir duração
 
 // Estado de conversa simples em memória (produção: use Redis)
 const sessions = new Map();
@@ -58,14 +59,34 @@ const verifySignatureIfPresent = (req) => {
   const sigHeader = req.get('x-hub-signature-256');
   if (!sigHeader) return true;
   const hmac = crypto.createHmac('sha256', WABA_APP_SECRET);
-  // req.rawBody foi setado no server.js (Buffer)
-  hmac.update(req.rawBody);
+  // no server.js definimos req.rawBody como string
+  hmac.update(req.rawBody || JSON.stringify(req.body || {}), 'utf8');
   const expected = `sha256=${hmac.digest('hex')}`;
   try {
     return crypto.timingSafeEqual(Buffer.from(sigHeader), Buffer.from(expected));
   } catch {
     return false;
   }
+};
+
+/* ---------- Data helpers (pt-BR <-> ISO) ---------- */
+const isIso = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '').trim());
+const isBr  = (s) => /^\d{2}\/\d{2}\/\d{4}$/.test(String(s || '').trim());
+
+const toIso = (s) => {
+  const v = String(s || '').trim();
+  if (isIso(v)) return v;
+  if (isBr(v)) {
+    const [d, m, y] = v.split('/');
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+};
+
+const toBr = (iso) => {
+  if (!isIso(iso)) return iso || '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 };
 
 /** ====== Verify (GET) ====== */
@@ -194,48 +215,71 @@ async function handleIncomingMessage(msg, meta) {
       }
       session.payload.professional = staff[pick];
       session.step = 'ask_date';
-      await sendText(to, 'Informe a data (AAAA-MM-DD). Ex.: 2025-08-25');
+      await sendText(to, 'Informe a data (**DD/MM/AAAA**). Ex.: 25/08/2025');
       break;
     }
 
     case 'ask_date': {
-      const day = String(text).trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
-        await sendText(to, 'Formato inválido. Use AAAA-MM-DD. Ex.: 2025-08-25');
+      if (text.toLowerCase() === 'voltar') {
+        session.step = 'menu';
+        await sendChoices(to, 'O que você deseja?', [
+          'Agendar atendimento',
+          'Remarcar/Cancelar',
+          'Falar com atendente',
+        ]);
         break;
       }
-      session.payload.date = day;
-      session.step = 'ask_time';
+
+      const iso = toIso(text);
+      if (!iso) {
+        await sendText(to, 'Formato inválido. Use **DD/MM/AAAA**. Ex.: 25/08/2025');
+        break;
+      }
+
+      session.payload.dateISO = iso;
+      session.payload.dateBR = toBr(iso);
+
       const slots = await listSlots(
         session.payload.professional.id,
-        day,
+        iso,
         session.payload.service.id
       );
+
       if (!slots.length) {
         await sendText(
           to,
-          'Não encontrei horários neste dia. Envie outra data (AAAA-MM-DD) ou digite "voltar".'
+          'Não encontrei horários neste dia. Envie outra data (DD/MM/AAAA) ou digite "voltar".'
         );
         break;
       }
+
       const top = slots.slice(0, 8);
       await sendChoices(to, 'Horários disponíveis (escolha um número):', top);
+      session.step = 'ask_time';
       break;
     }
 
     case 'ask_time': {
       const slots = await listSlots(
         session.payload.professional.id,
-        session.payload.date,
+        session.payload.dateISO,
         session.payload.service.id
       );
       const top = slots.slice(0, 8);
       const pick = parseInt(text, 10) - 1;
-      if (Number.isNaN(pick) || pick < 0 || pick >= top.length) {
-        await sendText(to, 'Escolha um número válido da lista.');
-        await sendChoices(to, 'Horários disponíveis:', top);
+
+      if (!top.length) {
+        await sendText(to, 'Sem horários para este dia. Envie outra data (DD/MM/AAAA).');
+        session.step = 'ask_date';
         break;
       }
+
+      if (Number.isNaN(pick) || pick < 0 || pick >= top.length) {
+        await sendText(to, 'Escolha um número válido da lista.');
+        await sendChoices(to, 'Horários disponíveis (escolha um número):', top);
+        break;
+      }
+
       const hhmm = top[pick];
       session.payload.time = hhmm;
 
@@ -244,7 +288,7 @@ async function handleIncomingMessage(msg, meta) {
         `Confirmar agendamento?\n` +
           `Serviço: ${session.payload.service.name}\n` +
           `Profissional: ${session.payload.professional.name}\n` +
-          `Data: ${session.payload.date}\n` +
+          `Data: ${session.payload.dateBR}\n` +
           `Hora: ${hhmm}\n\n` +
           `Responda "sim" para confirmar ou "não" para cancelar.`
       );
@@ -259,7 +303,7 @@ async function handleIncomingMessage(msg, meta) {
         await sendText(
           to,
           `Agendamento criado! Código: ${created.id}\n` +
-            `Nos vemos em ${session.payload.date} às ${session.payload.time}.`
+            `Nos vemos em ${session.payload.dateBR} às ${session.payload.time}.`
         );
         session.step = 'start';
         session.payload = {};
@@ -280,7 +324,7 @@ async function handleIncomingMessage(msg, meta) {
       const n = parseInt(text, 10);
       if (n === 1) {
         session.step = 'ask_date';
-        await sendText(to, 'Informe a data (AAAA-MM-DD).');
+        await sendText(to, 'Informe a data (**DD/MM/AAAA**).');
       } else {
         session.step = 'start';
         await sendText(to, 'Voltando ao menu inicial.');
@@ -336,14 +380,38 @@ async function listStaff() {
   }
 }
 
-async function listSlots(proId, date, serviceId) {
-  try {
-    const res = await axios.get(`${APP_BASE_URL}/public/available-slots`, {
-      params: { staffId: proId, date, serviceId },
-    });
-    return (Array.isArray(res.data) ? res.data : [])
-      .map((s) => (typeof s === 'string' ? s : s?.formatted || s?.time))
+async function listSlots(proId, dateISO, serviceId) {
+  // mapeia qualquer formato "parecido" com horário para "HH:MM"
+  const mapSlots = (arr = []) =>
+    (Array.isArray(arr) ? arr : [])
+      .map((s) => {
+        if (typeof s === 'string') return s;
+        return (
+          s?.formatted ||
+          s?.time ||
+          s?.hour ||
+          s?.startTime ||
+          (s?.start
+            ? new Date(s.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : null)
+        );
+      })
       .filter(Boolean);
+
+  try {
+    // 1ª tentativa: com serviceId
+    const r1 = await axios.get(`${APP_BASE_URL}/public/available-slots`, {
+      params: { staffId: proId, date: dateISO, serviceId },
+    });
+    let slots = mapSlots(r1.data?.slots ?? r1.data);
+    if (slots.length) return slots;
+
+    // 2ª tentativa: com duração padrão
+    const r2 = await axios.get(`${APP_BASE_URL}/public/available-slots`, {
+      params: { staffId: proId, date: dateISO, duration: DEFAULT_SLOT_MINUTES },
+    });
+    slots = mapSlots(r2.data?.slots ?? r2.data);
+    return slots;
   } catch (e) {
     console.error('Erro ao buscar slots:', e?.response?.data || e.message);
     return [];
@@ -376,9 +444,10 @@ async function getDefaultCompanyId() {
 }
 
 async function createAppointmentFromSession(client, payload) {
-  const { service, professional, date, time } = payload;
-  // Usa horário LOCAL do servidor; se precisar timezone fixo, troque para date-fns-tz
-  const start = new Date(`${date}T${time}:00`);
+  const { service, professional, dateISO, time } = payload;
+
+  // Usa horário LOCAL do servidor; se precisar timezone fixo, ajuste com date-fns-tz
+  const start = new Date(`${dateISO}T${time}:00`);
   const svc = await prisma.service.findUnique({
     where: { id: service.id },
     select: { duration: true },
@@ -400,6 +469,25 @@ async function createAppointmentFromSession(client, payload) {
     select: { id: true },
   });
   return created;
+}
+
+/* ====== Perguntas auxiliares ====== */
+async function askService(to) {
+  const services = await listServices();
+  if (!services.length) {
+    await sendText(to, 'Não há serviços cadastrados no sistema.');
+    return;
+  }
+  await sendChoices(to, 'Escolha o serviço:', services.map((s) => s.name));
+}
+
+async function askProfessional(to) {
+  const staff = await listStaff();
+  if (!staff.length) {
+    await sendText(to, 'Nenhum profissional disponível para agendamento.');
+    return;
+  }
+  await sendChoices(to, 'Escolha o profissional:', staff.map((s) => s.name));
 }
 
 export default router;
