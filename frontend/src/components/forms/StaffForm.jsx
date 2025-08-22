@@ -1,7 +1,7 @@
+// src/components/staff/StaffForm.jsx
 import React, { useEffect, useMemo, useState } from 'react';
-
-
 import { asArray } from '../../utils/asArray';
+
 /* ========================= Constantes ========================= */
 const ROLES = [
   { value: 'STAFF', label: 'Colaborador(a)' },
@@ -229,7 +229,7 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
             { id: 'main', label: 'Dados Pessoais' },
             { id: 'schedule', label: 'Horário de Trabalho' },
             { id: 'options', label: 'Opções' },
-          asArray(]).map((t) => (
+          ].map((t) => (
             <button
               key={t.id}
               type="button"
@@ -502,32 +502,7 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
               Opções complementares (não obrigatórias). Campos vazios não serão enviados.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Telefone</label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className="mt-1 block w-full p-2 border rounded"
-                placeholder="(11) 98765-4321"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Apelido</label>
-              <input
-                type="text"
-                name="nickname"
-                value={formData.nickname}
-                onChange={handleChange}
-                className="mt-1 block w-full p-2 border rounded"
-                placeholder="Como o cliente vê no app"
-              />
-            </div>
-          </div>
+          {/* Mantido apenas informativo para evitar duplicidade de campos */}
         </div>
       )}
 

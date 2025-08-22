@@ -7,9 +7,10 @@ import {
   ArrowUp, ArrowDown
 } from 'lucide-react';
 
-
 import { asArray } from '../../utils/asArray';
+
 const STATUSES = ['OPEN', 'PAID', 'CANCELED'];
+const PAGE_SIZES = [10, 20, 50, 100];
 
 // Helpers visuais
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : '');
@@ -107,7 +108,14 @@ export default function PayablesPage() {
 
       // normaliza payload (array direto OU objeto paginado)
       const payload = Array.isArray(r.data)
-        ? { items: r.data, total: r.data.length, page, pageSize, totalsByStatus: { OPEN:{count:0,amount:0}, PAID:{count:0,amount:0}, CANCELED:{count:0,amount:0} }, summary: { amountSum: r.data.reduce((s,x)=>s+Number(x.amount||0),0) } }
+        ? {
+            items: r.data,
+            total: r.data.length,
+            page,
+            pageSize,
+            totalsByStatus: { OPEN:{count:0,amount:0}, PAID:{count:0,amount:0}, CANCELED:{count:0,amount:0} },
+            summary: { amountSum: r.data.reduce((s,x)=>s+Number(x.amount||0),0) }
+          }
         : r.data || {};
 
       const items = payload.items || [];
@@ -356,6 +364,8 @@ export default function PayablesPage() {
   const SortIcon = ({ col }) =>
     sortBy === col ? (sortOrder === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />) : null;
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -534,7 +544,7 @@ export default function PayablesPage() {
         {/* paginação */}
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="text-sm text-gray-600">
-            Página {page} de {Math.max(1, Math.ceil(total / pageSize))} • {total} registro(s)
+            Página {page} de {totalPages} • {total} registro(s)
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -542,7 +552,9 @@ export default function PayablesPage() {
               value={pageSize}
               onChange={(e)=>{ setPage(1); setPageSize(parseInt(e.target.value, 10)); }}
             >
-              {[10,20,50,asArray(100]).map(n => <option key={n} value={n}>{n}/página</option>)}
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>{n}/página</option>
+              ))}
             </select>
             <button
               className="px-3 py-1 text-sm border rounded disabled:opacity-50"
@@ -554,10 +566,9 @@ export default function PayablesPage() {
             <button
               className="px-3 py-1 text-sm border rounded disabled:opacity-50"
               onClick={()=>{
-                const totalPages = Math.max(1, Math.ceil(total / pageSize));
                 setPage(p => Math.min(totalPages, p+1));
               }}
-              disabled={page >= Math.max(1, Math.ceil(total / pageSize)) || loading}
+              disabled={page >= totalPages || loading}
             >
               Próxima
             </button>
