@@ -7,11 +7,9 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import toast from "react-hot-toast";
 
+import { asArray } from "../utils/asArray";
 
-import { asArray } from '../utils/asArray';
-/* -------- Helpers seguros -------- */
-const asArray = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
-
+/* -------- Helpers -------- */
 function toDateISO(dateStr /* YYYY-MM-DD */, hhmm /* HH:mm */) {
   const [h = "00", m = "00"] = String(hhmm || "").split(":");
   const d = new Date(`${dateStr}T00:00:00`);
@@ -67,9 +65,8 @@ const BookingPage = () => {
         setLoading(true);
         const { data } = await api.get(`/public/booking-page/${companyId}`, { signal: ac.signal });
 
-        // 🔒 Blindagem: garanta arrays sempre
+        // 🔒 Blindagem: garanta arrays sempre e respeite visibilidade
         const services = asArray(data?.services);
-        // Opcional: só mostra quem é visível
         const staff = asArray(data?.staff).filter((s) => s?.showInBooking !== false);
 
         setCompanyData({
@@ -99,7 +96,7 @@ const BookingPage = () => {
         const params = {
           date: selectedDate,
           serviceId: selectedService.id, // permite duração custom
-          staffId: selectedStaff.id,     // conforme seus logs públicos
+          staffId: selectedStaff.id, // conforme seus logs públicos
         };
         const res = await api.get("/public/available-slots", { params, signal: ac.signal });
         setAvailableSlots(normalizeSlots(res.data));
@@ -150,7 +147,7 @@ const BookingPage = () => {
       companyId,
       serviceId: selectedService.id,
       staffId: selectedStaff.id,
-      date: selectedDate,     // opcional — se o backend usa junto com slotTime
+      date: selectedDate, // opcional — se o backend usa junto com slotTime
       slotTime: selectedSlot, // "HH:mm"
       clientName: customerDetails.name,
       clientPhone: customerDetails.phone,
@@ -233,8 +230,8 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Serviço</h2>
               </div>
               <ul className="space-y-3">
-                {asArray(asArray(companyData.services)).map((service) => (
-                  <li key={service.id || service.name}>
+                {asArray(companyData.services).map((service, idx) => (
+                  <li key={service.id || service.name || idx}>
                     <button
                       onClick={() => handleSelectService(service)}
                       className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition"
@@ -272,8 +269,8 @@ const BookingPage = () => {
                 <h2 className="text-xl font-semibold">Escolha um Profissional</h2>
               </div>
               <ul className="space-y-3">
-                {asArray(asArray(companyData.staff)).map((staffMember) => (
-                  <li key={staffMember.id || staffMember.name}>
+                {asArray(companyData.staff).map((staffMember, idx) => (
+                  <li key={staffMember.id || staffMember.name || idx}>
                     <button
                       onClick={() => handleSelectStaff(staffMember)}
                       className="w-full text-left p-4 border rounded-xl flex justify-between items-center hover:bg-purple-50 transition"
