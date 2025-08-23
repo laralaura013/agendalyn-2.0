@@ -62,6 +62,8 @@ app.use((req, _res, next) => {
 /* ------------------------ Preflight manual ------------------------- */
 const allowOrigin = (origin) => {
   if (!origin) return true;
+
+  // FRONTEND_URL pode ser lista separada por vírgula
   const envAllowed = (process.env.FRONTEND_URL || '')
     .split(',')
     .map((s) => s.trim())
@@ -112,9 +114,10 @@ app.use(
 /**
  * ⚠️ Webhook do WhatsApp precisa do RAW BODY.
  * Monte a rota de WhatsApp ANTES do express.json global.
- * Aqui usamos express.json com "verify" para capturar o buffer bruto em req.rawBody.
- * (Se preferir assinatura estrita HMAC, você pode trocar por express.raw({ type: 'application/json' })
- * no router do webhook especificamente.)
+ * Capturamos o buffer bruto em req.rawBody para validação HMAC.
+ *
+ * Importante: aqui já encadeamos o companyLogger para que
+ * as rotas autenticadas (/settings, /health, /test) recebam req.companyId.
  */
 app.use(
   '/api/integrations/whatsapp',
@@ -124,6 +127,7 @@ app.use(
       req.rawBody = buf; // Buffer para HMAC quando necessário
     },
   }),
+  companyLogger,      // ✅ garante req.companyId nas rotas autenticadas de WhatsApp
   whatsappRoutes
 );
 
@@ -131,7 +135,7 @@ app.use(
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-// Logger contextual (empresa/usuário)
+// Logger contextual (empresa/usuário) — para as demais rotas
 app.use(companyLogger);
 
 /* ----------------------------- Rotas ------------------------------ */
