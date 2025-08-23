@@ -40,15 +40,22 @@ function SellModal({ open, onClose, pkg, onSold }) {
     return () => clearTimeout(t);
   }, [q]);
 
-  // Corrigido: usa /clients/min (q/take/skip) e normaliza {items:[]}
+  // Tenta /clients/min -> /clients/select -> /clients (com q/take/skip)
   const fetchClients = useCallback(
     async (term) => {
       if (!open) return;
+      setLoadingClients(true);
       try {
-        setLoadingClients(true);
-        const res = await api.get("/clients/min", {
-          params: { q: term || "", take: 50, skip: 0 },
-        });
+        let res;
+        try {
+          res = await api.get("/clients/min", { params: { q: term || "", take: 50, skip: 0 } });
+        } catch {
+          try {
+            res = await api.get("/clients/select", { params: { q: term || "", take: 50, skip: 0 } });
+          } catch {
+            res = await api.get("/clients", { params: { q: term || "", take: 50, skip: 0 } });
+          }
+        }
         const items = Array.isArray(res.data) ? res.data : res.data?.items || [];
         setClients(items);
       } catch (e) {
@@ -93,7 +100,6 @@ function SellModal({ open, onClose, pkg, onSold }) {
 
     setSaving(true);
     try {
-      // Corrigido: rota de venda existente no seu backend
       await api.post("/packages/sell", {
         clientId,
         packageId: pkg.id,
@@ -106,7 +112,7 @@ function SellModal({ open, onClose, pkg, onSold }) {
       const msg =
         e?.response?.data?.message ||
         (e?.response?.status === 404
-          ? "Rota /packages/sell não encontrada. Verifique o app.use('/api/packages', ...)."
+          ? "Rota /packages/sell não encontrada. Verifique seu server.js e packageRoutes."
           : e?.message) ||
         "Erro ao confirmar venda.";
       toast.error(msg);
@@ -240,6 +246,7 @@ function SellModal({ open, onClose, pkg, onSold }) {
 function CreatePackageModal({ open, onClose, onCreated }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [sessions, setSessions] = useState(""); // OBRIGATÓRIO no backend
   const [validity, setValidity] = useState("");
   const [features, setFeatures] = useState("");
 
@@ -253,7 +260,7 @@ function CreatePackageModal({ open, onClose, onCreated }) {
 
   useEffect(() => {
     if (!open) {
-      setName(""); setPrice(""); setValidity(""); setFeatures("");
+      setName(""); setPrice(""); setSessions(""); setValidity(""); setFeatures("");
       setSvcQuery(""); setDebounced(""); setServices([]);
       setSelectedSvcIds([]); setSaving(false);
     }
@@ -301,6 +308,8 @@ function CreatePackageModal({ open, onClose, onCreated }) {
     e.preventDefault();
     if (!name.trim()) return toast.error("Informe o nome do pacote.");
     if (!price) return toast.error("Informe o preço.");
+    if (!sessions) return toast.error("Informe a quantidade de sessões.");
+    if (!validity) return toast.error("Informe a validade (dias).");
     if (selectedSvcIds.length === 0)
       return toast.error("Selecione pelo menos um serviço.");
 
@@ -309,13 +318,14 @@ function CreatePackageModal({ open, onClose, onCreated }) {
       const payloadBase = {
         name: name.trim(),
         price: Number(price),
-        validityDays: validity ? Number(validity) : null,
+        sessions: Number(sessions),
+        validityDays: Number(validity),
         features: features
           ? features.split(",").map((s) => s.trim()).filter(Boolean)
           : [],
       };
 
-      // API mais comum: serviceIds
+      // API padrão do seu backend: serviceIds
       try {
         await api.post("/packages", { ...payloadBase, serviceIds: selectedSvcIds });
       } catch (err) {
@@ -383,9 +393,20 @@ function CreatePackageModal({ open, onClose, onCreated }) {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sessões</label>
+            <input
+              type="number" min="1" step="1"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              value={sessions}
+              onChange={(e) => setSessions(e.target.value)}
+              placeholder="Ex.: 5"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Validade (dias)</label>
             <input
-              type="number" min="0"
+              type="number" min="1" step="1"
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
               value={validity}
               onChange={(e) => setValidity(e.target.value)}
@@ -498,7 +519,11 @@ function DeletePackagesModal({ open, onClose, ids = [], onDeleted }) {
       onDeleted?.();
       onClose?.();
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || "Erro ao excluir.";
+      const status = e?.response?.status;
+      const msg =
+        status === 404
+          ? "Exclusão de pacote não disponível na API (/packages/:id)."
+          : e?.response?.data?.message || e?.message || "Erro ao excluir.";
       toast.error(msg);
     } finally {
       setDeleting(false);
@@ -548,7 +573,6 @@ function DeletePackagesModal({ open, onClose, ids = [], onDeleted }) {
 
 /* ================= Card ================= */
 function ServicePills({ names = [] }) {
-  // mostra até 3 nomes, o resto vira +N
   const max = 3;
   const show = names.slice(0, max);
   const rest = names.length - show.length;
@@ -594,7 +618,6 @@ function PackageCard({ item, onSelect, selected, toggleSelected }) {
       <div className="flex-grow">
         <div className="flex items-center gap-2 mb-2">
           <h2 className="text-2xl font-bold text-gray-800">{item.name}</h2>
-          {/* contador de serviços */}
           <span className="text-xs bg-gray-800 text-white px-2 py-0.5 rounded-full">
             {serviceNames.length} serviço{serviceNames.length === 1 ? "" : "s"}
           </span>
@@ -606,7 +629,6 @@ function PackageCard({ item, onSelect, selected, toggleSelected }) {
           {item.validityDays ? `Validade: ${item.validityDays} dias` : "Validade: —"}
         </p>
 
-        {/* features/lista marcada */}
         <ul className="space-y-2 text-gray-700">
           {(serviceNames.length ? serviceNames : []).slice(0, 6).map((n, i) => (
             <li key={i} className="flex items-center">
@@ -616,7 +638,6 @@ function PackageCard({ item, onSelect, selected, toggleSelected }) {
           ))}
         </ul>
 
-        {/* pílulas dos serviços */}
         <ServicePills names={serviceNames} />
       </div>
 
@@ -649,7 +670,6 @@ export default function PackagesPage() {
       const list = Array.isArray(res.data) ? res.data : res.data?.items || [];
       const normalized = list.map((p) => ({
         ...p,
-        // Garante que tenhamos algum nome pra exibir
         services: Array.isArray(p.services) ? p.services : [],
         features:
           p.features ||

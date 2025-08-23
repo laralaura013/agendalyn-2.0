@@ -2,6 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import listEndpoints from 'express-list-endpoints';
 
 // Middlewares
 import { companyLogger } from './middlewares/loggerMiddleware.js';
@@ -195,6 +196,18 @@ app.get('/api', (_req, res) =>
 app.get('/', (_req, res) =>
   res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' })
 );
+
+/* ---------------------- Lista de rotas (console) ------------------ */
+// Mostra tabela com as rotas registradas – útil em dev.
+// Desative definindo LIST_ROUTES=false no .env
+if (process.env.LIST_ROUTES !== 'false') {
+  const table = listEndpoints(app).map((r) => ({
+    methods: r.methods.join(','),
+    path: r.path,
+  }));
+  console.log('📚 Rotas registradas:');
+  console.table(table);
+}
 
 /* ----------------------- 404 & Error Handler ---------------------- */
 app.use((req, res) => {
