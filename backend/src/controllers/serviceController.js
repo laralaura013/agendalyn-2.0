@@ -1,3 +1,4 @@
+// controllers/serviceController.js
 import prisma from '../prismaClient.js';
 
 /* Helpers */
@@ -26,10 +27,7 @@ export const listServicesMin = async (req, res) => {
 
     const where = {
       companyId,
-      deletedAt: null,
-      ...(q
-        ? { name: { contains: q, mode: 'insensitive' } }
-        : {}),
+      ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
     };
 
     const items = await prisma.service.findMany({
@@ -40,7 +38,7 @@ export const listServicesMin = async (req, res) => {
       take,
     });
 
-    // a CreatePackageModal aceita array direto
+    // CreatePackageModal aceita array direto
     return res.status(200).json(items);
   } catch (error) {
     console.error('❌ Erro ao listar serviços (min):', error);
@@ -61,10 +59,7 @@ export const listServices = async (req, res) => {
 
     const where = {
       companyId,
-      deletedAt: null,
-      ...(q
-        ? { name: { contains: q, mode: 'insensitive' } }
-        : {}),
+      ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
     };
 
     const [total, items] = await Promise.all([
@@ -118,8 +113,8 @@ export const createService = async (req, res) => {
     const newService = await prisma.service.create({
       data: {
         name,
-        price: p,                // Prisma Decimal aceita number/string
-        duration: d,             // ajuste para seu schema se for outro campo
+        price: p,     // Prisma Decimal aceita number|string
+        duration: d,  // ajuste o campo se no seu schema for outro nome
         companyId,
       },
       select: { id: true, name: true, price: true, duration: true },
@@ -160,7 +155,7 @@ export const updateService = async (req, res) => {
     }
 
     const result = await prisma.service.updateMany({
-      where: { id, companyId, deletedAt: null },
+      where: { id, companyId },
       data,
     });
 
@@ -182,7 +177,7 @@ export const updateService = async (req, res) => {
 
 /* =========================
    DELETAR serviço (hard delete)
-   - se estiver vinculado, retorna 409
+   - se estiver vinculado a pacote, retorna 409
    ========================= */
 export const deleteService = async (req, res) => {
   try {
@@ -213,8 +208,7 @@ export const deleteService = async (req, res) => {
     console.error('--- ERRO AO DELETAR SERVIÇO ---', error);
     if (error.code === 'P2003') {
       return res.status(409).json({
-        message:
-          'Este serviço não pode ser excluído, pois está sendo utilizado em um ou mais registros.',
+        message: 'Este serviço não pode ser excluído, pois está sendo utilizado em um ou mais registros.',
       });
     }
     res.status(500).json({ message: 'Erro ao deletar serviço.' });
