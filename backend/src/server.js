@@ -37,11 +37,14 @@ import financeRoutes from './routes/financeRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 
-// Formas de pagamento (OrderDrawer)
+// Pagamentos (OrderDrawer)
 import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
-// WhatsApp (settings + webhook dentro do mesmo router)
+// Integrações WhatsApp (settings + webhook)
 import whatsappRoutes from './routes/whatsappRoutes.js';
+
+// Integrações Meta (Embedded Signup + status + webhook + template)
+import metaRoutes from './routes/metaRoutes.js';
 
 dotenv.config();
 
@@ -116,7 +119,7 @@ app.use(
  * Monte a rota de WhatsApp ANTES do express.json global.
  * Capturamos o buffer bruto em req.rawBody para validação HMAC.
  *
- * Importante: aqui já encadeamos o companyLogger para que
+ * Importante: encadeamos o companyLogger para que
  * as rotas autenticadas (/settings, /health, /test) recebam req.companyId.
  */
 app.use(
@@ -127,9 +130,17 @@ app.use(
       req.rawBody = buf; // Buffer para HMAC quando necessário
     },
   }),
-  companyLogger,      // ✅ garante req.companyId nas rotas autenticadas de WhatsApp
+  companyLogger,
   whatsappRoutes
 );
+
+/**
+ * ⚠️ Meta (Embedded Signup) também usa webhook com possível validação HMAC.
+ * O router de Meta já aplica express.json({ verify }) internamente,
+ * então aqui só encadeamos o companyLogger para rotas autenticadas
+ * (status, embedded/start, disconnect, send/template).
+ */
+app.use('/api/integrations/meta', companyLogger, metaRoutes);
 
 /* ------------------------ Core middlewares ------------------------ */
 app.use(express.json({ limit: '5mb' }));

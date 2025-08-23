@@ -11,6 +11,7 @@ import {
   Send,
   ShieldCheck,
   Smartphone,
+  LogOut,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -18,7 +19,7 @@ import api from '../services/api';
 import GoogleConnectButton from '../components/integrations/GoogleConnectButton';
 import WhatsAppDeeplinkCard from '../components/integrations/WhatsAppDeeplinkCard';
 
-// ------------- helpers -------------
+// --------- helpers ---------
 const getSafeUser = () => {
   try {
     const raw = localStorage.getItem('user');
@@ -86,7 +87,7 @@ const Toggle = ({ checked, onChange, label, helper }) => (
   </div>
 );
 
-// ------------- page -------------
+// --------- page ---------
 const SettingsPage = () => {
   const [loading, setLoading] = useState(true);
 
@@ -98,7 +99,7 @@ const SettingsPage = () => {
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleEmail, setGoogleEmail] = useState('');
 
-  // whatsapp
+  // whatsapp (config)
   const [wa, setWa] = useState({
     whatsappEnabled: false,
     useSharedWaba: true,
@@ -118,13 +119,18 @@ const SettingsPage = () => {
   const [savingWa, setSavingWa] = useState(false);
   const [testing, setTesting] = useState(false);
   const [healthLoading, setHealthLoading] = useState(false);
+
+  // teste rápido
   const [testTo, setTestTo] = useState('');
   const [testText, setTestText] = useState('Teste do bot ✅');
-
-  // NOVO: template test
   const [useTemplate, setUseTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('hello_world');
   const [lang, setLang] = useState('pt_BR');
+
+  // meta embedded
+  const [metaStatus, setMetaStatus] = useState({ connected: false });
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const bookingUrl = useMemo(() => `${window.location.origin}/agendar/${companyId}`, [companyId]);
 
@@ -154,11 +160,25 @@ const SettingsPage = () => {
     setWa((prev) => ({ ...prev, ...data }));
   }, []);
 
+  const fetchMetaStatus = useCallback(async () => {
+    try {
+      const { data } = await api.get('/integrations/meta/status');
+      setMetaStatus(data || { connected: false });
+    } catch {
+      setMetaStatus({ connected: false });
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        await Promise.all([fetchCompanyProfile(), fetchGoogleStatus(), fetchWhatsSettings()]);
+        await Promise.all([
+          fetchCompanyProfile(),
+          fetchGoogleStatus(),
+          fetchWhatsSettings(),
+          fetchMetaStatus(),
+        ]);
       } catch (e) {
         console.error(e);
         toast.error('Falha ao carregar configurações.');
@@ -166,7 +186,7 @@ const SettingsPage = () => {
         setLoading(false);
       }
     })();
-  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings]);
+  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus]);
 
   // ------------ actions ------------
   const saveCompany = async (e) => {
@@ -184,6 +204,8 @@ const SettingsPage = () => {
     try {
       await api.put('/integrations/whatsapp/settings', wa);
       toast.success('Configurações do WhatsApp salvas!');
+      await fetchWhatsSettings();
+      await fetchMetaStatus();
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Falha ao salvar configurações.');
     } finally {
@@ -213,14 +235,21 @@ const SettingsPage = () => {
 
     setTesting(true);
     try {
-      await api.post('/integrations/whatsapp/test', {
-        to: testTo,
-        text: useTemplate ? undefined : testText,
-        useTemplate,
-        templateName,
-        lang,
-      });
-      toast.success(useTemplate ? 'Template enviado!' : 'Mensagem enviada!');
+      if (useTemplate) {
+        await api.post('/integrations/meta/send/template', {
+          to: testTo,
+          templateName,
+          lang,
+        });
+        toast.success('Template enviado!');
+      } else {
+        await api.post('/integrations/whatsapp/test', {
+          to: testTo,
+          text: testText,
+          useTemplate: false,
+        });
+        toast.success('Mensagem enviada!');
+      }
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Falha ao enviar teste.');
     } finally {
@@ -228,10 +257,44 @@ const SettingsPage = () => {
     }
   };
 
+  const handleConnectMeta = async () => {
+    try {
+      setMetaLoading(true);
+      const { data } = await api.post('/integrations/meta/embedded/start');
+      const win = window.open(data.url, 'metaOnboard', 'width=850,height=750');
+
+      // polling simples até o popup fechar → atualiza status
+      const poll = setInterval(async () => {
+        if (win?.closed) {
+          clearInterval(poll);
+          await fetchMetaStatus();
+          await fetchWhatsSettings();
+        }
+      }, 900);
+    } catch (e) {
+      toast.error('Falha ao abrir o onboarding do Meta.');
+    } finally {
+      setMetaLoading(false);
+    }
+  };
+
+  const handleDisconnectMeta = async () => {
+    try {
+      setDisconnecting(true);
+      await api.post('/integrations/meta/disconnect');
+      toast.success('Conexão removida.');
+      await fetchMetaStatus();
+      await fetchWhatsSettings();
+    } catch (e) {
+      toast.error('Falha ao desconectar.');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
   const userData = getSafeUser();
   const staffId = userData?.id || '';
 
-  // ------------ UI helpers ------------
   const StatusBadge = ({ status }) => {
     if (status === 'OK')
       return (
@@ -252,7 +315,6 @@ const SettingsPage = () => {
     );
   };
 
-  // ------------ loading ------------
   if (loading) {
     return (
       <div className="min-h-screen px-4 pt-6 pb-24 sm:px-6 md:px-10">
@@ -265,6 +327,8 @@ const SettingsPage = () => {
       </div>
     );
   }
+
+  const showConnectBtn = !wa.useSharedWaba && !metaStatus.connected;
 
   return (
     <div className="min-h-screen px-4 pt-6 pb-24 sm:px-6 md:px-10">
@@ -292,13 +356,12 @@ const SettingsPage = () => {
       </div>
 
       <div className="mx-auto max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Coluna esquerda (2/3) */}
+        {/* Coluna esquerda */}
         <div className="lg:col-span-2 space-y-6">
-          {/* WhatsApp */}
           <Section
             title="WhatsApp"
             icon={Smartphone}
-            desc="Configure o bot por empresa. Você pode usar número compartilhado (global) ou o seu próprio (Meta)."
+            desc="Configure o bot por empresa. Use número compartilhado (global) ou conecte seu próprio número via Meta."
             right={
               <div className="flex items-center gap-2">
                 <StatusBadge status={wa.whatsappStatus} />
@@ -320,18 +383,13 @@ const SettingsPage = () => {
               </div>
             }
           >
-            {/* banner status */}
             {!wa.whatsappEnabled ? (
               <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800 text-sm flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 mt-0.5" />
-                <div>
-                  O WhatsApp está <strong>desativado</strong> para esta empresa. Ative e salve para
-                  começar a receber mensagens.
-                </div>
+                <div>O WhatsApp está <strong>desativado</strong> para esta empresa.</div>
               </div>
             ) : null}
 
-            {/* toggles */}
             <div className="grid gap-4">
               <Toggle
                 checked={wa.whatsappEnabled}
@@ -346,43 +404,57 @@ const SettingsPage = () => {
               />
             </div>
 
-            {/* credenciais (colapsa quando usa compartilhado) */}
+            {/* Botão Conectar / Desconectar Meta */}
+            {!wa.useSharedWaba ? (
+              <div className="mt-4 flex items-center gap-3">
+                {metaStatus.connected ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-200">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Conectado via Meta
+                    </span>
+                    <button
+                      onClick={handleDisconnectMeta}
+                      disabled={disconnecting}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      {disconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                      Desconectar
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleConnectMeta}
+                    disabled={metaLoading}
+                    className="inline-flex items-center gap-2 rounded-xl bg-purple-600 text-white px-4 py-2 text-sm font-semibold shadow hover:bg-purple-700"
+                  >
+                    {metaLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
+                    Conectar via Meta
+                  </button>
+                )}
+              </div>
+            ) : null}
+
+            {/* Credenciais manuais (apenas se NÃO usar compartilhado) */}
             {!wa.useSharedWaba ? (
               <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label hint="Token do usuário de sistema do Meta (escopos: whatsapp_business_messaging, whatsapp_business_management)">
-                    WABA Access Token
-                  </Label>
+                  <Label>WABA Access Token</Label>
                   <input
                     type="password"
                     className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                    value={wa.wabaAccessToken}
+                    value={wa.wabaAccessToken || ''}
                     onChange={(e) => setWa((s) => ({ ...s, wabaAccessToken: e.target.value }))}
-                    placeholder="EAAG... (nunca exponha no front)"
+                    placeholder="EAAG... (opcional se conectar via Meta)"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label hint="ID do número WhatsApp (Phone Number ID) da configuração do WhatsApp Cloud API.">
-                    WABA Phone Number ID
-                  </Label>
+                  <Label>WABA Phone Number ID</Label>
                   <input
                     type="text"
                     className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                    value={wa.wabaPhoneNumberId}
+                    value={wa.wabaPhoneNumberId || ''}
                     onChange={(e) => setWa((s) => ({ ...s, wabaPhoneNumberId: e.target.value }))}
                     placeholder="ex.: 770384329493099"
-                  />
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label hint="Recomendado para validar a assinatura HMAC do webhook.">
-                    WABA App Secret (opcional)
-                  </Label>
-                  <input
-                    type="password"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                    value={wa.wabaAppSecret}
-                    onChange={(e) => setWa((s) => ({ ...s, wabaAppSecret: e.target.value }))}
-                    placeholder="App secret do app no Meta"
                   />
                 </div>
               </div>
@@ -411,7 +483,7 @@ const SettingsPage = () => {
 
               {/* menu do bot */}
               <div className="space-y-2">
-                <Label hint="Itens apresentados no menu 1, 2, 3...">Menu do Bot (itens)</Label>
+                <Label>Menu do Bot (itens)</Label>
                 <div className="space-y-2">
                   {wa.botMenuItems.map((item, idx) => (
                     <div
@@ -445,18 +517,14 @@ const SettingsPage = () => {
                           });
                         }}
                         placeholder="CÓDIGO (ex.: BOOKING)"
-                        title="Código usado internamente (ex.: BOOKING, RESCHEDULE, HUMAN)"
+                        title="Código usado internamente"
                       />
                       <button
                         type="button"
                         onClick={() =>
-                          setWa((s) => ({
-                            ...s,
-                            botMenuItems: s.botMenuItems.filter((_, i) => i !== idx),
-                          }))
+                          setWa((s) => ({ ...s, botMenuItems: s.botMenuItems.filter((_, i) => i !== idx) }))
                         }
                         className="text-sm text-gray-600 hover:text-red-600"
-                        title="Remover"
                       >
                         Remover
                       </button>
@@ -466,10 +534,7 @@ const SettingsPage = () => {
                 <button
                   type="button"
                   onClick={() =>
-                    setWa((s) => ({
-                      ...s,
-                      botMenuItems: [...s.botMenuItems, { label: '', value: '' }],
-                    }))
+                    setWa((s) => ({ ...s, botMenuItems: [...s.botMenuItems, { label: '', value: '' }] }))
                   }
                   className="inline-flex items-center gap-2 text-sm text-purple-700 hover:text-purple-800"
                 >
@@ -490,9 +555,7 @@ const SettingsPage = () => {
                 <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
                   Última verificação:{' '}
                   {wa.whatsappLastCheckAt ? (
-                    <span className="font-medium">
-                      {new Date(wa.whatsappLastCheckAt).toLocaleString()}
-                    </span>
+                    <span className="font-medium">{new Date(wa.whatsappLastCheckAt).toLocaleString()}</span>
                   ) : (
                     <span>—</span>
                   )}
@@ -546,7 +609,6 @@ const SettingsPage = () => {
                     Usar mensagem template (primeiro contato)
                   </label>
                 </div>
-
                 <div>
                   <Label>Template name</Label>
                   <input
@@ -558,7 +620,6 @@ const SettingsPage = () => {
                     disabled={!useTemplate}
                   />
                 </div>
-
                 <div>
                   <Label>Idioma</Label>
                   <input
@@ -622,14 +683,14 @@ const SettingsPage = () => {
           </Section>
         </div>
 
-        {/* Coluna direita (1/3) */}
+        {/* Coluna direita */}
         <div className="space-y-6">
           {/* Google */}
           <Section title="Google Calendar" icon={CalendarIcon} desc="Sincronize seus agendamentos com seu Google Calendar.">
-            {staffId ? (
+            {getSafeUser()?.id ? (
               <>
                 <GoogleConnectButton
-                  staffId={staffId}
+                  staffId={getSafeUser()?.id}
                   isConnected={googleConnected}
                   onStatusChange={(connected, email) => {
                     setGoogleConnected(connected);
@@ -648,7 +709,7 @@ const SettingsPage = () => {
             )}
           </Section>
 
-          {/* Link/QR multi-empresa */}
+          {/* Link/QR */}
           <Section
             title="Link/QR para WhatsApp (multi-empresa)"
             icon={QrCode}
@@ -657,7 +718,7 @@ const SettingsPage = () => {
             <WhatsAppDeeplinkCard slug={wa.slug} />
           </Section>
 
-          {/* Webhook info / ajuda rápida */}
+          {/* Ajuda webhook */}
           <Section
             title="Como conectar o WhatsApp"
             icon={PlugZap}
@@ -677,7 +738,6 @@ const SettingsPage = () => {
   );
 };
 
-// ícone simples para evitar mais imports
 const CalendarIcon = (props) => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" {...props}>
     <path
