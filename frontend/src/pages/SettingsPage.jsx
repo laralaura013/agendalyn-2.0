@@ -1,47 +1,112 @@
-// src/pages/SettingsPage.jsx
 import {
+  AlertTriangle,
+  BadgeCheck,
+  CheckCircle2,
   Copy,
   Link,
-  Plus,
+  Loader2,
+  PlugZap,
+  QrCode,
   RefreshCw,
+  Save,
   Send,
-  AlertTriangle,
-  XCircle,
+  ShieldCheck,
+  Smartphone,
 } from 'lucide-react';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import GoogleConnectButton from '../components/integrations/GoogleConnectButton';
-import WhatsAppInstructions from '../components/integrations/WhatsAppInstructions';
 import WhatsAppDeeplinkCard from '../components/integrations/WhatsAppDeeplinkCard';
 
-// Parse seguro do localStorage
-function getSafeUser() {
+// ------------- helpers -------------
+const getSafeUser = () => {
   try {
     const raw = localStorage.getItem('user');
-    if (!raw) return null;
-    return JSON.parse(raw);
+    return raw ? JSON.parse(raw) : null;
   } catch {
     localStorage.removeItem('user');
     return null;
   }
-}
+};
 
+const Label = ({ children, hint }) => (
+  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+    {children}
+    {hint ? (
+      <span
+        className="ml-1 text-gray-400 text-xs cursor-help"
+        title={hint}
+        aria-label={hint}
+      >
+        ⓘ
+      </span>
+    ) : null}
+  </label>
+);
+
+const Section = ({ title, icon: Icon, desc, right, children }) => (
+  <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 md:p-6 transition hover:shadow-md">
+    <div className="flex items-start justify-between gap-3 mb-4">
+      <div>
+        <div className="flex items-center gap-2">
+          {Icon ? (
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50">
+              <Icon className="h-4 w-4 text-purple-700" />
+            </span>
+          ) : null}
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900">{title}</h2>
+        </div>
+        {desc ? <p className="text-sm text-gray-500 mt-1">{desc}</p> : null}
+      </div>
+      {right}
+    </div>
+    {children}
+  </div>
+);
+
+const Toggle = ({ checked, onChange, label, helper }) => (
+  <div className="flex items-start gap-3">
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition ${
+        checked ? 'bg-purple-600' : 'bg-gray-300'
+      }`}
+      role="switch"
+      aria-checked={checked}
+    >
+      <span
+        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+          checked ? 'translate-x-5' : 'translate-x-1'
+        }`}
+      />
+    </button>
+    <div className="flex-1">
+      <p
+        className="select-none cursor-pointer text-sm font-medium text-gray-800"
+        onClick={() => onChange(!checked)}
+      >
+        {label}
+      </p>
+      {helper ? <p className="text-xs text-gray-500 mt-0.5">{helper}</p> : null}
+    </div>
+  </div>
+);
+
+// ------------- page -------------
 const SettingsPage = () => {
-  const [formData, setFormData] = useState({ name: '', phone: '', address: '', slug: '' });
-  const [companyId, setCompanyId] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // company
+  const [companyId, setCompanyId] = useState('');
+  const [companyForm, setCompanyForm] = useState({ name: '', phone: '', address: '' });
+
+  // google
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleEmail, setGoogleEmail] = useState('');
 
-  // WhatsApp
-  const [waLoading, setWaLoading] = useState(true);
-  const [waSaving, setWaSaving] = useState(false);
-  const [waChecking, setWaChecking] = useState(false);
-  const [waTesting, setWaTesting] = useState(false);
-  const [waHealth, setWaHealth] = useState({ status: null, at: null });
-
-  const emptyMenu = [{ label: 'Agendar atendimento', value: 'BOOKING' }];
+  // whatsapp
   const [wa, setWa] = useState({
     whatsappEnabled: false,
     useSharedWaba: true,
@@ -49,563 +114,594 @@ const SettingsPage = () => {
     wabaPhoneNumberId: '',
     wabaAppSecret: '',
     botGreeting: 'Olá! 👋 Sou o assistente virtual. Como posso ajudar?',
-    botCancelPolicy: 'Cancelamentos com 3h de antecedência.',
-    botMenuItems: emptyMenu,
+    botCancelPolicy: '',
+    botMenuItems: [{ label: 'Agendar atendimento', value: 'BOOKING' }],
     slug: '',
     subscriptionPlan: '',
     subscriptionStatus: '',
-    phoneNumberIdShared: null, // vem do /meta-info
+    whatsappStatus: null,
+    whatsappLastCheckAt: null,
   });
 
-  const [waTestNumber, setWaTestNumber] = useState('');
-  const [waTestText, setWaTestText] = useState('Teste do bot ✅');
+  const [savingWa, setSavingWa] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [testTo, setTestTo] = useState('');
+  const [testText, setTestText] = useState('Teste do bot ✅');
 
-  const bookingUrl = `${window.location.origin}/agendar/${companyId}`;
+  const bookingUrl = useMemo(() => `${window.location.origin}/agendar/${companyId}`, [companyId]);
 
-  const waChange = (k, v) => setWa((s) => ({ ...s, [k]: v }));
-  const addMenuItem = () =>
-    setWa((s) => ({ ...s, botMenuItems: [...(s.botMenuItems || []), { label: '', value: '' }] }));
-  const removeMenuItem = (idx) =>
-    setWa((s) => ({ ...s, botMenuItems: s.botMenuItems.filter((_, i) => i !== idx) }));
-  const updateMenuItem = (idx, field, value) =>
-    setWa((s) => ({
-      ...s,
-      botMenuItems: s.botMenuItems.map((it, i) => (i === idx ? { ...it, [field]: value } : it)),
-    }));
-
-  const usingShared = useMemo(() => {
-    if (wa.useSharedWaba) return true;
-    return !(wa.wabaAccessToken && wa.wabaPhoneNumberId);
-  }, [wa.useSharedWaba, wa.wabaAccessToken, wa.wabaPhoneNumberId]);
-
-  const missingOwnCreds = useMemo(
-    () => !usingShared && (!wa.wabaAccessToken || !wa.wabaPhoneNumberId),
-    [usingShared, wa.wabaAccessToken, wa.wabaPhoneNumberId]
-  );
-
-  const canOperateWhatsApp =
-    wa.whatsappEnabled && (usingShared || (!!wa.wabaAccessToken && !!wa.wabaPhoneNumberId));
-
-  const readinessBadge = canOperateWhatsApp ? (
-    <span className="badge badge-emerald" title="Configuração suficiente para operar">
-      Pronto para uso
-    </span>
-  ) : (
-    <span className="badge badge-gray" title="Faltam ajustes para operar">
-      Incompleto
-    </span>
-  );
-
-  // Empresa
+  // ------------ fetchers ------------
   const fetchCompanyProfile = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get('/company/profile');
-      setFormData({
-        name: data.name || '',
-        phone: data.phone || '',
-        address: data.address || '',
-        slug: data.slug || '',
-      });
-      setCompanyId(data.id || '');
-    } catch {
-      toast.error('Failed to load company data.');
-    } finally {
-      setLoading(false);
-    }
+    const { data } = await api.get('/company/profile');
+    setCompanyId(data.id || '');
+    setCompanyForm({
+      name: data.name || '',
+      phone: data.phone || '',
+      address: data.address || '',
+    });
   }, []);
 
-  // Google
   const fetchGoogleStatus = useCallback(async () => {
+    const userData = getSafeUser();
+    if (!userData?.id) return;
     try {
-      const userData = getSafeUser();
-      if (!userData?.id) return;
       const { data } = await api.get(`/integrations/google/status/${userData.id}`);
       setGoogleConnected(!!data.connected);
       setGoogleEmail(data.email || '');
-    } catch (err) {
-      console.warn('Erro ao buscar status Google:', err);
-    }
-  }, []);
-
-  // WhatsApp
-  const fetchWhatsAppSettings = useCallback(async () => {
-    setWaLoading(true);
-    try {
-      const { data } = await api.get('/integrations/whatsapp/settings');
-      setWa((s) => ({
-        ...s,
-        ...data,
-        botMenuItems: Array.isArray(data?.botMenuItems) ? data.botMenuItems : (data?.botMenuJson ? JSON.parse(data.botMenuJson) : emptyMenu),
-      }));
-      if (data?.whatsappStatus) {
-        setWaHealth({ status: data.whatsappStatus, at: data.whatsappLastCheckAt || null });
-      }
-      // meta-info para descobrir número compartilhado
-      const info = await api.get('/integrations/whatsapp/meta-info');
-      setWa((s) => ({ ...s, phoneNumberIdShared: info.data?.phoneNumberIdShared || null }));
     } catch (e) {
-      console.error(e);
-      toast.error('Falha ao carregar configurações do WhatsApp');
-    } finally {
-      setWaLoading(false);
+      // silencioso
     }
   }, []);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const result = params.get('google');
-    if (result === 'connected') {
-      toast.success('Google Calendar conectado com sucesso!');
-      fetchGoogleStatus();
-    } else if (result === 'error') {
-      toast.error('Erro ao conectar ao Google Calendar.');
-    }
-    if (result) {
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, [fetchGoogleStatus]);
+  const fetchWhatsSettings = useCallback(async () => {
+    const { data } = await api.get('/integrations/whatsapp/settings');
+    setWa((prev) => ({ ...prev, ...data }));
+  }, []);
 
   useEffect(() => {
-    fetchCompanyProfile();
-    fetchGoogleStatus();
-    fetchWhatsAppSettings();
-  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsAppSettings]);
+    (async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchCompanyProfile(), fetchGoogleStatus(), fetchWhatsSettings()]);
+      } catch (e) {
+        console.error(e);
+        toast.error('Falha ao carregar configurações.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const savePromise = api.put('/company/profile', formData);
-    toast.promise(savePromise, {
-      loading: 'Saving changes...',
-      success: 'Settings saved successfully!',
-      error: 'Failed to save changes.',
+  // ------------ actions ------------
+  const saveCompany = async (e) => {
+    e?.preventDefault?.();
+    const p = api.put('/company/profile', companyForm);
+    toast.promise(p, {
+      loading: 'Salvando empresa...',
+      success: 'Empresa atualizada!',
+      error: 'Falha ao salvar.',
     });
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(bookingUrl);
-    toast.success('Link copied to clipboard!');
-  };
-
-  const saveWhatsApp = async () => {
-    setWaSaving(true);
+  const saveWhats = async () => {
+    setSavingWa(true);
     try {
-      const payload = { ...wa, botMenuItems: wa.botMenuItems };
-      await api.put('/integrations/whatsapp/settings', payload);
+      await api.put('/integrations/whatsapp/settings', wa);
       toast.success('Configurações do WhatsApp salvas!');
     } catch (e) {
-      console.error(e);
-      toast.error('Falha ao salvar configurações do WhatsApp');
+      toast.error(e?.response?.data?.message || 'Falha ao salvar configurações.');
     } finally {
-      setWaSaving(false);
+      setSavingWa(false);
     }
   };
 
-  const checkWhatsApp = async () => {
-    if (!canOperateWhatsApp) {
-      return toast.error('Ative o WhatsApp e configure as credenciais antes de verificar.');
-    }
-    setWaChecking(true);
+  const checkHealth = async () => {
+    setHealthLoading(true);
     try {
       const { data } = await api.get('/integrations/whatsapp/health');
-      setWaHealth({
-        status: data?.status,
-        at: data?.meta?.whatsappLastCheckAt || new Date().toISOString(),
-      });
-      toast.success('Conexão verificada!');
+      toast.success('Conexão OK!');
+      setWa((prev) => ({
+        ...prev,
+        whatsappStatus: data.status,
+        whatsappLastCheckAt: new Date().toISOString(),
+      }));
     } catch (e) {
-      console.error(e);
-      setWaHealth({ status: 'ERROR', at: new Date().toISOString() });
-      toast.error('Falha ao verificar conexão');
+      toast.error('Falha ao verificar conexão.');
     } finally {
-      setWaChecking(false);
+      setHealthLoading(false);
     }
   };
 
-  const sendWhatsAppTest = async () => {
-    if (!canOperateWhatsApp) {
-      return toast.error('Ative o WhatsApp e configure as credenciais antes de enviar teste.');
-    }
-    if (!waTestNumber) return toast.error('Informe o número destino (com DDI, ex.: 55...)');
-    setWaTesting(true);
+  const sendTest = async () => {
+    if (!testTo || !testText) return toast.error('Preencha o número e a mensagem.');
+    setTesting(true);
     try {
-      await api.post('/integrations/whatsapp/test', { to: waTestNumber, text: waTestText });
+      await api.post('/integrations/whatsapp/test', { to: testTo, text: testText });
       toast.success('Mensagem enviada!');
     } catch (e) {
-      console.error(e);
-      toast.error('Falha ao enviar mensagem');
+      toast.error('Falha ao enviar teste.');
     } finally {
-      setWaTesting(false);
+      setTesting(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
-        <p className="text-gray-500">Loading settings...</p>
-      </div>
-    );
-  }
 
   const userData = getSafeUser();
   const staffId = userData?.id || '';
 
-  // número compartilhado em E.164 (se quiser mostrar no card). Se você tiver o número real,
-  // pode preencher aqui manualmente (ex.: +15551402556). Pelo phoneNumberId não dá pra inferir o número.
-  const sharedPhoneE164 = ''; // opcional: '+15551402556'
+  // ------------ UI helpers ------------
+  const StatusBadge = ({ status }) => {
+    if (status === 'OK')
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-200">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Conectado
+        </span>
+      );
+    if (status === 'ERROR')
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-200">
+          <AlertTriangle className="h-3.5 w-3.5" /> Erro
+        </span>
+      );
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-200">
+        <PlugZap className="h-3.5 w-3.5" /> Desconectado
+      </span>
+    );
+  };
+
+  // ------------ loading ------------
+  if (loading) {
+    return (
+      <div className="min-h-screen px-4 pt-6 pb-24 sm:px-6 md:px-10">
+        <div className="mx-auto max-w-5xl">
+          <div className="flex items-center gap-3 text-gray-600">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <p>Carregando configurações...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
-      <h1 className="text-2xl md:text-3xl font-bold mb-6">Company Settings</h1>
-
-      {/* Booking Link */}
-      <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8">
-        <div className="flex items-center gap-2 mb-2">
-          <Link className="h-5 w-5 text-purple-700" />
-          <h2 className="text-xl font-semibold">Your Booking Page</h2>
+    <div className="min-h-screen px-4 pt-6 pb-24 sm:px-6 md:px-10">
+      {/* header */}
+      <div className="mx-auto max-w-5xl mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">
+              Configurações
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Ajuste informações da empresa, integrações e o bot do WhatsApp.
+            </p>
+          </div>
+          <a
+            href={bookingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl bg-purple-600 text-white px-4 py-2 text-sm font-semibold shadow hover:bg-purple-700 transition"
+          >
+            <Link className="h-4 w-4" />
+            Página de agendamento
+          </a>
         </div>
-        <p className="text-sm text-gray-600 mb-4">
-          Share this link with your clients so they can book online.
-        </p>
-        <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
+      </div>
+
+      <div className="mx-auto max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna esquerda (2/3) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* WhatsApp */}
+          <Section
+            title="WhatsApp"
+            icon={Smartphone}
+            desc="Configure o bot por empresa. Você pode usar número compartilhado (global) ou o seu próprio (Meta)."
+            right={
+              <div className="flex items-center gap-2">
+                <StatusBadge status={wa.whatsappStatus} />
+                <button
+                  onClick={checkHealth}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {healthLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Verificando...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4" />
+                      Verificar conexão
+                    </>
+                  )}
+                </button>
+              </div>
+            }
+          >
+            {/* banner status */}
+            {!wa.whatsappEnabled ? (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800 text-sm flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5" />
+                <div>
+                  O WhatsApp está <strong>desativado</strong> para esta empresa. Ative e salve para
+                  começar a receber mensagens.
+                </div>
+              </div>
+            ) : null}
+
+            {/* toggles */}
+            <div className="grid gap-4">
+              <Toggle
+                checked={wa.whatsappEnabled}
+                onChange={(v) => setWa((s) => ({ ...s, whatsappEnabled: v }))}
+                label="Ativar WhatsApp para esta empresa"
+              />
+              <Toggle
+                checked={wa.useSharedWaba}
+                onChange={(v) => setWa((s) => ({ ...s, useSharedWaba: v }))}
+                label="Usar número compartilhado (global)"
+                helper="Se marcado, o sistema usará o número global configurado no backend."
+              />
+            </div>
+
+            {/* credenciais (colapsa quando usa compartilhado) */}
+            {!wa.useSharedWaba ? (
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label hint="Token do usuário de sistema do Meta (escopos: whatsapp_business_messaging, whatsapp_business_management)">
+                    WABA Access Token
+                  </Label>
+                  <input
+                    type="password"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                    value={wa.wabaAccessToken}
+                    onChange={(e) => setWa((s) => ({ ...s, wabaAccessToken: e.target.value }))}
+                    placeholder="EAAG... (nunca exponha no front)"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label hint="ID do número WhatsApp (Phone Number ID) da configuração do WhatsApp Cloud API.">
+                    WABA Phone Number ID
+                  </Label>
+                  <input
+                    type="text"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                    value={wa.wabaPhoneNumberId}
+                    onChange={(e) => setWa((s) => ({ ...s, wabaPhoneNumberId: e.target.value }))}
+                    placeholder="ex.: 770384329493099"
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label hint="Recomendado para validar a assinatura HMAC do webhook.">
+                    WABA App Secret (opcional)
+                  </Label>
+                  <input
+                    type="password"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                    value={wa.wabaAppSecret}
+                    onChange={(e) => setWa((s) => ({ ...s, wabaAppSecret: e.target.value }))}
+                    placeholder="App secret do app no Meta"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {/* textos do bot */}
+            <div className="mt-6 grid grid-cols-1 gap-4">
+              <div className="space-y-1.5">
+                <Label>Saudação</Label>
+                <input
+                  type="text"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                  value={wa.botGreeting}
+                  onChange={(e) => setWa((s) => ({ ...s, botGreeting: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Política de Cancelamento</Label>
+                <textarea
+                  rows={3}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                  value={wa.botCancelPolicy || ''}
+                  onChange={(e) => setWa((s) => ({ ...s, botCancelPolicy: e.target.value }))}
+                />
+              </div>
+
+              {/* menu do bot */}
+              <div className="space-y-2">
+                <Label hint="Itens apresentados no menu 1, 2, 3...">Menu do Bot (itens)</Label>
+                <div className="space-y-2">
+                  {wa.botMenuItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
+                    >
+                      <input
+                        type="text"
+                        className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm bg-white"
+                        value={item.label}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setWa((s) => {
+                            const list = [...s.botMenuItems];
+                            list[idx] = { ...list[idx], label: v };
+                            return { ...s, botMenuItems: list };
+                          });
+                        }}
+                        placeholder="Rótulo (ex.: Agendar atendimento)"
+                      />
+                      <input
+                        type="text"
+                        className="w-44 rounded-lg border border-gray-300 px-3 py-1.5 text-sm bg-white uppercase"
+                        value={item.value}
+                        onChange={(e) => {
+                          const v = e.target.value.toUpperCase();
+                          setWa((s) => {
+                            const list = [...s.botMenuItems];
+                            list[idx] = { ...list[idx], value: v };
+                            return { ...s, botMenuItems: list };
+                          });
+                        }}
+                        placeholder="CÓDIGO (ex.: BOOKING)"
+                        title="Código usado internamente (ex.: BOOKING, RESCHEDULE, HUMAN)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWa((s) => ({
+                            ...s,
+                            botMenuItems: s.botMenuItems.filter((_, i) => i !== idx),
+                          }))
+                        }
+                        className="text-sm text-gray-600 hover:text-red-600"
+                        title="Remover"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWa((s) => ({
+                      ...s,
+                      botMenuItems: [...s.botMenuItems, { label: '', value: '' }],
+                    }))
+                  }
+                  className="inline-flex items-center gap-2 text-sm text-purple-700 hover:text-purple-800"
+                >
+                  + Adicionar item
+                </button>
+              </div>
+
+              {/* ações */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  onClick={saveWhats}
+                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 text-white px-4 py-2 text-sm font-semibold shadow hover:bg-purple-700"
+                >
+                  {savingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar configurações
+                </button>
+
+                <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                  Última verificação:{' '}
+                  {wa.whatsappLastCheckAt ? (
+                    <span className="font-medium">
+                      {new Date(wa.whatsappLastCheckAt).toLocaleString()}
+                    </span>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* teste rápido */}
+            <div className="mt-6 border-t border-gray-100 pt-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label>Número destino (ex.: 5599999999999)</Label>
+                  <input
+                    type="tel"
+                    value={testTo}
+                    onChange={(e) => setTestTo(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Mensagem de teste</Label>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="text"
+                      value={testText}
+                      onChange={(e) => setTestText(e.target.value)}
+                      className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                    />
+                    <button
+                      onClick={sendTest}
+                      className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      Enviar teste
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          {/* Empresa */}
+          <Section
+            title="Informações da empresa"
+            icon={BadgeCheck}
+            desc="Esses dados aparecem no agendamento e em recibos."
+            right={
+              <button
+                onClick={saveCompany}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Save className="h-4 w-4" />
+                Salvar
+              </button>
+            }
+          >
+            <form onSubmit={saveCompany} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Nome da empresa</Label>
+                <input
+                  type="text"
+                  value={companyForm.name}
+                  onChange={(e) => setCompanyForm((s) => ({ ...s, name: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Telefone</Label>
+                <input
+                  type="tel"
+                  value={companyForm.phone}
+                  onChange={(e) => setCompanyForm((s) => ({ ...s, phone: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Endereço</Label>
+                <textarea
+                  rows={3}
+                  value={companyForm.address}
+                  onChange={(e) => setCompanyForm((s) => ({ ...s, address: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                />
+              </div>
+            </form>
+          </Section>
+        </div>
+
+        {/* Coluna direita (1/3) */}
+        <div className="space-y-6">
+          {/* Google */}
+          <Section
+            title="Google Calendar"
+            icon={CalendarIcon}
+            desc="Sincronize seus agendamentos com seu Google Calendar."
+          >
+            {staffId ? (
+              <>
+                <GoogleConnectButton
+                  staffId={staffId}
+                  isConnected={googleConnected}
+                  onStatusChange={(connected, email) => {
+                    setGoogleConnected(connected);
+                    setGoogleEmail(email || '');
+                  }}
+                />
+                {googleConnected && googleEmail ? (
+                  <p className="mt-2 inline-flex items-center gap-1 text-xs text-green-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Conectado como <strong className="font-semibold">{googleEmail}</strong>
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-red-600">Não foi possível detectar seu usuário.</p>
+            )}
+          </Section>
+
+          {/* Link/QR multi-empresa */}
+          <Section
+            title="Link/QR para WhatsApp (multi-empresa)"
+            icon={QrCode}
+            desc="Defina o slug da empresa nas configurações para gerar o link."
+          >
+            <WhatsAppDeeplinkCard slug={wa.slug} />
+          </Section>
+
+          {/* Webhook info / ajuda rápida */}
+          <Section
+            title="Como conectar o WhatsApp"
+            icon={PlugZap}
+            desc="Use no Meta Business (Webhooks) quando for usar número próprio."
+            right={
+              <span className="hidden md:inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-200">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Seguro
+              </span>
+            }
+          >
+            <WebhookHelp />
+          </Section>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ícone simples para evitar mais imports
+const CalendarIcon = (props) => <svg viewBox="0 0 24 24" className="h-5 w-5" {...props}><path fill="currentColor" d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H2V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1Zm15 8v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9h20ZM6 14h4v4H6v-4Z"/></svg>;
+
+const WebhookHelp = () => {
+  const [meta, setMeta] = useState({ webhookUrl: '', verifyToken: '', phoneNumberIdShared: '' });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get('/integrations/whatsapp/meta-info');
+        setMeta(data);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div>
+        <Label>Webhook URL</Label>
+        <div className="mt-1 flex items-center gap-2">
           <input
-            type="text"
-            value={bookingUrl}
             readOnly
-            className="flex-1 bg-transparent outline-none text-sm text-gray-700"
+            value={meta.webhookUrl || ''}
+            className="flex-1 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
           />
-          <button onClick={handleCopyLink} className="p-2 text-gray-500 hover:text-purple-700">
-            <Copy size={18} />
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+            onClick={() => {
+              navigator.clipboard.writeText(meta.webhookUrl || '');
+              toast.success('Webhook URL copiada!');
+            }}
+          >
+            <Copy className="h-4 w-4" /> Copiar
           </button>
         </div>
       </div>
 
-      {/* Google Calendar */}
-      <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8">
-        <h2 className="text-xl font-semibold mb-4">Google Calendar</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Connect your Google Calendar to sync appointments automatically.
-        </p>
-        {staffId ? (
-          <div className="flex flex-col gap-2">
-            <GoogleConnectButton
-              staffId={staffId}
-              isConnected={googleConnected}
-              onStatusChange={(connected, email) => {
-                setGoogleConnected(connected);
-                setGoogleEmail(email || '');
-              }}
-            />
-            {googleConnected && googleEmail && (
-              <p className="text-sm text-green-600">
-                ✅ Connected as <strong>{googleEmail}</strong>
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="text-red-500">Unable to detect your staff ID.</p>
-        )}
-      </div>
-
-      {/* Company Form */}
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-md mb-8">
-        <h2 className="text-xl font-semibold mb-4">Company Information</h2>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Company Name</label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="mt-1 block w-full p-2 border rounded-md"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Contact Phone</label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className="mt-1 block w-full p-2 border rounded-md"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Address</label>
-            <textarea
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              rows="3"
-              className="mt-1 block w-full p-2 border rounded-md"
-            ></textarea>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Slug (código da empresa)</label>
-            <input
-              type="text"
-              name="slug"
-              value={formData.slug}
-              onChange={handleChange}
-              className="mt-1 block w-full p-2 border rounded-md"
-              placeholder="ex.: barbearia-x"
-            />
-          </div>
-          <div className="flex justify-end pt-4">
-            <button
-              type="submit"
-              className="px-6 py-2 bg-purple-700 text-white font-semibold rounded-lg shadow-md hover:bg-purple-800"
-            >
-              Save Changes
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* WhatsApp (Cloud API) */}
-      <div className="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
-        <div className="flex items-center gap-2 mb-2">
-          <h2 className="text-xl font-semibold">WhatsApp</h2>
-
-          {waHealth.status && (
-            <span
-              className={`badge ${waHealth.status === 'OK' ? 'badge-green' : 'badge-red'}`}
-              title={waHealth.at ? new Date(waHealth.at).toLocaleString() : ''}
-            >
-              {waHealth.status === 'OK' ? 'OK' : 'ERROR'}
-            </span>
-          )}
-
-          <span
-            className={`badge ${usingShared ? 'badge-blue' : 'badge-amber'}`}
-            title={usingShared ? 'Usando número da plataforma (global)' : 'Usando número próprio desta empresa'}
-          >
-            Usando: {usingShared ? 'Compartilhado' : 'Próprio'}
-          </span>
-
-          {readinessBadge}
+      <div>
+        <Label>Verify Token</Label>
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            readOnly
+            value={meta.verifyToken || 'Defina WABA_VERIFY_TOKEN no backend'}
+            className="flex-1 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
+          />
         </div>
+      </div>
 
-        {!wa.whatsappEnabled && (
-          <div className="alert alert-yellow mb-4">
-            <AlertTriangle className="mt-0.5 h-4 w-4" />
-            <div>
-              O WhatsApp está <b>desativado</b> para esta empresa. Ative a opção abaixo para testar a conexão e
-              receber mensagens.
-            </div>
-          </div>
-        )}
-
-        {!usingShared && missingOwnCreds && (
-          <div className="alert alert-rose mb-4">
-            <XCircle className="mt-0.5 h-4 w-4" />
-            <div>
-              Para usar <b>número próprio</b>, preencha <b>WABA Access Token</b> e <b>WABA Phone Number ID</b>.
-            </div>
-          </div>
-        )}
-
-        <p className="text-sm text-gray-600 mb-4">
-          Configure a conexão com o WhatsApp Cloud API por empresa. Você pode usar um número próprio (token +
-          phone_number_id) ou um número compartilhado global da plataforma.
+      {meta.phoneNumberIdShared ? (
+        <p className="text-xs text-gray-500">
+          Número compartilhado (global) configurado: <strong>{meta.phoneNumberIdShared}</strong>
         </p>
+      ) : null}
 
-        {waLoading ? (
-          <p className="text-gray-500">Carregando configurações do WhatsApp…</p>
-        ) : (
-          <>
-            <div className="flex flex-col gap-3 mb-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={!!wa.whatsappEnabled}
-                  onChange={(e) => waChange('whatsappEnabled', e.target.checked)}
-                />
-                <span>Ativar WhatsApp para esta empresa</span>
-              </label>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={!!wa.useSharedWaba}
-                  onChange={(e) => waChange('useSharedWaba', e.target.checked)}
-                />
-                <span>Usar número compartilhado (global)</span>
-              </label>
-              <p className="text-xs text-gray-500 -mt-2">
-                {usingShared
-                  ? 'As mensagens sairão do número global do sistema. Ideal para começar rápido.'
-                  : 'As mensagens sairão do número próprio desta empresa. Informe token e phone_number_id abaixo.'}
-              </p>
-            </div>
-
-            {!usingShared && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">WABA Access Token</label>
-                  <input
-                    className="mt-1 block w-full p-2 border rounded-md"
-                    value={wa.wabaAccessToken || ''}
-                    onChange={(e) => waChange('wabaAccessToken', e.target.value)}
-                    placeholder="EAAB... (token do WhatsApp Cloud)"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">WABA Phone Number ID</label>
-                  <input
-                    className="mt-1 block w-full p-2 border rounded-md"
-                    value={wa.wabaPhoneNumberId || ''}
-                    onChange={(e) => waChange('wabaPhoneNumberId', e.target.value)}
-                    placeholder="Ex.: 123456789012345"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">WABA App Secret (opcional)</label>
-                  <input
-                    className="mt-1 block w-full p-2 border rounded-md"
-                    value={wa.wabaAppSecret || ''}
-                    onChange={(e) => waChange('wabaAppSecret', e.target.value)}
-                    placeholder="Para validar assinatura do webhook (x-hub-signature-256)"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-2 mb-8">
-              <button
-                onClick={saveWhatsApp}
-                disabled={waSaving}
-                className="px-4 py-2 rounded-md bg-purple-700 text-white hover:bg-purple-800 disabled:opacity-60"
-              >
-                {waSaving ? 'Salvando…' : 'Salvar configurações'}
-              </button>
-              <button
-                onClick={checkWhatsApp}
-                disabled={waChecking || !canOperateWhatsApp}
-                className="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 flex items-center gap-2 disabled:opacity-60"
-                title={!canOperateWhatsApp ? 'Ative e configure o WhatsApp para verificar.' : undefined}
-              >
-                <RefreshCw size={16} />
-                {waChecking ? 'Verificando…' : 'Verificar conexão'}
-              </button>
-
-              {waHealth.status && (
-                <div className="text-sm self-center text-gray-600">
-                  Status:&nbsp;
-                  <b className={waHealth.status === 'OK' ? 'text-green-700' : 'text-red-700'}>
-                    {waHealth.status}
-                  </b>
-                  {waHealth.at ? ` • ${new Date(waHealth.at).toLocaleString()}` : ''}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Saudação</label>
-                <textarea
-                  className="mt-1 block w-full p-2 border rounded-md"
-                  rows={3}
-                  value={wa.botGreeting || ''}
-                  onChange={(e) => waChange('botGreeting', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Política de Cancelamento</label>
-                <textarea
-                  className="mt-1 block w-full p-2 border rounded-md"
-                  rows={3}
-                  value={wa.botCancelPolicy || ''}
-                  onChange={(e) => waChange('botCancelPolicy', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="mb-8">
-              <label className="block text-sm font-medium text-gray-700">Menu do Bot (itens)</label>
-              <div className="space-y-3 mt-2">
-                {(wa.botMenuItems || []).map((it, idx) => (
-                  <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <input
-                      className="p-2 border rounded-md"
-                      placeholder="Rótulo (ex.: Agendar)"
-                      value={it.label}
-                      onChange={(e) => updateMenuItem(idx, 'label', e.target.value)}
-                    />
-                    <input
-                      className="p-2 border rounded-md"
-                      placeholder="Ação/valor (ex.: BOOKING, RESCHEDULE, HUMAN)"
-                      value={it.value}
-                      onChange={(e) => updateMenuItem(idx, 'value', e.target.value)}
-                    />
-                    <button
-                      onClick={() => removeMenuItem(idx)}
-                      className="px-3 rounded-md bg-gray-100 hover:bg-gray-200"
-                    >
-                      Remover
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={addMenuItem}
-                  className="px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 inline-flex items-center gap-2"
-                >
-                  <Plus size={16} /> Adicionar item
-                </button>
-              </div>
-            </div>
-
-            <div className="border-t pt-6">
-              <h3 className="font-semibold mb-3">Mensagem de teste</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <input
-                  className="p-2 border rounded-md"
-                  placeholder="Número destino (ex.: 55XXXXXXXXXXX)"
-                  value={waTestNumber}
-                  onChange={(e) => setWaTestNumber(e.target.value)}
-                />
-                <input
-                  className="p-2 border rounded-md md:col-span-2"
-                  placeholder="Texto"
-                  value={waTestText}
-                  onChange={(e) => setWaTestText(e.target.value)}
-                />
-              </div>
-              <div className="mt-3">
-                <button
-                  onClick={sendWhatsAppTest}
-                  disabled={waTesting || !canOperateWhatsApp}
-                  className="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 inline-flex items-center gap-2 disabled:opacity-60"
-                  title={!canOperateWhatsApp ? 'Ative e configure o WhatsApp para enviar teste.' : undefined}
-                >
-                  <Send size={16} />
-                  {waTesting ? 'Enviando…' : 'Enviar teste'}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Link/QR para WhatsApp com slug (multi-empresa) */}
-      <div className="max-w-3xl mx-auto mt-8">
-        <WhatsAppDeeplinkCard
-          companySlug={formData.slug}
-          sharedPhoneE164={sharedPhoneE164 /* opcional: ex. '+15551402556' */}
-        />
-      </div>
-
-      {/* Instruções de conexão do WhatsApp */}
-      <div className="max-w-3xl mx-auto mt-8">
-        <WhatsAppInstructions />
-      </div>
+      <ol className="mt-2 list-decimal pl-5 text-gray-600 text-xs space-y-1">
+        <li>Acesse o Meta Business → WhatsApp → Configuração → Webhooks.</li>
+        <li>Edite e cole a Webhook URL acima.</li>
+        <li>Defina o mesmo Verify Token no Meta e no backend.</li>
+        <li>Salve e verifique: o status deve ficar <em>Verificado</em>.</li>
+      </ol>
     </div>
   );
 };
