@@ -1,812 +1,929 @@
+// ✅ ARQUIVO: src/pages/WaitlistPage.jsx
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
-  AlertTriangle,
-  BadgeCheck,
-  CheckCircle2,
-  Copy,
-  Link,
-  Loader2,
-  PlugZap,
-  QrCode,
-  Save,
-  Send,
-  ShieldCheck,
-  Smartphone,
-  LogOut,
-} from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import toast from 'react-hot-toast';
-import api from '../services/api';
-import GoogleConnectButton from '../components/integrations/GoogleConnectButton';
-import WhatsAppDeeplinkCard from '../components/integrations/WhatsAppDeeplinkCard';
+  PlusCircle, Filter, X, Bell, Pencil, Trash2, CheckCircle2, Users, UserPlus,
+  Calendar as CalendarIcon
+} from "lucide-react";
+import api from "../services/api";
+import toast from "react-hot-toast";
 
-// --------- helpers ---------
-const getSafeUser = () => {
-  try {
-    const raw = localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    localStorage.removeItem('user');
-    return null;
-  }
-};
+import { asArray } from "../utils/asArray";
+// 👉 Ajuste o caminho abaixo se necessário
+import AppointmentModal from "../components/schedule/AppointmentModal";
 
-const Label = ({ children, hint }) => (
-  <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-    {children}
-    {hint ? (
-      <span className="ml-1 text-gray-400 text-xs cursor-help" title={hint} aria-label={hint}>
-        ⓘ
-      </span>
-    ) : null}
-  </label>
-);
+const STATUS_OPTIONS = [
+  { id: "WAITING", label: "Aguardando" },
+  { id: "NOTIFIED", label: "Notificado" },
+  { id: "SCHEDULED", label: "Agendado" },
+  { id: "CANCELLED", label: "Cancelado" },
+];
 
-const Section = ({ title, icon: Icon, desc, right, children }) => (
-  <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 md:p-6 transition hover:shadow-md">
-    <div className="flex items-start justify-between gap-3 mb-4">
-      <div>
-        <div className="flex items-center gap-2">
-          {Icon ? (
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50">
-              <Icon className="h-4 w-4 text-purple-700" />
-            </span>
-          ) : null}
-          <h2 className="text-lg md:text-xl font-semibold text-gray-900">{title}</h2>
-        </div>
-        {desc ? <p className="text-sm text-gray-500 mt-1">{desc}</p> : null}
-      </div>
-      {right}
-    </div>
-    {children}
-  </div>
-);
+const DEFAULT_SLOT_MINUTES = 30;
 
-const Toggle = ({ checked, onChange, label, helper }) => (
-  <div className="flex items-start gap-3">
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition ${
-        checked ? 'bg-purple-600' : 'bg-gray-300'
-      }`}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-          checked ? 'translate-x-5' : 'translate-x-1'
-        }`}
-      />
-    </button>
-    <div className="flex-1">
-      <p className="select-none cursor-pointer text-sm font-medium text-gray-800" onClick={() => onChange(!checked)}>
-        {label}
-      </p>
-      {helper ? <p className="text-xs text-gray-500 mt-0.5">{helper}</p> : null}
-    </div>
-  </div>
-);
+/* ------------------ Utils ------------------ */
 
-// --------- page ---------
-const SettingsPage = () => {
-  const [loading, setLoading] = useState(true);
+// Helpers para normalizar lista vinda da API (array ou {items/results/data})
+const pickItems = (data) =>
+  Array.isArray(data) ? data : (data?.items || data?.results || data?.data || []);
 
-  // company
-  const [companyId, setCompanyId] = useState('');
-  const [companyForm, setCompanyForm] = useState({ name: '', phone: '', address: '' });
-
-  // google
-  const [googleConnected, setGoogleConnected] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState('');
-
-  // whatsapp (config)
-  const [wa, setWa] = useState({
-    whatsappEnabled: false,
-    useSharedWaba: true,
-    wabaAccessToken: '',
-    wabaPhoneNumberId: '',
-    wabaAppSecret: '',
-    botGreeting: 'Olá! 👋 Sou o assistente virtual. Como posso ajudar?',
-    botCancelPolicy: '',
-    botMenuItems: [{ label: 'Agendar atendimento', value: 'BOOKING' }],
-    slug: '',
-    subscriptionPlan: '',
-    subscriptionStatus: '',
-    whatsappStatus: null,
-    whatsappLastCheckAt: null,
+// Mapeia campos comuns para {id, name} (cobre várias formas de retornar nome/ID)
+const toSimpleList = (data) =>
+  pickItems(data).map((x) => {
+    const name =
+      x.name ||
+      x.fullName ||
+      x.displayName ||
+      x.title ||
+      [x.firstName, x.lastName].filter(Boolean).join(" ") ||
+      "—";
+    return { ...x, id: x.id || x._id || x.value || x.key, name };
   });
 
-  const [savingWa, setSavingWa] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [healthLoading, setHealthLoading] = useState(false);
+function Badge({ status }) {
+  const map = {
+    WAITING: "bg-amber-50 text-amber-700 border-amber-200",
+    NOTIFIED: "bg-sky-50 text-sky-700 border-sky-200",
+    SCHEDULED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    CANCELLED: "bg-rose-50 text-rose-700 border-rose-200",
+  };
+  const label = STATUS_OPTIONS.find((s) => s.id === status)?.label || status;
+  return (
+    <span className={`text-xs px-2 py-1 rounded border ${map[status] || "bg-gray-50 text-gray-700 border-gray-200"}`}>
+      {label}
+    </span>
+  );
+}
+function formatDate(d) {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(date)) return "—";
+  return date.toLocaleDateString("pt-BR");
+}
+function toYMD(d) {
+  const dt = typeof d === "string" ? new Date(d) : d;
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function formatDateInput(d) {
+  try {
+    const dt = typeof d === "string" ? new Date(d) : d;
+    return dt.toISOString().slice(0, 10);
+  } catch {
+    return "";
+  }
+}
 
-  // teste rápido
-  const [testTo, setTestTo] = useState('');
-  const [testText, setTestText] = useState('Teste do bot ✅');
-  const [useTemplate, setUseTemplate] = useState(false);
-  const [templateName, setTemplateName] = useState('hello_world');
-  const [lang, setLang] = useState('pt_BR');
+/* ------------------ Página ------------------ */
+function WaitlistPage() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // meta embedded
-  const [metaStatus, setMetaStatus] = useState({ connected: false });
-  const [metaLoading, setMetaLoading] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [services, setServices] = useState([]);
+  const [staff, setStaff] = useState([]);
 
-  const bookingUrl = useMemo(() => `${window.location.origin}/agendar/${companyId}`, [companyId]);
+  // filtros
+  const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
-  // ------------ fetchers ------------
-  const fetchCompanyProfile = useCallback(async () => {
-    const { data } = await api.get('/company/profile');
-    setCompanyId(data.id || '');
-    setCompanyForm({
-      name: data.name || '',
-      phone: data.phone || '',
-      address: data.address || '',
-    });
-  }, []);
+  // form (create/edit)
+  const [openForm, setOpenForm] = useState(false);
+  const [editing, setEditing] = useState(null);
 
-  const fetchGoogleStatus = useCallback(async () => {
-    const userData = getSafeUser();
-    if (!userData?.id) return;
+  // Drawer de horários
+  const [openSlots, setOpenSlots] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState([]); // ["07:00","07:30",...]
+  const [slotDate, setSlotDate] = useState(() => new Date());
+  const [slotPro, setSlotPro] = useState(""); // professionalId
+  const [slotMinutes, setSlotMinutes] = useState(DEFAULT_SLOT_MINUTES);
+  const [slotServiceId, setSlotServiceId] = useState("");
+  const [activeWaitItem, setActiveWaitItem] = useState(null); // item da espera que está sendo agendado
+
+  // Modal de agendamento
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null); // {start, end}
+  const [selectedEvent, setSelectedEvent] = useState(null); // para edição (não usamos aqui)
+
+  /* ----------- Carregamento com normalização (min/select + fallback) ----------- */
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
     try {
-      const { data } = await api.get(`/integrations/google/status/${userData.id}`);
-      setGoogleConnected(!!data.connected);
-      setGoogleEmail(data.email || '');
-    } catch {}
-  }, []);
+      // waitlist é simples
+      const waitlistP = api.get("/waitlist");
 
-  const fetchWhatsSettings = useCallback(async () => {
-    const { data } = await api.get('/integrations/whatsapp/settings');
-    setWa((prev) => ({ ...prev, ...data }));
-  }, []);
+      // CLIENTES: tenta /clients/min, cai para /clients paginado
+      const clientsP = (async () => {
+        try {
+          const r = await api.get("/clients/min", { params: { q: "", take: 200, skip: 0 } });
+          return toSimpleList(r.data);
+        } catch {
+          const r = await api.get("/clients", { params: { page: 1, pageSize: 200 } });
+          return toSimpleList(r.data);
+        }
+      })();
 
-  const fetchMetaStatus = useCallback(async () => {
-    try {
-      const { data } = await api.get('/integrations/meta/status');
-      setMetaStatus(data || { connected: false });
-    } catch {
-      setMetaStatus({ connected: false });
+      // SERVIÇOS: tenta /services/select, cai para /services
+      const servicesP = (async () => {
+        try {
+          const r = await api.get("/services/select", { params: { q: "", take: 200, skip: 0 } });
+          return toSimpleList(r.data);
+        } catch {
+          const r = await api.get("/services", { params: { page: 1, pageSize: 200 } });
+          return toSimpleList(r.data);
+        }
+      })();
+
+      // STAFF: tenta /staff/select, cai para /staff
+      const staffP = (async () => {
+        try {
+          const r = await api.get("/staff/select", { params: { q: "", take: 200, skip: 0 } });
+          return toSimpleList(r.data);
+        } catch {
+          const r = await api.get("/staff", { params: { page: 1, pageSize: 200 } });
+          return toSimpleList(r.data);
+        }
+      })();
+
+      const [w, c, s, st] = await Promise.all([waitlistP, clientsP, servicesP, staffP]);
+
+      setItems(pickItems(w.data));
+      setClients(c);      // array [{id, name, ...}]
+      setServices(s);     // array [{id, name, ...}]
+      setStaff(st);       // array [{id, name, ...}]
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao carregar dados da lista de espera.");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        await Promise.all([
-          fetchCompanyProfile(),
-          fetchGoogleStatus(),
-          fetchWhatsSettings(),
-          fetchMetaStatus(),
-        ]);
-      } catch (e) {
-        console.error(e);
-        toast.error('Falha ao carregar configurações.');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus]);
+    fetchAll();
+  }, [fetchAll]);
 
-  // ------------ actions ------------
-  const saveCompany = async (e) => {
-    e?.preventDefault?.();
-    const p = api.put('/company/profile', companyForm);
-    toast.promise(p, {
-      loading: 'Salvando empresa...',
-      success: 'Empresa atualizada!',
-      error: 'Falha ao salvar.',
+  const filtered = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return (items || []).filter((it) => {
+      const matchesText =
+        !t ||
+        (it.client?.name || "").toLowerCase().includes(t) ||
+        (it.clientName || "").toLowerCase().includes(t) ||
+        (it.phone || "").toLowerCase().includes(t) ||
+        (it.pref || "").toLowerCase().includes(t) ||
+        (it.notes || "").toLowerCase().includes(t);
+      const matchesStatus = !statusFilter || it.status === statusFilter;
+      return matchesText && matchesStatus;
+    });
+  }, [items, q, statusFilter]);
+
+  /* ------------------ CRUD Waitlist ------------------ */
+  const onCreate = () => {
+    setEditing(null);
+    setOpenForm(true);
+  };
+  const onEdit = (item) => {
+    setEditing(item);
+    setOpenForm(true);
+  };
+  const onDelete = async (id) => {
+    if (!window.confirm("Remover este registro da lista de espera?")) return;
+    toast.promise(api.delete(`/waitlist/${id}`), {
+      loading: "Removendo...",
+      success: () => {
+        setItems((prev) => prev.filter((x) => x.id !== id));
+        return "Removido com sucesso.";
+      },
+      error: "Erro ao remover.",
+    });
+  };
+  const onNotify = async (id) => {
+    toast.promise(api.post(`/waitlist/${id}/notify`), {
+      loading: "Notificando...",
+      success: () => {
+        setItems((prev) => asArray(prev).map((x) => (x.id === id ? { ...x, status: "NOTIFIED" } : x)));
+        return "Cliente marcado como notificado.";
+      },
+      error: "Erro ao notificar.",
+    });
+  };
+  const onStatus = async (id, next) => {
+    toast.promise(api.put(`/waitlist/${id}`, { status: next }), {
+      loading: "Atualizando status...",
+      success: () => {
+        setItems((prev) => asArray(prev).map((x) => (x.id === id ? { ...x, status: next } : x)));
+        return "Status atualizado.";
+      },
+      error: "Erro ao atualizar status.",
     });
   };
 
-  const saveWhats = async () => {
-    setSavingWa(true);
-    try {
-      await api.put('/integrations/whatsapp/settings', wa);
-      toast.success('Configurações do WhatsApp salvas!');
-      await fetchWhatsSettings();
-      await fetchMetaStatus();
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Falha ao salvar configurações.');
-    } finally {
-      setSavingWa(false);
-    }
-  };
+  /* ------------------ Drawer de horários ------------------ */
 
-  const checkHealth = async () => {
-    setHealthLoading(true);
-    try {
-      const { data } = await api.get('/integrations/whatsapp/health');
-      toast.success('Conexão OK!');
-      setWa((prev) => ({
-        ...prev,
-        whatsappStatus: data.status,
-        whatsappLastCheckAt: new Date().toISOString(),
-      }));
-    } catch {
-      toast.error('Falha ao verificar conexão.');
-    } finally {
-      setHealthLoading(false);
-    }
-  };
+  // Busca horários disponíveis. Tenta com duration; se vier vazio, tenta com serviceId.
+  const fetchAvailableSlots = useCallback(
+    async (targetDate = slotDate, proId = slotPro, minutes = slotMinutes) => {
+      try {
+        setSlotsLoading(true);
 
-  const sendTest = async () => {
-    if (!testTo) return toast.error('Preencha o número de destino.');
+        const baseParams = { date: toYMD(targetDate) };
+        if (proId) baseParams.professionalId = proId;
 
-    setTesting(true);
-    try {
-      if (useTemplate) {
-        await api.post('/integrations/meta/send/template', {
-          to: testTo,
-          templateName,
-          lang,
+        // 1ª tentativa: com duration (minutes)
+        let res = await api.get("/public/available-slots", {
+          params: { ...baseParams, duration: minutes },
         });
-        toast.success('Template enviado!');
-      } else {
-        await api.post('/integrations/whatsapp/test', {
-          to: testTo,
-          text: testText,
-          useTemplate: false,
-        });
-        toast.success('Mensagem enviada!');
-      }
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Falha ao enviar teste.');
-    } finally {
-      setTesting(false);
-    }
-  };
 
-  const handleConnectMeta = async () => {
-    try {
-      setMetaLoading(true);
-      const { data } = await api.post('/integrations/meta/embedded/start');
-      const win = window.open(data.url, 'metaOnboard', 'width=850,height=750');
+        let items = (res.data || [])
+          .map((s) => (typeof s === "string" ? s : s?.time))
+          .filter(Boolean);
 
-      // polling simples até o popup fechar → atualiza status
-      const poll = setInterval(async () => {
-        if (win?.closed) {
-          clearInterval(poll);
-          await fetchMetaStatus();
-          await fetchWhatsSettings();
+        // 2ª tentativa: com serviceId (fallback)
+        const fallbackServiceId = activeWaitItem?.serviceId || slotServiceId || services?.[0]?.id;
+        if ((!items || items.length === 0) && fallbackServiceId) {
+          res = await api.get("/public/available-slots", {
+            params: { ...baseParams, serviceId: fallbackServiceId },
+          });
+          items = (res.data || [])
+            .map((s) => (typeof s === "string" ? s : s?.time))
+            .filter(Boolean);
         }
-      }, 900);
-    } catch (e) {
-      toast.error('Falha ao abrir o onboarding do Meta.');
-    } finally {
-      setMetaLoading(false);
-    }
+
+        setAvailableSlots(items);
+      } catch (e) {
+        console.error("Erro ao carregar horários disponíveis:", e);
+        toast.error("Erro ao carregar horários disponíveis.");
+      } finally {
+        setSlotsLoading(false);
+      }
+    },
+    [slotDate, slotPro, slotMinutes, slotServiceId, activeWaitItem, services]
+  );
+
+  const openScheduleDrawer = (waitItem) => {
+    setActiveWaitItem(waitItem || null);
+
+    // Pré-seleciona filtros a partir do item
+    const baseDate = waitItem?.preferredDate ? new Date(waitItem.preferredDate) : new Date();
+    setSlotDate(baseDate);
+    setSlotPro(waitItem?.professionalId || "");
+    setSlotServiceId(waitItem?.serviceId || "");
+    setSlotMinutes(DEFAULT_SLOT_MINUTES);
+
+    setOpenSlots(true);
+    setTimeout(() => fetchAvailableSlots(baseDate, waitItem?.professionalId || "", DEFAULT_SLOT_MINUTES), 0);
   };
 
-  const handleDisconnectMeta = async () => {
-    try {
-      setDisconnecting(true);
-      await api.post('/integrations/meta/disconnect');
-      toast.success('Conexão removida.');
-      await fetchMetaStatus();
-      await fetchWhatsSettings();
-    } catch (e) {
-      toast.error('Falha ao desconectar.');
-    } finally {
-      setDisconnecting(false);
-    }
+  // Quando o usuário escolhe um horário no drawer:
+  // -> calcula start/end
+  // -> abre AppointmentModal pré-preenchido (em vez de salvar direto)
+  const handlePickSlot = (hhmm) => {
+    const [h, m] = String(hhmm).split(":").map(Number);
+    const start = new Date(slotDate);
+    start.setHours(h, m, 0, 0);
+    const end = new Date(start);
+    end.setMinutes(end.getMinutes() + (slotMinutes || DEFAULT_SLOT_MINUTES));
+
+    setSelectedEvent(null);
+    setSelectedSlot({ start, end });
+    setOpenSlots(false);
+    setIsModalOpen(true);
   };
 
-  const userData = getSafeUser();
-  const staffId = userData?.id || '';
+  // Salvar do AppointmentModal: cria agendamento e atualiza waitlist
+  const handleSaveAppointment = async (formData) => {
+    const isEditing = selectedEvent && selectedEvent.id;
+    const p = isEditing
+      ? api.put(`/appointments/${selectedEvent.id}`, formData)
+      : api.post("/appointments", formData);
 
-  const StatusBadge = ({ status }) => {
-    if (status === 'OK')
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-200">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Conectado
-        </span>
-      );
-    if (status === 'ERROR')
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-200">
-          <AlertTriangle className="h-3.5 w-3.5" /> Erro
-        </span>
-      );
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-200">
-        <PlugZap className="h-3.5 w-3.5" /> Desconectado
-      </span>
-    );
+    await toast.promise(p, {
+      loading: isEditing ? "Atualizando agendamento..." : "Criando agendamento...",
+      success: async () => {
+        // se veio de waitlist, marca o item como SCHEDULED
+        if (activeWaitItem?.id) {
+          try {
+            await api.put(`/waitlist/${activeWaitItem.id}`, { status: "SCHEDULED" });
+            setItems((prev) =>
+              asArray(prev).map((x) => (x.id === activeWaitItem.id ? { ...x, status: "SCHEDULED" } : x))
+            );
+          } catch (e) {
+            console.warn("Agendamento criado, mas não foi possível atualizar waitlist:", e);
+          }
+        }
+        setIsModalOpen(false);
+        setActiveWaitItem(null);
+        setSelectedSlot(null);
+        setSelectedEvent(null);
+        return isEditing ? "Agendamento atualizado!" : "Agendamento criado com sucesso!";
+      },
+      error: "Erro ao salvar o agendamento.",
+    });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen px-4 pt-6 pb-24 sm:px-6 md:px-10">
-        <div className="mx-auto max-w-5xl">
-          <div className="flex items-center gap-3 text-gray-600">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <p>Carregando configurações...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleDeleteAppointment = async (id) => {
+    if (!window.confirm("Tem certeza que deseja excluir este agendamento?")) return;
 
-  const showConnectBtn = !wa.useSharedWaba && !metaStatus.connected;
+    await toast.promise(api.delete(`/appointments/${id}`), {
+      loading: "Excluindo agendamento...",
+      success: () => {
+        setIsModalOpen(false);
+        setSelectedSlot(null);
+        setSelectedEvent(null);
+        return "Agendamento excluído com sucesso!";
+      },
+      error: "Erro ao excluir agendamento.",
+    });
+  };
 
+  /* ------------------ Render ------------------ */
   return (
-    <div className="min-h-screen px-4 pt-6 pb-24 sm:px-6 md:px-10">
-      {/* header */}
-      <div className="mx-auto max-w-5xl mb-6">
-        <div className="flex items-center justify-between">
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Header */}
+        <header className="flex flex-col sm:flex-row justify-between items-center mb-10">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">
-              Configurações
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <Users className="w-7 h-7" /> Lista de Espera
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Ajuste informações da empresa, integrações e o bot do WhatsApp.
+            <p className="text-md text-gray-600 mt-1">
+              Gerencie interessados e agende diretamente quando houver horário disponível.
             </p>
           </div>
-          <a
-            href={bookingUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl bg-purple-600 text-white px-4 py-2 text-sm font-semibold shadow hover:bg-purple-700 transition"
+          <button
+            onClick={onCreate}
+            className="mt-4 sm:mt-0 flex items-center gap-2 bg-[#8C7F8A] hover:bg-opacity-80 text-white font-semibold py-2 px-5 rounded-lg shadow-md"
           >
-            <Link className="h-4 w-4" />
-            Página de agendamento
-          </a>
-        </div>
-      </div>
+            <UserPlus className="w-5 h-5" /> Novo
+          </button>
+        </header>
 
-      <div className="mx-auto max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Coluna esquerda */}
-        <div className="lg:col-span-2 space-y-6">
-          <Section
-            title="WhatsApp"
-            icon={Smartphone}
-            desc="Configure o bot por empresa. Use número compartilhado (global) ou conecte seu próprio número via Meta."
-            right={
-              <div className="flex items-center gap-2">
-                <StatusBadge status={wa.whatsappStatus} />
-                <button
-                  onClick={checkHealth}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  {healthLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Verificando...
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="h-4 w-4" />
-                      Verificar conexão
-                    </>
-                  )}
-                </button>
-              </div>
-            }
-          >
-            {!wa.whatsappEnabled ? (
-              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800 text-sm flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 mt-0.5" />
-                <div>O WhatsApp está <strong>desativado</strong> para esta empresa.</div>
-              </div>
-            ) : null}
-
-            <div className="grid gap-4">
-              <Toggle
-                checked={wa.whatsappEnabled}
-                onChange={(v) => setWa((s) => ({ ...s, whatsappEnabled: v }))}
-                label="Ativar WhatsApp para esta empresa"
-              />
-              <Toggle
-                checked={wa.useSharedWaba}
-                onChange={(v) => setWa((s) => ({ ...s, useSharedWaba: v }))}
-                label="Usar número compartilhado (global)"
-                helper="Se marcado, o sistema usará o número global configurado no backend."
-              />
-            </div>
-
-            {/* Botão Conectar / Desconectar Meta */}
-            {!wa.useSharedWaba ? (
-              <div className="mt-4 flex items-center gap-3">
-                {metaStatus.connected ? (
-                  <>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-200">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Conectado via Meta
-                    </span>
-                    <button
-                      onClick={handleDisconnectMeta}
-                      disabled={disconnecting}
-                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      {disconnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-                      Desconectar
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={handleConnectMeta}
-                    disabled={metaLoading}
-                    className="inline-flex items-center gap-2 rounded-xl bg-purple-600 text-white px-4 py-2 text-sm font-semibold shadow hover:bg-purple-700"
-                  >
-                    {metaLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlugZap className="h-4 w-4" />}
-                    Conectar via Meta
-                  </button>
-                )}
-              </div>
-            ) : null}
-
-            {/* Credenciais manuais (apenas se NÃO usar compartilhado) */}
-            {!wa.useSharedWaba ? (
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>WABA Access Token</Label>
-                  <input
-                    type="password"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                    value={wa.wabaAccessToken || ''}
-                    onChange={(e) => setWa((s) => ({ ...s, wabaAccessToken: e.target.value }))}
-                    placeholder="EAAG... (opcional se conectar via Meta)"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>WABA Phone Number ID</Label>
-                  <input
-                    type="text"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                    value={wa.wabaPhoneNumberId || ''}
-                    onChange={(e) => setWa((s) => ({ ...s, wabaPhoneNumberId: e.target.value }))}
-                    placeholder="ex.: 770384329493099"
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            {/* textos do bot */}
-            <div className="mt-6 grid grid-cols-1 gap-4">
-              <div className="space-y-1.5">
-                <Label>Saudação</Label>
-                <input
-                  type="text"
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                  value={wa.botGreeting}
-                  onChange={(e) => setWa((s) => ({ ...s, botGreeting: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Política de Cancelamento</Label>
-                <textarea
-                  rows={3}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                  value={wa.botCancelPolicy || ''}
-                  onChange={(e) => setWa((s) => ({ ...s, botCancelPolicy: e.target.value }))}
-                />
-              </div>
-
-              {/* menu do bot */}
-              <div className="space-y-2">
-                <Label>Menu do Bot (itens)</Label>
-                <div className="space-y-2">
-                  {wa.botMenuItems.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2"
-                    >
-                      <input
-                        type="text"
-                        className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm bg-white"
-                        value={item.label}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setWa((s) => {
-                            const list = [...s.botMenuItems];
-                            list[idx] = { ...list[idx], label: v };
-                            return { ...s, botMenuItems: list };
-                          });
-                        }}
-                        placeholder="Rótulo (ex.: Agendar atendimento)"
-                      />
-                      <input
-                        type="text"
-                        className="w-44 rounded-lg border border-gray-300 px-3 py-1.5 text-sm bg-white uppercase"
-                        value={item.value}
-                        onChange={(e) => {
-                          const v = e.target.value.toUpperCase();
-                          setWa((s) => {
-                            const list = [...s.botMenuItems];
-                            list[idx] = { ...list[idx], value: v };
-                            return { ...s, botMenuItems: list };
-                          });
-                        }}
-                        placeholder="CÓDIGO (ex.: BOOKING)"
-                        title="Código usado internamente"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setWa((s) => ({ ...s, botMenuItems: s.botMenuItems.filter((_, i) => i !== idx) }))
-                        }
-                        className="text-sm text-gray-600 hover:text-red-600"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setWa((s) => ({ ...s, botMenuItems: [...s.botMenuItems, { label: '', value: '' }] }))
-                  }
-                  className="inline-flex items-center gap-2 text-sm text-purple-700 hover:text-purple-800"
-                >
-                  + Adicionar item
-                </button>
-              </div>
-
-              {/* ações */}
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <button
-                  onClick={saveWhats}
-                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 text-white px-4 py-2 text-sm font-semibold shadow hover:bg-purple-700"
-                >
-                  {savingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Salvar configurações
-                </button>
-
-                <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
-                  Última verificação:{' '}
-                  {wa.whatsappLastCheckAt ? (
-                    <span className="font-medium">{new Date(wa.whatsappLastCheckAt).toLocaleString()}</span>
-                  ) : (
-                    <span>—</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* teste rápido */}
-            <div className="mt-6 border-t border-gray-100 pt-5 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <Label>Número destino (ex.: 5599999999999)</Label>
-                  <input
-                    type="tel"
-                    value={testTo}
-                    onChange={(e) => setTestTo(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label>Mensagem de teste</Label>
-                  <div className="mt-1 flex gap-2">
-                    <input
-                      type="text"
-                      value={testText}
-                      onChange={(e) => setTestText(e.target.value)}
-                      className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                      disabled={useTemplate}
-                    />
-                    <button
-                      onClick={sendTest}
-                      className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      Enviar teste
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    id="useTemplate"
-                    type="checkbox"
-                    checked={useTemplate}
-                    onChange={(e) => setUseTemplate(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <label htmlFor="useTemplate" className="text-sm text-gray-700">
-                    Usar mensagem template (primeiro contato)
-                  </label>
-                </div>
-                <div>
-                  <Label>Template name</Label>
-                  <input
-                    type="text"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="hello_world"
-                    disabled={!useTemplate}
-                  />
-                </div>
-                <div>
-                  <Label>Idioma</Label>
-                  <input
-                    type="text"
-                    value={lang}
-                    onChange={(e) => setLang(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="pt_BR"
-                    disabled={!useTemplate}
-                  />
-                </div>
-              </div>
-            </div>
-          </Section>
-
-          {/* Empresa */}
-          <Section
-            title="Informações da empresa"
-            icon={BadgeCheck}
-            desc="Esses dados aparecem no agendamento e em recibos."
-            right={
-              <button
-                onClick={saveCompany}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        {/* Filtros */}
+        <div className="bg-white rounded-xl shadow p-4 mb-6 border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <input
+              className="w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50 md:col-span-2"
+              placeholder="Buscar por nome, telefone, preferência, observações..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <select
+                className="w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
               >
-                <Save className="h-4 w-4" />
-                Salvar
+                <option value="">Todos os Status</option>
+                {asArray(STATUS_OPTIONS).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={fetchAll}
+                className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 flex items-center gap-2"
+                title="Recarregar"
+              >
+                <Filter className="w-4 h-4" /> Atualizar
               </button>
-            }
-          >
-            <form onSubmit={saveCompany} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Nome da empresa</Label>
-                <input
-                  type="text"
-                  value={companyForm.name}
-                  onChange={(e) => setCompanyForm((s) => ({ ...s, name: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Telefone</Label>
-                <input
-                  type="tel"
-                  value={companyForm.phone}
-                  onChange={(e) => setCompanyForm((s) => ({ ...s, phone: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                />
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <Label>Endereço</Label>
-                <textarea
-                  rows={3}
-                  value={companyForm.address}
-                  onChange={(e) => setCompanyForm((s) => ({ ...s, address: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
-                />
-              </div>
-            </form>
-          </Section>
+            </div>
+          </div>
         </div>
 
-        {/* Coluna direita */}
-        <div className="space-y-6">
-          {/* Google */}
-          <Section title="Google Calendar" icon={CalendarIcon} desc="Sincronize seus agendamentos com seu Google Calendar.">
-            {getSafeUser()?.id ? (
-              <>
-                <GoogleConnectButton
-                  staffId={getSafeUser()?.id}
-                  isConnected={googleConnected}
-                  onStatusChange={(connected, email) => {
-                    setGoogleConnected(connected);
-                    setGoogleEmail(email || '');
-                  }}
-                />
-                {googleConnected && googleEmail ? (
-                  <p className="mt-2 inline-flex items-center gap-1 text-xs text-green-700">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Conectado como <strong className="font-semibold">{googleEmail}</strong>
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="text-sm text-red-600">Não foi possível detectar seu usuário.</p>
-            )}
-          </Section>
+        {/* Lista (tabela) */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600">
+                <tr>
+                  <th className="text-left px-4 py-3">Cliente</th>
+                  <th className="text-left px-4 py-3">Contato</th>
+                  <th className="text-left px-4 py-3">Serviço</th>
+                  <th className="text-left px-4 py-3">Profissional</th>
+                  <th className="text-left px-4 py-3">Preferência</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-right px-4 py-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {loading && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-gray-500">
+                      Carregando...
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-gray-500">
+                      Nenhum item encontrado.
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  asArray(filtered).map((it) => (
+                    <tr key={it.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-gray-900">
+                          {it.client?.name || it.clientName || "—"}
+                        </div>
+                        <div className="text-gray-500 text-xs">
+                          Criado em {formatDate(it.createdAt)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">{it.client?.phone || it.phone || "—"}</td>
+                      <td className="px-4 py-3">{it.service?.name || "—"}</td>
+                      <td className="px-4 py-3">{it.professional?.name || "—"}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs text-gray-600">
+                          {it.preferredDate ? `Dia ${formatDate(it.preferredDate)}` : "—"}
+                          {it.preferredTime ? ` • ${it.preferredTime}` : ""}
+                        </div>
+                        {it.pref && <div className="text-xs text-gray-500">{it.pref}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge status={it.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 justify-end">
+                          <button
+                            className="px-2 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50"
+                            onClick={() => onNotify(it.id)}
+                            title="Notificar/Marcar como notificado"
+                          >
+                            <Bell className="w-4 h-4" />
+                          </button>
 
-          {/* Link/QR */}
-          <Section
-            title="Link/QR para WhatsApp (multi-empresa)"
-            icon={QrCode}
-            desc="Defina o slug da empresa nas configurações para gerar o link."
-          >
-            <WhatsAppDeeplinkCard slug={wa.slug} />
-          </Section>
+                          {/* ✅ Agendar → abre drawer de horários */}
+                          <button
+                            className="px-2 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50"
+                            onClick={() => openScheduleDrawer(it)}
+                            title="Agendar (escolher horário)"
+                          >
+                            <CalendarIcon className="w-4 h-4" />
+                          </button>
 
-          {/* Ajuda webhook */}
-          <Section
-            title="Como conectar o WhatsApp"
-            icon={PlugZap}
-            desc="Use no Meta Business (Webhooks) quando for usar número próprio."
-            right={
-              <span className="hidden md:inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-200">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Seguro
-              </span>
-            }
-          >
-            <WebhookHelp />
-          </Section>
+                          <select
+                            className="px-2 py-1 text-xs border rounded-lg"
+                            value={it.status}
+                            onChange={(e) => onStatus(it.id, e.target.value)}
+                            title="Alterar status"
+                          >
+                            {asArray(STATUS_OPTIONS).map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="px-2 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50"
+                            onClick={() => onEdit(it)}
+                            title="Editar"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            className="px-2 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50 text-rose-600"
+                            onClick={() => onDelete(it.id)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* Formulário (criar/editar espera) */}
+        {openForm && (
+          <FormModal
+            onClose={() => setOpenForm(false)}
+            onSaved={(saved, isEdit) => {
+              setOpenForm(false);
+              setItems((prev) => {
+                if (isEdit) return asArray(prev).map((x) => (x.id === saved.id ? saved : x));
+                return [saved, ...prev];
+              });
+            }}
+            editing={editing}
+            clients={clients}
+            services={services}
+            staff={staff}
+          />
+        )}
+
+        {/* Drawer de Horários */}
+        {openSlots && (
+          <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
+            <SlotsContent
+              date={slotDate}
+              setDate={setSlotDate}
+              proId={slotPro}
+              setProId={setSlotPro}
+              serviceId={slotServiceId}
+              setServiceId={setSlotServiceId}
+              minutes={slotMinutes}
+              setMinutes={setSlotMinutes}
+              staff={staff}
+              services={services}
+              loading={slotsLoading}
+              slots={availableSlots}
+              onReload={() => fetchAvailableSlots(slotDate, slotPro, slotMinutes)}
+              onPick={handlePickSlot}
+            />
+          </BaseModal>
+        )}
+
+        {/* ✅ AppointmentModal (pré-preenchido ao escolher um horário) */}
+        {isModalOpen && (
+          <AppointmentModal
+            isOpen={isModalOpen}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedSlot(null);
+              setSelectedEvent(null);
+              setActiveWaitItem(null);
+            }}
+            onSave={handleSaveAppointment}
+            onDelete={handleDeleteAppointment}
+            event={selectedEvent}
+            slot={selectedSlot}
+            clients={clients}
+            services={services}
+            staff={staff}
+            // Se seu AppointmentModal aceitar "initialData", pode enviar:
+            // initialData={{
+            //   clientId: activeWaitItem?.clientId ?? "",
+            //   serviceId: activeWaitItem?.serviceId ?? "",
+            //   professionalId: activeWaitItem?.professionalId ?? slotPro ?? "",
+            // }}
+          />
+        )}
       </div>
     </div>
   );
-};
+}
 
-const CalendarIcon = (props) => (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" {...props}>
-    <path
-      fill="currentColor"
-      d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H2V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1Zm15 8v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9h20ZM6 14h4v4H6v-4Z"
-    />
-  </svg>
-);
+/* ------------------ Form modal (create/edit) ------------------ */
+function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
+  const [clientId, setClientId] = useState(editing?.clientId || "");
+  const [clientName, setClientName] = useState(editing?.clientName || "");
+  const [phone, setPhone] = useState(editing?.phone || "");
 
-const WebhookHelp = () => {
-  const [meta, setMeta] = useState({ webhookUrl: '', verifyToken: '', phoneNumberIdShared: '' });
+  const [serviceId, setServiceId] = useState(editing?.serviceId || "");
+  const [professionalId, setProfessionalId] = useState(editing?.professionalId || "");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get('/integrations/whatsapp/meta-info');
-        setMeta(data);
-      } catch {}
-    })();
-  }, []);
+  const [preferredDate, setPreferredDate] = useState(
+    editing?.preferredDate ? new Date(editing.preferredDate).toISOString().slice(0, 10) : ""
+  );
+  const [preferredTime, setPreferredTime] = useState(editing?.preferredTime || "");
+  const [pref, setPref] = useState(editing?.pref || "");
+  const [notes, setNotes] = useState(editing?.notes || "");
+  const [status, setStatus] = useState(editing?.status || "WAITING");
+
+  const isEdit = !!editing?.id;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      clientId: clientId || undefined,
+      clientName: clientId ? undefined : clientName || undefined,
+      phone: clientId ? undefined : phone || undefined,
+      serviceId: serviceId || undefined,
+      professionalId: professionalId || undefined,
+      preferredDate: preferredDate || undefined, // YYYY-MM-DD
+      preferredTime: preferredTime || undefined,
+      pref: pref || undefined,
+      notes: notes || undefined,
+      status: status || undefined,
+    };
+
+    if (!payload.clientId && !payload.clientName && !payload.phone) {
+      toast.error("Informe um cliente ou nome/telefone.");
+      return;
+    }
+
+    if (isEdit) {
+      toast.promise(api.put(`/waitlist/${editing.id}`, payload), {
+        loading: "Salvando...",
+        success: (res) => {
+          onSaved?.(res.data, true);
+          return "Registro atualizado.";
+        },
+        error: "Erro ao salvar.",
+      });
+    } else {
+      toast.promise(api.post(`/waitlist`, payload), {
+        loading: "Criando...",
+        success: (res) => {
+          onSaved?.(res.data, false);
+          return "Registro criado.";
+        },
+        error: "Erro ao criar.",
+      });
+    }
+  };
 
   return (
-    <div className="space-y-3 text-sm">
-      <div>
-        <Label>Webhook URL</Label>
-        <div className="mt-1 flex items-center gap-2">
-          <input
-            readOnly
-            value={meta.webhookUrl || ''}
-            className="flex-1 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
-          />
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50"
-            onClick={() => {
-              navigator.clipboard.writeText(meta.webhookUrl || '');
-              toast.success('Webhook URL copiada!');
-            }}
-          >
-            <Copy className="h-4 w-4" /> Copiar
-          </button>
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[640px]">
+        <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border p-5">
+          <div className="flex items-center justify-between pb-3 border-b">
+            <h3 className="font-semibold flex items-center gap-2 text-lg">
+              <PlusCircle className="w-5 h-5" />
+              {isEdit ? "Editar Espera" : "Novo na Espera"}
+            </h3>
+            <button className="p-1 rounded hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <form className="pt-4 space-y-4" onSubmit={handleSubmit}>
+            {/* Cliente (ID OU nome/telefone) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-600">Cliente (cadastrado)</label>
+                <select
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={clientId}
+                  onChange={(e) => {
+                    setClientId(e.target.value);
+                    if (e.target.value) {
+                      setClientName("");
+                      setPhone("");
+                    }
+                  }}
+                >
+                  <option value="">— Selecionar —</option>
+                  {asArray(clients).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div />
+              {!clientId && (
+                <>
+                  <div>
+                    <label className="text-xs text-gray-600">Nome (se não tiver cadastro)</label>
+                    <input
+                      className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="Ex.: Maria Silva"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Telefone</label>
+                    <input
+                      className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="Ex.: (11) 99999-9999"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Preferências */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-600">Serviço</label>
+                <select
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={serviceId}
+                  onChange={(e) => setServiceId(e.target.value)}
+                >
+                  <option value="">— Qualquer —</option>
+                  {asArray(services).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Profissional</label>
+                <select
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={professionalId}
+                  onChange={(e) => setProfessionalId(e.target.value)}
+                >
+                  <option value="">— Qualquer —</option>
+                  {asArray(staff).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-gray-600">Data preferida</label>
+                <input
+                  type="date"
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={preferredDate}
+                  onChange={(e) => setPreferredDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Hora preferida</label>
+                <input
+                  type="time"
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={preferredTime}
+                  onChange={(e) => setPreferredTime(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Preferência (livre)</label>
+                <input
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={pref}
+                  onChange={(e) => setPref(e.target.value)}
+                  placeholder="Ex.: Manhã / Sábado / Após as 18h"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-600">Observações</label>
+              <input
+                className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Informações adicionais importantes"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-600">Status</label>
+                <select
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  {asArray(STATUS_OPTIONS).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg border bg-white hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {isEdit ? "Salvar alterações" : "Adicionar à espera"}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-
-      <div>
-        <Label>Verify Token</Label>
-        <div className="mt-1 flex items-center gap-2">
-          <input
-            readOnly
-            value={meta.verifyToken || 'Defina WABA_VERIFY_TOKEN no backend'}
-            className="flex-1 rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
-
-      {meta.phoneNumberIdShared ? (
-        <p className="text-xs text-gray-500">
-          Número compartilhado (global) configurado: <strong>{meta.phoneNumberIdShared}</strong>
-        </p>
-      ) : null}
-
-      <ol className="mt-2 list-decimal pl-5 text-gray-600 text-xs space-y-1">
-        <li>Acesse o Meta Business → WhatsApp → Configuração → Webhooks.</li>
-        <li>Edite e cole a Webhook URL acima.</li>
-        <li>Defina o mesmo Verify Token no Meta e no backend.</li>
-        <li>Salve e verifique: o status deve ficar <em>Verificado</em>.</li>
-      </ol>
     </div>
   );
-};
+}
 
-export default SettingsPage;
+/* ------------------ Drawer/Modal de Horários ------------------ */
+function BaseModal({ title, children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[560px]">
+        <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border p-5">
+          <div className="flex items-center justify-between pb-3 border-b">
+            <h3 className="font-semibold">{title}</h3>
+            <button className="p-1 rounded hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="pt-3">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SlotsContent({
+  date, setDate,
+  proId, setProId,
+  serviceId, setServiceId,
+  minutes, setMinutes,
+  staff, services,
+  loading, slots = [],
+  onReload, onPick
+}) {
+  return (
+    <div className="space-y-3">
+      {/* Filtros */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-gray-600">Data</label>
+          <input
+            type="date"
+            className="border rounded-lg px-3 py-2 w-full"
+            value={formatDateInput(date)}
+            onChange={(e) => setDate(e.target.value ? new Date(e.target.value) : new Date())}
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-600">Profissional</label>
+          <select
+            className="border rounded-lg px-3 py-2 w-full"
+            value={proId || ""}
+            onChange={(e) => setProId(e.target.value)}
+          >
+            <option value="">— Qualquer —</option>
+            {asArray(staff).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-600">Serviço (fallback)</label>
+          <select
+            className="border rounded-lg px-3 py-2 w-full"
+            value={serviceId || ""}
+            onChange={(e) => setServiceId(e.target.value)}
+          >
+            <option value="">— Não usar —</option>
+            {asArray(services).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-600">Duração (min)</label>
+          <input
+            type="number"
+            min={10}
+            step={5}
+            className="border rounded-lg px-3 py-2 w-full"
+            value={minutes}
+            onChange={(e) => setMinutes(Number(e.target.value) || DEFAULT_SLOT_MINUTES)}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-600">
+          {new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(date)}
+        </div>
+        <button onClick={onReload} className="px-3 py-2 text-xs rounded-lg border bg-white hover:bg-gray-50" title="Recarregar">
+          Recarregar
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-sm text-gray-500">Carregando horários...</div>
+      ) : slots.length === 0 ? (
+        <div className="text-sm text-gray-500">Sem horários disponíveis para os filtros selecionados.</div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {asArray(slots).map((s) => (
+            <button key={s} onClick={() => onPick(s)} className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="text-xs text-gray-500">
+        Profissional: <span className="font-medium">{proId || "—"}</span> • Duração: <span className="font-medium">{minutes} min</span>
+      </div>
+    </div>
+  );
+}
+
+export default WaitlistPage;
