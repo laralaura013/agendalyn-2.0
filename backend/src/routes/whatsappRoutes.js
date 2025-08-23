@@ -2,6 +2,7 @@
 import express from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import prisma from '../prismaClient.js';
 
 const router = express.Router();
@@ -13,10 +14,36 @@ const {
   WABA_PHONE_NUMBER_ID,
   APP_BASE_URL = 'http://localhost:3001/api',
   WABA_APP_SECRET, // opcional (validação da assinatura do webhook)
+  JWT_SECRET,
 } = process.env;
 
 /** ================== Sessões em memória (produção: usar Redis) ================== */
 const sessions = new Map();
+
+/** ================== Auth fallback (exige companyId em tudo exceto /webhook) ================== */
+router.use((req, res, next) => {
+  if (req.path.startsWith('/webhook')) return next(); // webhook é público (valida assinatura)
+
+  // Se o middleware global não preencheu, tenta decodificar o JWT aqui
+  if (!req.companyId) {
+    const auth = req.headers?.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (token && JWT_SECRET) {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        if (payload?.companyId) req.companyId = payload.companyId;
+        if (payload?.id) req.userId = payload.id;
+      } catch {
+        // token inválido/expirado: ignora, será 401 abaixo
+      }
+    }
+  }
+
+  if (!req.companyId) {
+    return res.status(401).json({ message: 'Empresa não identificada (auth).' });
+  }
+  next();
+});
 
 /** ================== Utils ================== */
 const e164BR = (phone) => {
@@ -123,8 +150,6 @@ const isValidSignature = (req) => {
 router.get('/settings', async (req, res) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(401).json({ message: 'Empresa não identificada (auth).' });
-
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: {
@@ -148,7 +173,6 @@ router.get('/settings', async (req, res) => {
 
     if (!company) return res.status(404).json({ message: 'Empresa não encontrada.' });
 
-    // monta resposta amigável
     const botMenuItems =
       safeParseJSON(company.botMenuJson) ??
       [
@@ -182,7 +206,6 @@ router.get('/settings', async (req, res) => {
 router.put('/settings', async (req, res) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(401).json({ message: 'Empresa não identificada (auth).' });
 
     const {
       whatsappEnabled,
@@ -196,7 +219,6 @@ router.put('/settings', async (req, res) => {
       slug,
     } = req.body || {};
 
-    // valida menu (array de {label, value})
     const normalizedMenu = Array.isArray(botMenuItems)
       ? botMenuItems
           .filter((x) => x && (x.label || x.value))
@@ -206,7 +228,6 @@ router.put('/settings', async (req, res) => {
           }))
       : null;
 
-    // Atualiza
     const updated = await prisma.company.update({
       where: { id: companyId },
       data: {
@@ -218,7 +239,6 @@ router.put('/settings', async (req, res) => {
         botGreeting: botGreeting || null,
         botCancelPolicy: botCancelPolicy || null,
         botMenuJson: normalizedMenu ? JSON.stringify(normalizedMenu) : prisma.Prisma.DbNull,
-        // slug é opcional; só seta se vier string
         ...(typeof slug === 'string' && slug.trim()
           ? { slug: slug.trim().toLowerCase() }
           : {}),
@@ -228,7 +248,6 @@ router.put('/settings', async (req, res) => {
 
     return res.json({ ok: true, id: updated.id });
   } catch (e) {
-    // trata possível unique(slug)
     if (e?.code === 'P2002' && e?.meta?.target?.includes('slug')) {
       return res.status(400).json({ message: 'Este slug já está em uso por outra empresa.' });
     }
@@ -238,6 +257,8 @@ router.put('/settings', async (req, res) => {
 });
 
 /** ================== VERIFY (GET) ================== */
+// OBS: ESTA ROTA É PÚBLICA — por isso não passa pelo guard acima.
+// Para isso, montamos explicitamente fora do .use de auth (no server.js ela vem ANTES do json global).
 router.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -249,6 +270,7 @@ router.get('/webhook', (req, res) => {
 });
 
 /** ================== RECEIVER (POST) ================== */
+// Também PÚBLICA (valida por assinatura HMAC)
 router.post('/webhook', async (req, res) => {
   try {
     if (!isValidSignature(req)) {
@@ -415,7 +437,7 @@ async function handleIncomingMessage(msg, phoneNumberIdFromWebhook) {
         session.step = 'handoff';
         await sendText(to, 'Ok! Em instantes um atendente dará continuidade por aqui. ✅', company);
       } else {
-        // fallback: mapeia 1/2/3
+        // fallback 1/2/3
         if (n === 1) {
           session.step = 'ask_service';
           await askService(to, company);
@@ -717,7 +739,6 @@ router.get('/health', async (req, res) => {
       `https://graph.facebook.com/v20.0/${cfg.phoneNumberId}`,
       { headers: { Authorization: `Bearer ${cfg.token}` } }
     );
-    // salva carimbo/estado (opcional)
     if (companyId) {
       await prisma.company.update({
         where: { id: companyId },
