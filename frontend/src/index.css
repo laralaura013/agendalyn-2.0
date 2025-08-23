@@ -3,6 +3,69 @@
 @tailwind utilities;
 
 /* ===========================
+   TEMA DA MARCA (edite os HEX)
+   =========================== */
+:root {
+  /* Primário da marca */
+  --brand-500: #8b5cf6;
+  --brand-600: #7c3aed;
+  --brand-700: #6d28d9;
+
+  /* Ação de confirmação/sucesso */
+  --accent-600: #10b981;
+  --accent-700: #059669;
+
+  /* Superfícies e textos (dark elegante) */
+  --surface-900: #0b1220;  /* fundo da página */
+  --surface-800: #111827;  /* painéis escuros */
+  --card-800:    #1f2937;  /* cards/modais */
+  --outline-200: rgba(255,255,255,0.08);
+
+  --text-100: #f8fafc; /* títulos */
+  --text-300: #cbd5e1; /* descrições */
+}
+
+/* Se você usar modo claro com uma classe .light no <html> */
+.light {
+  --surface-900: #f8fafc;
+  --surface-800: #ffffff;
+  --card-800:    #ffffff;
+  --outline-200: rgba(2,6,23,0.08);
+
+  --text-100: #0b1220;
+  --text-300: #475569;
+}
+
+/* ===========================
+   Utilitários semânticos
+   =========================== */
+@layer utilities {
+  .bg-surface { background-color: var(--surface-900); }
+  .bg-card    { background-color: var(--card-800); }
+  .bg-muted   { background-color: var(--surface-800); }
+
+  .text-title { color: var(--text-100); }
+  .text-muted { color: var(--text-300); }
+
+  .border-outline { border-color: var(--outline-200); }
+
+  .btn-brand {
+    @apply rounded-xl px-4 py-2 font-semibold text-white transition;
+    background-color: var(--brand-600);
+  }
+  .btn-brand:hover { background-color: var(--brand-700); }
+
+  .btn-accent {
+    @apply rounded-xl px-4 py-2 font-semibold text-white transition;
+    background-color: var(--accent-600);
+  }
+  .btn-accent:hover { background-color: var(--accent-700); }
+
+  .chip-brand { color: var(--brand-500); }
+  .ring-brand { box-shadow: 0 0 0 2px var(--brand-600) inset; }
+}
+
+/* ===========================
    BASE / LAYOUT SAFEGUARDS
    =========================== */
 
@@ -189,7 +252,7 @@ html, body, #root {
 }
 
 /* ===========================
-   FORM CONTROLS (foco acessível)
+   FORM CONTROLES (foco acessível)
    =========================== */
 
 input[type="text"],

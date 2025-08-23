@@ -1,0 +1,67 @@
+/* frontend/src/styles/theme.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========= PALETA DA SUA MARCA =========
+   Troque as cores abaixo pelos HEX da sua marca.
+   Ex.: --brand-600 / --brand-700 = primário (botões/links)
+        --accent-600 / --accent-700 = cor de confirmação/êxito
+*/
+:root {
+  /* Brand (primário) */
+  --brand-500: #8b5cf6; /* violeta */
+  --brand-600: #7c3aed;
+  --brand-700: #6d28d9;
+
+  /* Ação/Êxito (confirmar) */
+  --accent-600: #10b981; /* emerald */
+  --accent-700: #059669;
+
+  /* Superfícies e textos (dark elegante) */
+  --surface-900: #0b1220; /* fundo da página */
+  --surface-800: #111827; /* caixas escuras */
+  --card-800:    #1f2937; /* cards/modais */
+  --outline-200: rgba(255,255,255,0.08);
+
+  --text-100: #f8fafc; /* títulos */
+  --text-300: #cbd5e1; /* descrições */
+}
+
+/* (opcional) override para light mode se usar .light no <html> */
+.light {
+  --surface-900: #f8fafc;
+  --surface-800: #ffffff;
+  --card-800:    #ffffff;
+  --outline-200: rgba(2,6,23,0.08);
+
+  --text-100: #0b1220;
+  --text-300: #475569;
+}
+
+/* ========= Utilitários semânticos ========= */
+@layer utilities {
+  .bg-surface { background-color: var(--surface-900); }
+  .bg-card    { background-color: var(--card-800); }
+  .bg-muted   { background-color: var(--surface-800); }
+
+  .text-title { color: var(--text-100); }
+  .text-muted { color: var(--text-300); }
+
+  .border-outline { border-color: var(--outline-200); }
+
+  .btn-brand {
+    @apply rounded-xl px-4 py-2 font-semibold text-white transition;
+    background-color: var(--brand-600);
+  }
+  .btn-brand:hover { background-color: var(--brand-700); }
+
+  .btn-accent {
+    @apply rounded-xl px-4 py-2 font-semibold text-white transition;
+    background-color: var(--accent-600);
+  }
+  .btn-accent:hover { background-color: var(--accent-700); }
+
+  .chip-brand { color: var(--brand-500); }
+  .ring-brand { box-shadow: 0 0 0 2px var(--brand-600) inset; }
+}
