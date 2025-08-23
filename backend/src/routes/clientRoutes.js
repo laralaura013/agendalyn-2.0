@@ -1,7 +1,9 @@
+// src/routes/clientRoutes.js
 import express from 'express';
 import {
   listClients,
-  listClientsMin,     // <--- NOVO
+  listClientsMin,
+  listClientsForSelect,   // <--- NOVO
   createClient,
   updateClient,
   getClientById,
@@ -24,6 +26,10 @@ const guard = [protect, checkRole(['ADMIN', 'OWNER'])];
 // Lista MIN para selects/autocomplete (rápida)
 // GET /api/clients/min?q=jo&take=20&skip=0
 router.get('/min', guard, listClientsMin);
+
+// Lista simplificada para dropdowns de selects (somente ativos)
+// GET /api/clients/select?q=jo
+router.get('/select', guard, listClientsForSelect);
 
 // List / filtros / paginação
 router.get('/', guard, listClients);

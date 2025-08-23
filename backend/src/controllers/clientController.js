@@ -1,3 +1,4 @@
+// src/controllers/clientController.js
 import prisma from '../prismaClient.js';
 import multer from 'multer';
 import { parse as parseCsv } from 'csv-parse/sync';
@@ -13,6 +14,15 @@ const ENABLE_GENDER = String(process.env.ENABLE_CLIENT_GENDER || '').trim() === 
 
 const toDate = (v) => (v ? new Date(v) : null);
 const now = () => new Date();
+
+const ensureCompany = (req) => {
+  if (!req?.company?.id) {
+    const err = new Error('Empresa não identificada no contexto da requisição.');
+    err.status = 401;
+    throw err;
+  }
+  return req.company.id;
+};
 
 const parsePagination = (req) => {
   const page = Math.max(1, parseInt(req.query.page ?? '1', 10) || 1);
@@ -113,7 +123,7 @@ const normalizeGender = (v) => {
   return null;
 };
 
-/** Campos seguros de cliente para SELECT quando a coluna gender não existe no banco */
+/** Campos seguros de cliente para SELECT (sem password) */
 const baseClientSelect = {
   id: true,
   name: true,
@@ -138,24 +148,65 @@ const baseClientSelect = {
   companyId: true,
   createdAt: true,
   updatedAt: true,
-  password: true,
   originId: true,
 };
 
 /* =======================================================================
- * LISTA MINIMAL para selects/autocomplete (rápida)
- * GET /api/clients/min?q=jo&take=20&skip=0
+ * SELECT para dropdowns (rápido/ativo)  -> GET /api/clients/select?q=jo
+ * Somente clientes ATIVOS e não deletados
  * ======================================================================= */
-export const listClientsMin = async (req, res) => {
+export const listClientsForSelect = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const q = (req.query.q || '').toString().trim();
-    const take = Math.min(Number(req.query.take) || 20, 50);
-    const skip = Number(req.query.skip) || 0;
+    const take = Math.min(Number(req.query.take) || 50, 100);
 
     const where = {
       companyId,
       deletedAt: null,
+      isActive: true,
+      ...(q
+        ? {
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+              { phone: { contains: q, mode: 'insensitive' } },
+              { cpf: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const items = await prisma.client.findMany({
+      where,
+      orderBy: [{ name: 'asc' }],
+      select: { id: true, name: true, phone: true, email: true },
+      take,
+    });
+
+    return res.status(200).json(items);
+  } catch (error) {
+    console.error('❌ Erro ao listar clientes para select:', error);
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
+  }
+};
+
+/* =======================================================================
+ * LISTA MINIMAL para selects/autocomplete (rápida)
+ * GET /api/clients/min?q=jo&take=20&skip=0&activeOnly=1
+ * ======================================================================= */
+export const listClientsMin = async (req, res) => {
+  try {
+    const companyId = ensureCompany(req);
+    const q = (req.query.q || '').toString().trim();
+    const take = Math.min(Number(req.query.take) || 20, 50);
+    const skip = Number(req.query.skip) || 0;
+    const activeOnly = truthy(req.query.activeOnly);
+
+    const where = {
+      companyId,
+      deletedAt: null,
+      ...(activeOnly ? { isActive: true } : {}),
       ...(q
         ? {
             OR: [
@@ -188,14 +239,14 @@ export const listClientsMin = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Erro ao listar clientes (min):', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 /* =============== LIST (filtros + paginação + stats) =============== */
 export const listClients = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const { page, pageSize, skip, take } = parsePagination(req);
     const where = buildWhereFromQuery(companyId, req.query.q, {
       status: req.query.status,  // 'active' | 'inactive' | undefined
@@ -236,14 +287,14 @@ export const listClients = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Erro ao listar clientes:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 /* =============== GET by ID =============== */
 export const getClientById = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const { id } = req.params;
 
     const includeDeleted = truthy(req.query.includeDeleted);
@@ -259,14 +310,14 @@ export const getClientById = async (req, res) => {
     res.status(200).json(client);
   } catch (error) {
     console.error('❌ Erro ao buscar cliente por ID:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 /* =============== CREATE =============== */
 export const createClient = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const {
       name, email, phone, cpf, rg, gender, birthDate, notes,
       avatarUrl, zipCode, street, number, complement, district, city, state,
@@ -297,14 +348,14 @@ export const createClient = async (req, res) => {
     if (error?.code === 'P2002') {
       return res.status(400).json({ message: 'E-mail ou CPF já utilizado nesta empresa.' });
     }
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 /* =============== UPDATE =============== */
 export const updateClient = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const { id } = req.params;
     const {
       name, email, phone, cpf, rg, gender, birthDate, notes,
@@ -337,14 +388,14 @@ export const updateClient = async (req, res) => {
     if (error?.code === 'P2002') {
       return res.status(400).json({ message: 'E-mail ou CPF já utilizado nesta empresa.' });
     }
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 /* =============== SOFT DELETE / RESTORE / HARD DELETE =============== */
 export const softDeleteClient = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const { id } = req.params;
 
     const result = await prisma.client.updateMany({
@@ -356,13 +407,13 @@ export const softDeleteClient = async (req, res) => {
     res.status(200).json({ message: 'Cliente movido para lixeira.' });
   } catch (error) {
     console.error('❌ Erro ao soft-delete cliente:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 export const restoreClient = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const { id } = req.params;
 
     const result = await prisma.client.updateMany({
@@ -374,14 +425,14 @@ export const restoreClient = async (req, res) => {
     res.status(200).json({ message: 'Cliente restaurado.' });
   } catch (error) {
     console.error('❌ Erro ao restaurar cliente:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 // CUIDADO: remove definitivamente
 export const hardDeleteClient = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const { id } = req.params;
     await prisma.$transaction(async (tx) => {
       await tx.appointment.deleteMany({ where: { companyId, clientId: id } });
@@ -395,14 +446,14 @@ export const hardDeleteClient = async (req, res) => {
     res.status(200).json({ message: 'Cliente removido definitivamente.' });
   } catch (error) {
     console.error('❌ Erro ao hard-delete cliente:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 /* =============== BULK ACTIONS (soft delete / restore) =============== */
 export const bulkSoftDelete = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const ids = Array.isArray(req.body.ids) ? req.body.ids : [];
     if (ids.length === 0) return res.status(400).json({ message: 'Informe ids.' });
 
@@ -413,13 +464,13 @@ export const bulkSoftDelete = async (req, res) => {
     res.status(200).json({ message: 'Clientes movidos para lixeira.', count: result.count });
   } catch (error) {
     console.error('❌ Erro em bulk soft delete:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 export const bulkRestore = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const ids = Array.isArray(req.body.ids) ? req.body.ids : [];
     if (ids.length === 0) return res.status(400).json({ message: 'Informe ids.' });
 
@@ -430,13 +481,13 @@ export const bulkRestore = async (req, res) => {
     res.status(200).json({ message: 'Clientes restaurados.', count: result.count });
   } catch (error) {
     console.error('❌ Erro em bulk restore:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
 /* =============== MERGE (winner x loser) =============== */
 export const mergeClients = async (req, res) => {
-  const companyId = req.company.id;
+  const companyId = ensureCompany(req);
   const { winnerId, loserId } = req.body;
   if (!winnerId || !loserId || winnerId === loserId) {
     return res.status(400).json({ message: 'Informe winnerId e loserId diferentes.' });
@@ -506,7 +557,7 @@ export const mergeClients = async (req, res) => {
 /* =============== EXPORT CSV =============== */
 export const exportClientsCsv = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     const where = buildWhereFromQuery(companyId, req.query.q, {
       status: req.query.status,
       tag: req.query.tag,
@@ -568,7 +619,7 @@ export const exportClientsCsv = async (req, res) => {
     return res.status(200).send(csv);
   } catch (error) {
     console.error('❌ Erro ao exportar CSV de clientes:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
 
@@ -580,7 +631,7 @@ export const exportClientsCsv = async (req, res) => {
  */
 export const importClientsCsv = async (req, res) => {
   try {
-    const companyId = req.company.id;
+    const companyId = ensureCompany(req);
     if (!req.file) return res.status(400).json({ message: 'Envie um arquivo CSV em "file".' });
 
     const content = req.file.buffer.toString('utf-8');
@@ -660,6 +711,6 @@ export const importClientsCsv = async (req, res) => {
     res.status(200).json({ message: 'Importação concluída.', created, updated, skipped });
   } catch (error) {
     console.error('❌ Erro ao importar CSV:', error);
-    res.status(500).json({ message: 'Erro interno do servidor.' });
+    res.status(error.status || 500).json({ message: error.message || 'Erro interno do servidor.' });
   }
 };
