@@ -40,15 +40,17 @@ function SellModal({ open, onClose, pkg, onSold }) {
     return () => clearTimeout(t);
   }, [q]);
 
+  // Corrigido: usa /clients/min (q/take/skip) e normaliza {items:[]}
   const fetchClients = useCallback(
     async (term) => {
       if (!open) return;
       try {
         setLoadingClients(true);
-        const res = await api.get("/clients/select", {
-          params: { q: term || "", take: 50 },
+        const res = await api.get("/clients/min", {
+          params: { q: term || "", take: 50, skip: 0 },
         });
-        setClients(Array.isArray(res.data) ? res.data : []);
+        const items = Array.isArray(res.data) ? res.data : res.data?.items || [];
+        setClients(items);
       } catch (e) {
         console.error(e);
         toast.error("Não foi possível carregar clientes.");
@@ -91,7 +93,8 @@ function SellModal({ open, onClose, pkg, onSold }) {
 
     setSaving(true);
     try {
-      await api.post("/client-packages", {
+      // Corrigido: rota de venda existente no seu backend
+      await api.post("/packages/sell", {
         clientId,
         packageId: pkg.id,
         paymentMethod: payment,
@@ -100,7 +103,12 @@ function SellModal({ open, onClose, pkg, onSold }) {
       onSold?.();
       onClose?.();
     } catch (e) {
-      const msg = e?.response?.data?.message || e?.message || "Erro ao confirmar venda.";
+      const msg =
+        e?.response?.data?.message ||
+        (e?.response?.status === 404
+          ? "Rota /packages/sell não encontrada. Verifique o app.use('/api/packages', ...)."
+          : e?.message) ||
+        "Erro ao confirmar venda.";
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -257,17 +265,15 @@ function CreatePackageModal({ open, onClose, onCreated }) {
     return () => clearTimeout(t);
   }, [svcQuery]);
 
-  // carrega serviços (tenta duas rotas conhecidas)
+  // carrega serviços (tenta /services/select e faz fallback para /services)
   const fetchServices = useCallback(async (q) => {
     try {
       setLoadingSvcs(true);
-      // tente a rota "select" (alguns backends usam isso)
       let res;
       try {
-        res = await api.get("/services/select", { params: { q, take: 100 } });
+        res = await api.get("/services/select", { params: { q, take: 100, skip: 0 } });
       } catch {
-        // fallback para a rota padrão
-        res = await api.get("/services", { params: { q, pageSize: 100 } });
+        res = await api.get("/services", { params: { q, pageSize: 100, page: 1 } });
       }
       const items = Array.isArray(res.data)
         ? res.data
@@ -446,7 +452,7 @@ function CreatePackageModal({ open, onClose, onCreated }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Benefícios (opcional — separe por vírgula)
           </label>
-        <textarea
+          <textarea
             rows={3}
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
             value={features}
