@@ -17,6 +17,26 @@ model Company {
   updatedAt        DateTime @updatedAt
   isActive         Boolean  @default(true)
 
+  // --------- NOVOS CAMPOS (WhatsApp + Identidade/Assinatura) ----------
+  slug               String?  @unique
+  // Denormalização opcional para leitura rápida no front:
+  subscriptionPlan   String?                // ex.: FREE, BASIC, PRO
+  subscriptionStatus SubscriptionStatus?    // espelha status atual (ACTIVE/…)
+  // Configuração WhatsApp por empresa (fallback para ENV se useSharedWaba = true)
+  whatsappEnabled    Boolean  @default(false)
+  useSharedWaba      Boolean  @default(true)
+  wabaAccessToken    String?                // token do número próprio
+  wabaPhoneNumberId  String?                // phone_number_id do número próprio
+  wabaAppSecret      String?                // opcional p/ validação HMAC do webhook
+  // Textos do bot
+  botGreeting        String?
+  botCancelPolicy    String?
+  botMenuJson        String?                // JSON com itens de menu
+  // Saúde/conectividade
+  whatsappStatus     String?
+  whatsappLastCheckAt DateTime?
+  // --------------------------------------------------------------------
+
   anamnesisForms  AnamnesisForm[]
   appointments    Appointment[]
   brands          Brand[]
@@ -51,7 +71,7 @@ model User {
   role          Role     @default(STAFF)
   commission    Decimal? @db.Decimal(5, 2)
   workSchedule  Json?
-  phone         String?  @unique                // <— AGORA É ÚNICO
+  phone         String?  @unique                // <— ÚNICO
   nickname      String?
   companyId     String
   createdAt     DateTime @default(now())
@@ -69,7 +89,7 @@ model User {
   googleIntegration    GoogleIntegration?
 
   @@index([companyId])
-  @@unique([companyId, email])               // <— Único por empresa (multi-tenant)
+  @@unique([companyId, email])               // <— ÚNICO por empresa (multi-tenant)
 }
 
 model Service {

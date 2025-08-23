@@ -40,7 +40,7 @@ import exportRoutes from './routes/exportRoutes.js';
 // Formas de pagamento (OrderDrawer)
 import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 
-// WhatsApp
+// WhatsApp (settings + webhook dentro do mesmo router)
 import whatsappRoutes from './routes/whatsappRoutes.js';
 
 dotenv.config();
@@ -62,18 +62,32 @@ app.use((req, _res, next) => {
 /* ------------------------ Preflight manual ------------------------- */
 const allowOrigin = (origin) => {
   if (!origin) return true;
-  const netlify = /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin) || origin === 'https://frontlyn.netlify.app';
+  const envAllowed = (process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const isEnvAllowed = envAllowed.some((u) => u && u === origin);
+
+  const netlify =
+    /^https:\/\/[a-z0-9-]+\.netlify\.app$/i.test(origin) ||
+    origin === 'https://frontlyn.netlify.app';
   const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
   const railway = /railway\.app$/i.test(origin);
   const vercel = /\.vercel\.app$/i.test(origin);
-  return netlify || local || railway || vercel;
+
+  return isEnvAllowed || netlify || local || railway || vercel;
 };
 
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
-    const reqOrigin  = req.headers.origin || 'https://frontlyn.netlify.app';
-    const reqHeaders = req.headers['access-control-request-headers'] || 'Content-Type, Authorization';
-    res.setHeader('Access-Control-Allow-Origin', allowOrigin(reqOrigin) ? reqOrigin : 'https://frontlyn.netlify.app');
+    const reqOrigin = req.headers.origin || 'https://frontlyn.netlify.app';
+    const reqHeaders =
+      req.headers['access-control-request-headers'] || 'Content-Type, Authorization';
+    res.setHeader(
+      'Access-Control-Allow-Origin',
+      allowOrigin(reqOrigin) ? reqOrigin : 'https://frontlyn.netlify.app'
+    );
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
@@ -96,15 +110,18 @@ app.use(
 );
 
 /**
- * ⚠️ O webhook do WhatsApp precisa do RAW BODY.
+ * ⚠️ Webhook do WhatsApp precisa do RAW BODY.
  * Monte a rota de WhatsApp ANTES do express.json global.
+ * Aqui usamos express.json com "verify" para capturar o buffer bruto em req.rawBody.
+ * (Se preferir assinatura estrita HMAC, você pode trocar por express.raw({ type: 'application/json' })
+ * no router do webhook especificamente.)
  */
 app.use(
   '/api/integrations/whatsapp',
   express.json({
     limit: '2mb',
     verify: (req, _res, buf) => {
-      req.rawBody = buf; // Buffer para HMAC
+      req.rawBody = buf; // Buffer para HMAC quando necessário
     },
   }),
   whatsappRoutes
@@ -118,7 +135,7 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(companyLogger);
 
 /* ----------------------------- Rotas ------------------------------ */
-// Webhooks primeiro
+// Webhooks gerais primeiro
 app.use('/api/webhooks', webhookRoutes);
 
 // Rotas públicas e gerais
@@ -157,8 +174,12 @@ app.use('/api/exports', exportRoutes);
 app.use('/api/payment-methods', paymentMethodRoutes);
 
 /* --------------------------- Healthcheck -------------------------- */
-app.get('/api', (_req, res) => res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' }));
-app.get('/', (_req, res) => res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' }));
+app.get('/api', (_req, res) =>
+  res.json({ message: 'Bem-vindo à API do Agendalyn 2.0!' })
+);
+app.get('/', (_req, res) =>
+  res.status(200).json({ status: 'ok', message: 'Agendalyn 2.0 API is healthy' })
+);
 
 /* ----------------------- 404 & Error Handler ---------------------- */
 app.use((req, res) => {
