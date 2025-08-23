@@ -1,16 +1,22 @@
 import prisma from '../prismaClient.js';
+
 // Helper: Prisma Decimal -> number (ou Number() seguro)
 const toNumber = (v) =>
   v && typeof v === 'object' && typeof v.toNumber === 'function'
     ? v.toNumber()
     : Number(v);
 
-// LISTAR pacotes da empresa
+/* =========================
+   LISTAR pacotes da empresa
+   ========================= */
 export const listPackages = async (req, res) => {
   try {
     const packages = await prisma.package.findMany({
       where: { companyId: req.company.id },
-      include: { services: { select: { name: true } } }
+      include: {
+        services: { select: { id: true, name: true, price: true } },
+      },
+      orderBy: { createdAt: 'desc' },
     });
     res.status(200).json(packages);
   } catch (error) {
@@ -19,23 +25,50 @@ export const listPackages = async (req, res) => {
   }
 };
 
-// CRIAR novo pacote
+/* =========================
+   CRIAR novo pacote
+   - aceita serviceIds OU services
+   - sessions/validityDays são opcionais (defaults)
+   ========================= */
 export const createPackage = async (req, res) => {
   try {
-    const { name, price, sessions, validityDays, serviceIds } = req.body;
     const companyId = req.company.id;
 
-    if (!name || price === undefined || sessions === undefined || validityDays === undefined || !serviceIds || serviceIds.length === 0) {
-      return res.status(400).json({ message: 'Todos os campos, incluindo pelo menos um serviço, são obrigatórios.' });
+    const {
+      name,
+      price,
+      sessions,       // opcional
+      validityDays,   // opcional
+      serviceIds,     // preferido
+      services,       // fallback (alguns fronts/backs usam esse nome)
+    } = req.body;
+
+    // normalizações
+    const svcIds = Array.isArray(serviceIds)
+      ? serviceIds
+      : Array.isArray(services)
+      ? services
+      : [];
+
+    if (!name || price === undefined || svcIds.length === 0) {
+      return res.status(400).json({
+        message:
+          'Nome, preço e pelo menos um serviço são obrigatórios.',
+      });
     }
 
     const parsedPrice = toNumber(price);
-    const parsedSessions = Number(sessions);
-    const parsedValidity = Number(validityDays);
-
-    if (!Number.isFinite(parsedPrice) || !Number.isFinite(parsedSessions) || !Number.isFinite(parsedValidity)) {
-      return res.status(400).json({ message: 'Preço, sessões e validade devem ser números válidos.' });
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      return res.status(400).json({ message: 'Preço inválido.' });
     }
+
+    // Defaults que evitam quebra com o front
+    const parsedSessions = Number.isFinite(Number(sessions))
+      ? Number(sessions)
+      : 1; // default 1
+    const parsedValidity = Number.isFinite(Number(validityDays))
+      ? Number(validityDays)
+      : 365; // default 365
 
     const newPackage = await prisma.package.create({
       data: {
@@ -45,9 +78,12 @@ export const createPackage = async (req, res) => {
         validityDays: parsedValidity,
         companyId,
         services: {
-          connect: serviceIds.map((id) => ({ id }))
-        }
-      }
+          connect: svcIds.map((id) => ({ id })),
+        },
+      },
+      include: {
+        services: { select: { id: true, name: true, price: true } },
+      },
     });
 
     res.status(201).json(newPackage);
@@ -57,16 +93,61 @@ export const createPackage = async (req, res) => {
   }
 };
 
-// VENDER pacote para cliente
+/* =========================
+   DELETAR pacote
+   - valida empresa
+   - impede exclusão se já houve vendas (ClientPackage vinculado)
+   - limpa relação N:N com services antes de deletar
+   ========================= */
+export const deletePackage = async (req, res) => {
+  try {
+    const companyId = req.company.id;
+    const { id } = req.params;
+
+    const pkg = await prisma.package.findFirst({
+      where: { id, companyId },
+      include: { _count: { select: { clientPackages: true } } },
+    });
+
+    if (!pkg) {
+      return res.status(404).json({ message: 'Pacote não encontrado.' });
+    }
+
+    if (pkg._count?.clientPackages > 0) {
+      return res.status(400).json({
+        message:
+          'Este pacote já possui vendas e não pode ser excluído.',
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // limpa N:N
+      await tx.package.update({
+        where: { id },
+        data: { services: { set: [] } },
+      });
+      // deleta pacote
+      await tx.package.delete({ where: { id } });
+    });
+
+    res.status(200).json({ message: 'Pacote excluído com sucesso.' });
+  } catch (error) {
+    console.error('--- ERRO AO DELETAR PACOTE ---', error);
+    res.status(500).json({ message: 'Erro ao deletar pacote.' });
+  }
+};
+
+/* =========================
+   VENDER pacote para cliente
+   ========================= */
 export const sellPackageToClient = async (req, res) => {
-  const { packageId, clientId, paymentMethod } = req.body; // paymentMethod recebido mas ignorado no storage (schema não tem campo)
+  const { packageId, clientId, paymentMethod } = req.body; // paymentMethod recebido mas ignorado (schema não tem campo)
   const companyId = req.company.id;
   const userId = req.user.id;
 
   try {
-    // garante multi-tenant
     const pkg = await prisma.package.findFirst({
-      where: { id: packageId, companyId }
+      where: { id: packageId, companyId },
     });
 
     if (!pkg) {
@@ -77,23 +158,35 @@ export const sellPackageToClient = async (req, res) => {
     const sessions = Number(pkg.sessions);
 
     if (!Number.isFinite(sessions) || sessions <= 0) {
-      return res.status(400).json({ message: 'Pacote inválido: O número de sessões não está definido ou é zero.' });
+      return res.status(400).json({
+        message:
+          'Pacote inválido: O número de sessões não está definido ou é zero.',
+      });
     }
     if (!Number.isFinite(price) || price < 0) {
-      return res.status(400).json({ message: 'Pacote inválido: O preço não está definido.' });
+      return res.status(400).json({
+        message: 'Pacote inválido: O preço não está definido.',
+      });
     }
 
     const activeCashier = await prisma.cashierSession.findFirst({
-      where: { companyId, status: 'OPEN' }
+      where: { companyId, status: 'OPEN' },
     });
     if (!activeCashier) {
-      return res.status(400).json({ message: 'Nenhum caixa aberto para registrar a venda.' });
+      return res.status(400).json({
+        message: 'Nenhum caixa aberto para registrar a venda.',
+      });
     }
 
     // Necessário ter ao menos um serviço cadastrado para amarrar a comanda
-    const placeholderService = await prisma.service.findFirst({ where: { companyId } });
+    const placeholderService = await prisma.service.findFirst({
+      where: { companyId },
+    });
     if (!placeholderService) {
-      return res.status(400).json({ message: 'A empresa precisa ter pelo menos um serviço cadastrado.' });
+      return res.status(400).json({
+        message:
+          'A empresa precisa ter pelo menos um serviço cadastrado.',
+      });
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -109,33 +202,35 @@ export const sellPackageToClient = async (req, res) => {
             create: {
               quantity: 1,
               price: price,
-              serviceId: placeholderService.id
-            }
-          }
-        }
+              serviceId: placeholderService.id,
+            },
+          },
+        },
       });
 
-      // Lançamento no caixa (schema Transaction não tem paymentMethod)
+      // Lançamento no caixa
       await tx.transaction.create({
         data: {
           type: 'INCOME',
           amount: price,
           description: `Venda do Pacote: ${pkg.name}`,
-          cashierSessionId: activeCashier.id
-        }
+          cashierSessionId: activeCashier.id,
+        },
       });
 
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + (pkg.validityDays || 365));
+      expiresAt.setDate(
+        expiresAt.getDate() + (pkg.validityDays || 365)
+      );
 
-      // Importante: ClientPackage no seu schema NÃO tem companyId
+      // ClientPackage no schema não tem companyId
       const clientPackage = await tx.clientPackage.create({
         data: {
           sessionsRemaining: sessions,
           expiresAt,
           clientId,
-          packageId
-        }
+          packageId,
+        },
       });
 
       return clientPackage;
@@ -144,18 +239,25 @@ export const sellPackageToClient = async (req, res) => {
     res.status(201).json(result);
   } catch (error) {
     console.error('--- ERRO AO VENDER PACOTE ---', error);
-    res.status(500).json({ message: error.message || 'Erro interno do servidor ao vender o pacote.' });
+    res
+      .status(500)
+      .json({
+        message:
+          error.message || 'Erro interno do servidor ao vender o pacote.',
+      });
   }
 };
 
-// LISTAR pacotes comprados de um cliente
+/* =========================
+   LISTAR pacotes comprados de um cliente
+   ========================= */
 export const listClientPackages = async (req, res) => {
   try {
     const { clientId } = req.params;
     const clientPackages = await prisma.clientPackage.findMany({
       where: { clientId },
       include: { package: true },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
     res.status(200).json(clientPackages);
   } catch (error) {
@@ -164,7 +266,9 @@ export const listClientPackages = async (req, res) => {
   }
 };
 
-// CONSUMIR uma sessão de pacote
+/* =========================
+   CONSUMIR uma sessão de pacote
+   ========================= */
 export const usePackageSession = async (req, res) => {
   try {
     const { clientPackageId } = req.params;
@@ -172,23 +276,23 @@ export const usePackageSession = async (req, res) => {
 
     const result = await prisma.$transaction(async (tx) => {
       const clientPackage = await tx.clientPackage.findUnique({
-        where: { id: clientPackageId }
+        where: { id: clientPackageId },
       });
 
-      if (!clientPackage) throw new Error('Pacote do cliente não encontrado.');
-      if (clientPackage.sessionsRemaining <= 0) throw new Error('Este pacote não tem mais sessões disponíveis.');
-      if (new Date() > new Date(clientPackage.expiresAt)) throw new Error('Este pacote já expirou.');
+      if (!clientPackage)
+        throw new Error('Pacote do cliente não encontrado.');
+      if (clientPackage.sessionsRemaining <= 0)
+        throw new Error('Este pacote não tem mais sessões disponíveis.');
+      if (new Date() > new Date(clientPackage.expiresAt))
+        throw new Error('Este pacote já expirou.');
 
       const updatedClientPackage = await tx.clientPackage.update({
         where: { id: clientPackageId },
-        data: { sessionsRemaining: { decrement: 1 } }
+        data: { sessionsRemaining: { decrement: 1 } },
       });
 
       await tx.packageSessionUsage.create({
-        data: {
-          clientPackageId,
-          userId
-        }
+        data: { clientPackageId, userId },
       });
 
       return updatedClientPackage;
@@ -197,6 +301,8 @@ export const usePackageSession = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error('--- ERRO AO USAR SESSÃO DO PACOTE ---', error);
-    res.status(400).json({ message: error.message || 'Erro ao usar a sessão do pacote.' });
+    res
+      .status(400)
+      .json({ message: error.message || 'Erro ao usar a sessão do pacote.' });
   }
 };

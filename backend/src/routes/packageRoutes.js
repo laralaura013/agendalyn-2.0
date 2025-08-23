@@ -1,24 +1,30 @@
 import express from 'express';
 import { protect } from '../middlewares/authMiddleware.js';
-import { 
-    listPackages, 
-    createPackage, 
-    sellPackageToClient,
-    listClientPackages,
-    usePackageSession
+import {
+  listPackages,
+  createPackage,
+  deletePackage,
+  sellPackageToClient,
+  listClientPackages,
+  usePackageSession,
 } from '../controllers/packageController.js';
 
 const router = express.Router();
 router.use(protect);
 
-// Rotas que já tínhamos
-router.route('/')
+// /api/packages
+router
+  .route('/')
   .get(listPackages)
   .post(createPackage);
 
+// deletar pacote específico
+router.delete('/:id', deletePackage);
+
+// vender pacote
 router.post('/sell', sellPackageToClient);
 
-// --- ROTAS NOVAS E CORRIGIDAS ---
+// pacotes do cliente e uso de sessão
 router.get('/client/:clientId', listClientPackages);
 router.post('/use-session/:clientPackageId', usePackageSession);
 
