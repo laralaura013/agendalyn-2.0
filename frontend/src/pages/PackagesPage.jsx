@@ -10,7 +10,6 @@ import {
   X,
   CheckCircle2,
   ShoppingCart,
-  ChevronDown,
   Keyboard,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -21,11 +20,10 @@ import api from '../services/api';
  * ========================================================================= */
 const toBRL = (v) =>
   Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
 const safe = (s) => (s == null ? '' : String(s));
 
 /* =========================================================================
- * CommandItem (linha de cliente)
+ * Linha do cliente (lista do command palette)
  * ========================================================================= */
 function CommandItem({ item, active, onClick }) {
   const initials = safe(item.name)
@@ -42,12 +40,14 @@ function CommandItem({ item, active, onClick }) {
         ${active ? 'bg-zinc-100 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/70'}`}
     >
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white grid place-items-center text-xs font-bold">
+        <div className="w-8 h-8 rounded-full bg-violet-600 text-white grid place-items-center text-xs font-bold">
           {initials || 'C'}
         </div>
         <div className="min-w-0">
-          <div className="font-medium truncate">{safe(item.name) || '(Sem nome)'}</div>
-          <div className="text-xs text-zinc-500 truncate">
+          <div className="font-medium text-zinc-800 dark:text-zinc-100 truncate">
+            {safe(item.name) || '(Sem nome)'}
+          </div>
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
             {safe(item.phone)} {item.email ? `• ${item.email}` : ''}
           </div>
         </div>
@@ -57,7 +57,7 @@ function CommandItem({ item, active, onClick }) {
 }
 
 /* =========================================================================
- * SellPackageModal — estilo command palette (Command-K)
+ * Modal de venda — estilo command palette (Command-K)
  * ========================================================================= */
 function SellPackageModal({ open, onClose, pkg, onSold }) {
   const [q, setQ] = useState('');
@@ -69,7 +69,7 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
   const listRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Debounce
+  // Debounce da busca
   const [debouncedQ, setDebouncedQ] = useState('');
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
@@ -91,15 +91,16 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
     }
   }, []);
 
-  // Carregar quando abre / quando muda a busca
+  // Carregar quando abre e quando muda o termo
   useEffect(() => {
     if (open) fetchClients(debouncedQ);
   }, [open, debouncedQ, fetchClients]);
 
-  // Foco no input ao abrir
+  // Reset/foco ao abrir/fechar
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50);
-    else {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } else {
       setQ('');
       setSelected(null);
       setClients([]);
@@ -108,7 +109,7 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
     }
   }, [open]);
 
-  // Keyboard nav
+  // Navegação por teclado
   const onKeyDown = (e) => {
     if (e.key === 'Escape') return onClose?.();
     if (!clients.length) return;
@@ -145,7 +146,7 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
           packageId: pkg.id,
         });
       } catch (err) {
-        // fallback
+        // fallback caso o projeto use outra rota
         if (err?.response?.status === 404) {
           await api.post('/packages/sell', {
             clientId: selected.id,
@@ -172,40 +173,40 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onKeyDown={onKeyDown}>
-      {/* Backdrop com blur */}
+      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Dialog */}
       <div className="relative w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden
-                      bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-white/20 dark:border-white/10">
+                      bg-white/85 dark:bg-zinc-900/85 backdrop-blur-xl border border-white/20 dark:border-white/10">
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-5 h-5 text-violet-600" />
-              <h3 className="font-semibold text-lg">Vender pacote</h3>
+              <h3 className="font-semibold text-lg text-zinc-800 dark:text-zinc-100">Vender pacote</h3>
             </div>
             <button
               onClick={onClose}
               className="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
               aria-label="Fechar"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 text-zinc-700 dark:text-zinc-200" />
             </button>
           </div>
 
           {/* Pacote selecionado */}
-          <div className="mt-4 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 p-4 bg-white/60 dark:bg-zinc-900/60">
+          <div className="mt-4 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 p-4 bg-white/70 dark:bg-zinc-900/70">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="font-semibold truncate">{pkg?.name}</div>
-                <div className="text-xs text-zinc-500 flex items-center gap-2 mt-1">
-                  <Tag className="w-4 h-4" />
-                  {toBRL(pkg?.price)}{' '}
+                <div className="font-semibold text-zinc-800 dark:text-zinc-100 truncate">{pkg?.name}</div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2 mt-1">
+                  <Tag className="w-4 h-4 text-violet-600" />
+                  {toBRL(pkg?.price)}
                   {pkg?.validityDays ? (
                     <>
                       <span className="mx-1">•</span>
-                      <CalendarDays className="w-4 h-4" />
+                      <CalendarDays className="w-4 h-4 text-violet-600" />
                       <span>Validade: {pkg.validityDays} dias</span>
                     </>
                   ) : null}
@@ -217,33 +218,33 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
 
         {/* Search / List */}
         <div className="px-6 pt-4 pb-2">
-          <label className="text-sm font-medium flex items-center gap-2 mb-2">
-            <Users className="w-4 h-4" />
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-2 mb-2">
+            <Users className="w-4 h-4 text-violet-600" />
             Selecionar cliente
           </label>
 
           <div className="relative">
             <div className="flex items-center gap-2 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70
                             bg-white/70 dark:bg-zinc-900/70 px-3 py-2">
-              <Search className="w-4 h-4 shrink-0" />
+              <Search className="w-4 h-4 text-zinc-600 dark:text-zinc-300 shrink-0" />
               <input
                 ref={inputRef}
-                className="w-full bg-transparent outline-none text-sm"
+                className="w-full bg-transparent outline-none text-sm text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400"
                 placeholder="Nome, e-mail, telefone ou CPF…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 aria-label="Buscar cliente"
               />
-              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {isSearching ? <Loader2 className="w-4 h-4 animate-spin text-zinc-500" /> : null}
             </div>
 
             <div
               className="mt-2 max-h-64 overflow-y-auto rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70
-                         bg-white/70 dark:bg-zinc-900/70 p-1"
+                         bg-white/75 dark:bg-zinc-900/75 p-1"
               ref={listRef}
             >
               {clients.length === 0 ? (
-                <div className="px-3 py-6 text-center text-sm text-zinc-500">
+                <div className="px-3 py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
                   {isSearching ? 'Carregando…' : 'Nenhum cliente encontrado.'}
                 </div>
               ) : (
@@ -262,14 +263,14 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
             {selected ? (
               <div className="mt-2 flex items-center justify-between rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 px-3 py-2">
                 <div className="text-sm">
-                  <div className="font-medium">{selected.name}</div>
-                  <div className="text-zinc-500 text-xs">
+                  <div className="font-medium text-zinc-800 dark:text-zinc-100">{selected.name}</div>
+                  <div className="text-zinc-500 dark:text-zinc-400 text-xs">
                     {selected.phone} {selected.email ? `• ${selected.email}` : ''}
                   </div>
                 </div>
                 <button
                   onClick={() => setSelected(null)}
-                  className="text-xs px-2 py-1 rounded-lg border dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                  className="text-xs px-2 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 >
                   Trocar
                 </button>
@@ -280,7 +281,7 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-zinc-200/70 dark:border-zinc-800/70 flex items-center justify-between">
-          <div className="hidden md:flex items-center gap-2 text-xs text-zinc-500">
+          <div className="hidden md:flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
             <Keyboard className="w-4 h-4" />
             <span>
               Navegue com <kbd className="px-1.5 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-800/70">↑</kbd>/
@@ -291,7 +292,7 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition"
+              className="px-4 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
               disabled={isSelling}
             >
               Cancelar
@@ -312,7 +313,7 @@ function SellPackageModal({ open, onClose, pkg, onSold }) {
 }
 
 /* =========================================================================
- * PackagesPage
+ * Página de Pacotes
  * ========================================================================= */
 export default function PackagesPage() {
   const [loading, setLoading] = useState(true);
@@ -324,6 +325,7 @@ export default function PackagesPage() {
   const fetchPackages = useCallback(async () => {
     try {
       setLoading(true);
+      // ajuste o endpoint conforme seu backend (/api/packages)
       const res = await api.get('/packages', { params: { q } });
       setPackages(Array.isArray(res.data) ? res.data : res.data?.items || []);
     } catch (err) {
@@ -359,15 +361,15 @@ export default function PackagesPage() {
       <div className="mb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Package className="w-6 h-6 text-violet-600" />
-          <h1 className="text-xl md:text-2xl font-semibold">Pacotes</h1>
+          <h1 className="text-xl md:text-2xl font-semibold text-zinc-800 dark:text-zinc-100">Pacotes</h1>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="relative">
-            <div className="flex items-center gap-2 border dark:border-zinc-800 rounded-2xl px-3 py-2">
-              <Search className="w-4 h-4" />
+            <div className="flex items-center gap-2 border border-zinc-300 dark:border-zinc-800 rounded-2xl px-3 py-2">
+              <Search className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />
               <input
-                className="bg-transparent outline-none text-sm w-64"
+                className="bg-transparent outline-none text-sm w-64 text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400"
                 placeholder="Buscar pacote…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -381,27 +383,30 @@ export default function PackagesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="rounded-3xl border dark:border-zinc-800 p-4 h-40 animate-pulse bg-white/50 dark:bg-zinc-900/50" />
+            <div
+              key={i}
+              className="rounded-3xl border border-zinc-200 dark:border-zinc-800 p-4 h-40 animate-pulse bg-white/50 dark:bg-zinc-900/50"
+            />
           ))
         ) : filtered.length === 0 ? (
-          <div className="col-span-full rounded-3xl border dark:border-zinc-800 p-8 text-center text-zinc-500">
+          <div className="col-span-full rounded-3xl border border-zinc-200 dark:border-zinc-800 p-8 text-center text-zinc-500 dark:text-zinc-400">
             Nenhum pacote encontrado.
           </div>
         ) : (
           filtered.map((pkg) => (
             <div
               key={pkg.id}
-              className="rounded-3xl border dark:border-zinc-800 p-5 flex flex-col gap-4 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-sm"
+              className="rounded-3xl border border-zinc-200 dark:border-zinc-800 p-5 flex flex-col gap-4 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-sm"
             >
               <div className="space-y-1">
-                <div className="font-semibold text-lg">{pkg.name}</div>
-                <div className="text-sm text-zinc-500 flex items-center gap-2">
-                  <Tag className="w-4 h-4" />
+                <div className="font-semibold text-lg text-zinc-800 dark:text-zinc-100">{pkg.name}</div>
+                <div className="text-sm text-zinc-600 dark:text-zinc-300 flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-violet-600" />
                   {toBRL(pkg.price)}
                 </div>
                 {pkg.validityDays ? (
-                  <div className="text-xs text-zinc-500 flex items-center gap-1">
-                    <CalendarDays className="w-4 h-4" />
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                    <CalendarDays className="w-4 h-4 text-violet-600" />
                     Validade: {pkg.validityDays} dias
                   </div>
                 ) : null}
@@ -410,7 +415,7 @@ export default function PackagesPage() {
               <div className="mt-auto flex items-center justify-end">
                 <button
                   onClick={() => openSell(pkg)}
-                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:opacity-90 transition flex items-center gap-2"
+                  className="px-3 py-2 rounded-xl bg-violet-600 text-white hover:bg-violet-700 transition flex items-center gap-2"
                 >
                   <ShoppingCart className="w-4 h-4" />
                   Vender
