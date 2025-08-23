@@ -129,6 +129,33 @@ const sendChoices = async (to, title, options = [], company = null) => {
   return sendText(to, lines.join('\n'), company);
 };
 
+/** Envio via TEMPLATE (para iniciar conversa / fora da janela 24h) */
+const sendTemplate = async (to, templateName, lang = 'pt_BR', company = null, components = []) => {
+  const cfg = getWabaSendConfig(company);
+  try {
+    const payload = {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'template',
+      template: {
+        name: templateName,       // ex.: "hello_world"
+        language: { code: lang }, // ex.: "pt_BR" ou "en_US"
+      },
+    };
+    if (Array.isArray(components) && components.length) {
+      payload.template.components = components;
+    }
+    const { data } = await axios.post(cfg.graphUrl, payload, {
+      headers: { Authorization: `Bearer ${cfg.token}` },
+    });
+    console.log(`✅ Template enviado (${cfg.companyId || 'shared'}):`, data?.messages?.[0]?.id);
+    return data;
+  } catch (err) {
+    console.error('❌ Erro ao enviar template:', err?.response?.data || err.message);
+    throw err;
+  }
+};
+
 /** Assinatura do webhook (opcional) */
 const isValidSignature = (req) => {
   if (!WABA_APP_SECRET) return true;
@@ -146,7 +173,6 @@ const isValidSignature = (req) => {
 };
 
 /** ================== SETTINGS (painel) ================== */
-/** GET /integrations/whatsapp/settings */
 router.get('/settings', async (req, res) => {
   try {
     const companyId = req.companyId;
@@ -202,7 +228,6 @@ router.get('/settings', async (req, res) => {
   }
 });
 
-/** PUT /integrations/whatsapp/settings */
 router.put('/settings', async (req, res) => {
   try {
     const companyId = req.companyId;
@@ -257,8 +282,6 @@ router.put('/settings', async (req, res) => {
 });
 
 /** ================== VERIFY (GET) ================== */
-// OBS: ESTA ROTA É PÚBLICA — por isso não passa pelo guard acima.
-// Para isso, montamos explicitamente fora do .use de auth (no server.js ela vem ANTES do json global).
 router.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -270,7 +293,6 @@ router.get('/webhook', (req, res) => {
 });
 
 /** ================== RECEIVER (POST) ================== */
-// Também PÚBLICA (valida por assinatura HMAC)
 router.post('/webhook', async (req, res) => {
   try {
     if (!isValidSignature(req)) {
@@ -762,20 +784,27 @@ router.get('/health', async (req, res) => {
   }
 });
 
+/** ===== TEST: suporta texto livre OU template (primeiro contato) ===== */
 router.post('/test', async (req, res) => {
   try {
-    const { to, text } = req.body || {};
-    if (!to || !text) return res.status(400).json({ message: 'Parâmetros to e text são obrigatórios.' });
+    const { to, text, useTemplate, templateName = 'hello_world', lang = 'pt_BR', components } = req.body || {};
+    if (!to) return res.status(400).json({ message: 'Parâmetro "to" é obrigatório.' });
 
     const companyId = req.companyId;
     const company = companyId ? await prisma.company.findUnique({ where: { id: companyId } }) : null;
-
     const norm = e164BR(to);
-    await sendText(norm, text, company);
+
+    if (useTemplate) {
+      await sendTemplate(norm, templateName, lang, company, components);
+    } else {
+      if (!text) return res.status(400).json({ message: 'Parâmetro "text" é obrigatório quando useTemplate=false.' });
+      await sendText(norm, text, company);
+    }
+
     return res.json({ ok: true });
   } catch (e) {
     console.error('Erro /test:', e?.response?.data || e.message);
-    return res.status(500).json({ message: 'Falha ao enviar mensagem' });
+    return res.status(500).json({ message: 'Falha ao enviar mensagem', error: e?.response?.data || e.message });
   }
 });
 

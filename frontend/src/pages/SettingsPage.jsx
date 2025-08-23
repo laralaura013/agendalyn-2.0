@@ -7,7 +7,6 @@ import {
   Loader2,
   PlugZap,
   QrCode,
-  RefreshCw,
   Save,
   Send,
   ShieldCheck,
@@ -34,11 +33,7 @@ const Label = ({ children, hint }) => (
   <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
     {children}
     {hint ? (
-      <span
-        className="ml-1 text-gray-400 text-xs cursor-help"
-        title={hint}
-        aria-label={hint}
-      >
+      <span className="ml-1 text-gray-400 text-xs cursor-help" title={hint} aria-label={hint}>
         ⓘ
       </span>
     ) : null}
@@ -83,10 +78,7 @@ const Toggle = ({ checked, onChange, label, helper }) => (
       />
     </button>
     <div className="flex-1">
-      <p
-        className="select-none cursor-pointer text-sm font-medium text-gray-800"
-        onClick={() => onChange(!checked)}
-      >
+      <p className="select-none cursor-pointer text-sm font-medium text-gray-800" onClick={() => onChange(!checked)}>
         {label}
       </p>
       {helper ? <p className="text-xs text-gray-500 mt-0.5">{helper}</p> : null}
@@ -129,6 +121,11 @@ const SettingsPage = () => {
   const [testTo, setTestTo] = useState('');
   const [testText, setTestText] = useState('Teste do bot ✅');
 
+  // NOVO: template test
+  const [useTemplate, setUseTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState('hello_world');
+  const [lang, setLang] = useState('pt_BR');
+
   const bookingUrl = useMemo(() => `${window.location.origin}/agendar/${companyId}`, [companyId]);
 
   // ------------ fetchers ------------
@@ -149,9 +146,7 @@ const SettingsPage = () => {
       const { data } = await api.get(`/integrations/google/status/${userData.id}`);
       setGoogleConnected(!!data.connected);
       setGoogleEmail(data.email || '');
-    } catch (e) {
-      // silencioso
-    }
+    } catch {}
   }, []);
 
   const fetchWhatsSettings = useCallback(async () => {
@@ -206,7 +201,7 @@ const SettingsPage = () => {
         whatsappStatus: data.status,
         whatsappLastCheckAt: new Date().toISOString(),
       }));
-    } catch (e) {
+    } catch {
       toast.error('Falha ao verificar conexão.');
     } finally {
       setHealthLoading(false);
@@ -214,13 +209,20 @@ const SettingsPage = () => {
   };
 
   const sendTest = async () => {
-    if (!testTo || !testText) return toast.error('Preencha o número e a mensagem.');
+    if (!testTo) return toast.error('Preencha o número de destino.');
+
     setTesting(true);
     try {
-      await api.post('/integrations/whatsapp/test', { to: testTo, text: testText });
-      toast.success('Mensagem enviada!');
+      await api.post('/integrations/whatsapp/test', {
+        to: testTo,
+        text: useTemplate ? undefined : testText,
+        useTemplate,
+        templateName,
+        lang,
+      });
+      toast.success(useTemplate ? 'Template enviado!' : 'Mensagem enviada!');
     } catch (e) {
-      toast.error('Falha ao enviar teste.');
+      toast.error(e?.response?.data?.message || 'Falha ao enviar teste.');
     } finally {
       setTesting(false);
     }
@@ -499,7 +501,7 @@ const SettingsPage = () => {
             </div>
 
             {/* teste rápido */}
-            <div className="mt-6 border-t border-gray-100 pt-5">
+            <div className="mt-6 border-t border-gray-100 pt-5 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <Label>Número destino (ex.: 5599999999999)</Label>
@@ -518,6 +520,7 @@ const SettingsPage = () => {
                       value={testText}
                       onChange={(e) => setTestText(e.target.value)}
                       className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-purple-100"
+                      disabled={useTemplate}
                     />
                     <button
                       onClick={sendTest}
@@ -527,6 +530,45 @@ const SettingsPage = () => {
                       Enviar teste
                     </button>
                   </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="useTemplate"
+                    type="checkbox"
+                    checked={useTemplate}
+                    onChange={(e) => setUseTemplate(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <label htmlFor="useTemplate" className="text-sm text-gray-700">
+                    Usar mensagem template (primeiro contato)
+                  </label>
+                </div>
+
+                <div>
+                  <Label>Template name</Label>
+                  <input
+                    type="text"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="hello_world"
+                    disabled={!useTemplate}
+                  />
+                </div>
+
+                <div>
+                  <Label>Idioma</Label>
+                  <input
+                    type="text"
+                    value={lang}
+                    onChange={(e) => setLang(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="pt_BR"
+                    disabled={!useTemplate}
+                  />
                 </div>
               </div>
             </div>
@@ -583,11 +625,7 @@ const SettingsPage = () => {
         {/* Coluna direita (1/3) */}
         <div className="space-y-6">
           {/* Google */}
-          <Section
-            title="Google Calendar"
-            icon={CalendarIcon}
-            desc="Sincronize seus agendamentos com seu Google Calendar."
-          >
+          <Section title="Google Calendar" icon={CalendarIcon} desc="Sincronize seus agendamentos com seu Google Calendar.">
             {staffId ? (
               <>
                 <GoogleConnectButton
@@ -640,7 +678,14 @@ const SettingsPage = () => {
 };
 
 // ícone simples para evitar mais imports
-const CalendarIcon = (props) => <svg viewBox="0 0 24 24" className="h-5 w-5" {...props}><path fill="currentColor" d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H2V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1Zm15 8v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9h20ZM6 14h4v4H6v-4Z"/></svg>;
+const CalendarIcon = (props) => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" {...props}>
+    <path
+      fill="currentColor"
+      d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v2H2V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1Zm15 8v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9h20ZM6 14h4v4H6v-4Z"
+    />
+  </svg>
+);
 
 const WebhookHelp = () => {
   const [meta, setMeta] = useState({ webhookUrl: '', verifyToken: '', phoneNumberIdShared: '' });
@@ -650,9 +695,7 @@ const WebhookHelp = () => {
       try {
         const { data } = await api.get('/integrations/whatsapp/meta-info');
         setMeta(data);
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     })();
   }, []);
 
