@@ -1,38 +1,56 @@
-// ✅ ARQUIVO: src/pages/WaitlistPage.jsx (UI moderna + mesma lógica)
-// Mantém toda a lógica do waitlist antigo (fetch, filtros, CRUD, horários, AppointmentModal)
-// Troca apenas a camada de apresentação para o visual moderno do seu painel.
-
+// ✅ ARQUIVO: src/pages/WaitlistPage.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   PlusCircle, Filter, X, Bell, Pencil, Trash2, CheckCircle2, Users, UserPlus,
-  Calendar as CalendarIcon, Loader2
+  Calendar as CalendarIcon, AlertTriangle, RefreshCw
 } from "lucide-react";
 import api from "../services/api";
 import toast from "react-hot-toast";
 
 import { asArray } from "../utils/asArray";
+// 👉 Ajuste o caminho abaixo se necessário
 import AppointmentModal from "../components/schedule/AppointmentModal";
 
+/* ========================== Constantes ========================== */
 const STATUS_OPTIONS = [
   { id: "WAITING", label: "Aguardando" },
   { id: "NOTIFIED", label: "Notificado" },
   { id: "SCHEDULED", label: "Agendado" },
   { id: "CANCELLED", label: "Cancelado" },
 ];
-
 const DEFAULT_SLOT_MINUTES = 30;
 
-/* ------------------ Utils ------------------ */
+/* ========================== Utils ========================== */
+const pickItems = (data) =>
+  Array.isArray(data) ? data : (data?.items || data?.results || data?.data || []);
+
+const toSimpleList = (data) =>
+  pickItems(data).map((x) => {
+    const name =
+      x.name ||
+      x.fullName ||
+      x.displayName ||
+      x.title ||
+      [x.firstName, x.lastName].filter(Boolean).join(" ") ||
+      x.clientName ||
+      "—";
+    return {
+      ...x,
+      id: x.id || x._id || x.value || x.key,
+      name,
+    };
+  });
+
 function Badge({ status }) {
   const map = {
-    WAITING: "bg-yellow-100 text-yellow-800",
-    NOTIFIED: "bg-blue-100 text-blue-800",
-    SCHEDULED: "bg-green-100 text-green-800",
-    CANCELLED: "bg-red-100 text-red-800",
+    WAITING: "bg-amber-50 text-amber-700 border-amber-200",
+    NOTIFIED: "bg-sky-50 text-sky-700 border-sky-200",
+    SCHEDULED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    CANCELLED: "bg-rose-50 text-rose-700 border-rose-200",
   };
   const label = STATUS_OPTIONS.find((s) => s.id === status)?.label || status;
   return (
-    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${map[status] || "bg-gray-100 text-gray-800"}`}>
+    <span className={`text-xs px-2 py-1 rounded border ${map[status] || "bg-gray-50 text-gray-700 border-gray-200"}`}>
       {label}
     </span>
   );
@@ -59,8 +77,89 @@ function formatDateInput(d) {
   }
 }
 
-/* ------------------ Página ------------------ */
-export default function WaitlistPage() {
+/* ========================== Fetch Inteligente ========================== */
+async function smartFetchList(kind, setDiag) {
+  const attempts = [];
+  const pushAttempt = (a) => {
+    attempts.push(a);
+    setDiag((prev) => ({
+      ...prev,
+      [kind]: { ...(prev?.[kind] || {}), attempts: [...attempts] },
+    }));
+  };
+
+  const tryGet = async (url, params) => {
+    try {
+      const res = await api.get(url, { params });
+      const rows = toSimpleList(res.data);
+      pushAttempt({ url, params, ok: true, status: res.status, count: rows.length });
+      if (rows.length > 0) return rows;
+      return null;
+    } catch (e) {
+      pushAttempt({
+        url,
+        params,
+        ok: false,
+        status: e?.response?.status,
+        error: e?.response?.data?.message || e?.message,
+      });
+      return null;
+    }
+  };
+
+  let candidates = [];
+  if (kind === "clients") {
+    candidates = [
+      ["/clients/min", { q: "", take: 200, skip: 0 }],
+      ["/clients", { page: 1, pageSize: 200 }],
+      ["/clients", { take: 200, skip: 0 }],
+      ["/clients", { limit: 200 }],
+      ["/clients/list", {}],
+      ["/clients/all", {}],
+      ["/clients", {}],
+    ];
+  } else if (kind === "services") {
+    candidates = [
+      ["/services/select", { q: "", take: 200, skip: 0 }],
+      ["/services/min", { q: "", take: 200, skip: 0 }],
+      ["/services", { page: 1, pageSize: 200 }],
+      ["/services", { take: 200, skip: 0 }],
+      ["/services/list", {}],
+      ["/services/all", {}],
+      ["/services", {}],
+    ];
+  } else if (kind === "staff") {
+    candidates = [
+      ["/staff/select", { q: "", take: 200, skip: 0 }],
+      ["/staff/min", { q: "", take: 200, skip: 0 }],
+      ["/staff", { page: 1, pageSize: 200 }],
+      ["/staff", { take: 200, skip: 0 }],
+      ["/staff/list", {}],
+      ["/staff/all", {}],
+      ["/staff", {}],
+    ];
+  }
+
+  for (const [url, params] of candidates) {
+    const rows = await tryGet(url, params);
+    if (rows && rows.length) {
+      setDiag((prev) => ({
+        ...prev,
+        [kind]: { ...(prev?.[kind] || {}), ok: true, used: { url, params }, count: rows.length },
+      }));
+      return rows;
+    }
+  }
+
+  setDiag((prev) => ({
+    ...prev,
+    [kind]: { ...(prev?.[kind] || {}), ok: false, used: null, count: 0 },
+  }));
+  return [];
+}
+
+/* ========================== Página ========================== */
+function WaitlistPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,22 +190,46 @@ export default function WaitlistPage() {
   const [selectedSlot, setSelectedSlot] = useState(null); // {start, end}
   const [selectedEvent, setSelectedEvent] = useState(null); // para edição (não usamos aqui)
 
+  // Diagnóstico de endpoints testados
+  const [diag, setDiag] = useState({
+    clients: { attempts: [] },
+    services: { attempts: [] },
+    staff: { attempts: [] },
+  });
+
+  /* ----------- Carregamento com fetch inteligente ----------- */
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [w, c, s, st] = await Promise.all([
-        api.get("/waitlist"),
-        api.get("/clients"),
-        api.get("/services"),
-        api.get("/staff"),
+      const w = await api.get("/waitlist").catch((e) => {
+        toast.error(e?.response?.data?.message || "Erro ao carregar a lista de espera.");
+        return { data: [] };
+      });
+
+      const [c, s, st] = await Promise.all([
+        smartFetchList("clients", setDiag),
+        smartFetchList("services", setDiag),
+        smartFetchList("staff", setDiag),
       ]);
-      setItems(w.data || []);
-      setClients(c.data || []);
-      setServices(s.data || []);
-      setStaff(st.data || []);
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao carregar a lista de espera.");
+
+      setItems(pickItems(w.data));
+      setClients(c);
+      setServices(s);
+      setStaff(st);
+
+      // Fallback: extrai “catálogo mínimo” da própria lista
+      if (c.length === 0) {
+        const fromWait = asArray(w.data).map((it) => it.client).filter(Boolean);
+        if (fromWait.length) setClients(toSimpleList(fromWait));
+      }
+      if (s.length === 0) {
+        const fromWait = asArray(w.data).map((it) => it.service).filter(Boolean);
+        if (fromWait.length) setServices(toSimpleList(fromWait));
+      }
+      if (st.length === 0) {
+        const fromWait = asArray(w.data).map((it) => it.professional).filter(Boolean);
+        if (fromWait.length) setStaff(toSimpleList(fromWait));
+      }
     } finally {
       setLoading(false);
     }
@@ -172,50 +295,38 @@ export default function WaitlistPage() {
     });
   };
 
-  /* ------------------ Horários ------------------ */
+  /* ------------------ Horários / Agendamento ------------------ */
   const fetchAvailableSlots = useCallback(
-    async (targetDate = slotDate, proId = slotPro, minutes = slotMinutes) => {
+    async (targetDate = slotDate, proId = slotPro, minutes = DEFAULT_SLOT_MINUTES) => {
       try {
         setSlotsLoading(true);
 
         const baseParams = { date: toYMD(targetDate) };
         if (proId) baseParams.professionalId = proId;
 
-        // 1ª tentativa: com duration
-        let res = await api.get("/public/available-slots", {
-          params: { ...baseParams, duration: minutes },
-        });
+        // 1ª tentativa: duration
+        let res = await api.get("/public/available-slots", { params: { ...baseParams, duration: minutes } });
+        let items = (res.data || []).map((s) => (typeof s === "string" ? s : s?.time)).filter(Boolean);
 
-        let items = (res.data || [])
-          .map((s) => (typeof s === "string" ? s : s?.time))
-          .filter(Boolean);
-
-        // 2ª tentativa: com serviceId
+        // 2ª tentativa: serviceId
         const fallbackServiceId = activeWaitItem?.serviceId || slotServiceId || services?.[0]?.id;
         if ((!items || items.length === 0) && fallbackServiceId) {
-          res = await api.get("/public/available-slots", {
-            params: { ...baseParams, serviceId: fallbackServiceId },
-          });
-          items = (res.data || [])
-            .map((s) => (typeof s === "string" ? s : s?.time))
-            .filter(Boolean);
+          res = await api.get("/public/available-slots", { params: { ...baseParams, serviceId: fallbackServiceId } });
+          items = (res.data || []).map((s) => (typeof s === "string" ? s : s?.time)).filter(Boolean);
         }
 
         setAvailableSlots(items);
       } catch (e) {
-        console.error("Erro ao carregar horários disponíveis:", e);
         toast.error("Erro ao carregar horários disponíveis.");
       } finally {
         setSlotsLoading(false);
       }
     },
-    [slotDate, slotPro, slotMinutes, slotServiceId, activeWaitItem, services]
+    [slotDate, slotPro, slotServiceId, activeWaitItem, services]
   );
 
   const openScheduleDrawer = (waitItem) => {
     setActiveWaitItem(waitItem || null);
-
-    // Pré-seleciona filtros a partir do item
     const baseDate = waitItem?.preferredDate ? new Date(waitItem.preferredDate) : new Date();
     setSlotDate(baseDate);
     setSlotPro(waitItem?.professionalId || "");
@@ -270,7 +381,6 @@ export default function WaitlistPage() {
 
   const handleDeleteAppointment = async (id) => {
     if (!window.confirm("Tem certeza que deseja excluir este agendamento?")) return;
-
     await toast.promise(api.delete(`/appointments/${id}`), {
       loading: "Excluindo agendamento...",
       success: () => {
@@ -283,18 +393,23 @@ export default function WaitlistPage() {
     });
   };
 
-  /* ------------------ Render ------------------ */
+  /* ========================== Render ========================== */
+  const showDiag =
+    (clients.length === 0 && (diag.clients?.attempts?.length || 0) > 0) ||
+    (services.length === 0 && (diag.services?.attempts?.length || 0) > 0) ||
+    (staff.length === 0 && (diag.staff?.attempts?.length || 0) > 0);
+
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Header moderno */}
+        {/* Header */}
         <header className="flex flex-col sm:flex-row justify-between items-center mb-10">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <Users className="w-8 h-8 text-gray-800" /> Lista de Espera
+              <Users className="w-7 h-7" /> Lista de Espera
             </h1>
             <p className="text-md text-gray-600 mt-1">
-              Gerencie interessados e agende quando houver horário disponível.
+              Gerencie interessados e agende diretamente quando houver horário disponível.
             </p>
           </div>
           <button
@@ -305,7 +420,53 @@ export default function WaitlistPage() {
           </button>
         </header>
 
-        {/* Filtros em card */}
+        {/* Painel de diagnóstico */}
+        {showDiag && (
+          <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+            <div className="flex items-center gap-2 font-semibold mb-2">
+              <AlertTriangle className="w-5 h-5" />
+              Diagnóstico: não encontrei dados para {clients.length === 0 ? "clientes" : ""} {services.length === 0 ? "serviços" : ""} {staff.length === 0 ? "profissionais" : ""}.
+            </div>
+            <p className="text-sm mb-3">
+              Garanta que há um <b>token no localStorage</b> e um <b>companyId</b> (ex.: <code>localStorage.companyId = "SEU_ID"</code>).
+              Abaixo estão as tentativas e respostas:
+            </p>
+            <div className="grid md:grid-cols-3 gap-3 text-xs">
+              {["clients", "services", "staff"].map((k) => (
+                <div key={k} className="rounded-lg border bg-white p-2">
+                  <div className="font-semibold mb-1 uppercase">{k}</div>
+                  {(diag[k]?.attempts || []).map((a, i) => (
+                    <div key={i} className="mb-1">
+                      <div className="font-mono break-all">
+                        {a.url}
+                        {a.params && Object.keys(a.params).length ? ` ${JSON.stringify(a.params)}` : ""}
+                      </div>
+                      <div>
+                        {a.ok ? (
+                          <span className="text-emerald-700">OK</span>
+                        ) : (
+                          <span className="text-rose-700">ERRO</span>
+                        )}
+                        {" • "}
+                        status: <b>{a.status || "—"}</b>
+                        {typeof a.count === "number" ? <> • itens: <b>{a.count}</b></> : null}
+                        {a.error ? <> • msg: <span className="italic">{a.error}</span></> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={fetchAll}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg border px-3 py-2 bg-white hover:bg-gray-50"
+            >
+              <RefreshCw className="w-4 h-4" /> Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {/* Filtros */}
         <div className="bg-white rounded-xl shadow p-4 mb-6 border border-gray-200">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <input
@@ -321,7 +482,7 @@ export default function WaitlistPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="">Todos os Status</option>
-                {STATUS_OPTIONS.map((s) => (
+                {asArray(STATUS_OPTIONS).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
                   </option>
@@ -329,105 +490,124 @@ export default function WaitlistPage() {
               </select>
               <button
                 onClick={fetchAll}
-                className="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
+                className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 flex items-center gap-2"
                 title="Recarregar"
               >
-                <Filter className="w-4 h-4" /> Recarregar
+                <Filter className="w-4 h-4" /> Atualizar
               </button>
             </div>
           </div>
         </div>
 
-        {/* Lista moderna (cards) */}
-        {loading ? (
-          <p className="text-center text-gray-500 py-10">Carregando...</p>
-        ) : filtered.length > 0 ? (
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200">
-            <ul className="divide-y divide-gray-200">
-              {filtered.map((entry) => (
-                <li key={entry.id} className="p-4 sm:p-6 hover:bg-gray-50">
-                  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-4 flex-wrap">
-                        <p className="text-lg font-bold text-gray-900">
-                          {entry.client?.name || entry.clientName || "—"}
-                        </p>
-                        <Badge status={entry.status} />
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {entry.client?.phone || entry.phone || "—"} • Criado em {formatDate(entry.createdAt)}
-                      </p>
-                      <div className="mt-3 text-sm text-gray-700 space-y-1">
-                        <p><strong>Serviço:</strong> {entry.service?.name || "Qualquer"}</p>
-                        <p><strong>Profissional:</strong> {entry.professional?.name || "Qualquer"}</p>
-                        <p>
-                          <strong>Preferência:</strong>{" "}
-                          {entry.preferredDate ? `Dia ${formatDate(entry.preferredDate)}` : "Qualquer data"}
-                          {entry.preferredTime ? ` • ${entry.preferredTime}` : ""}
-                        </p>
-                        {entry.pref && <p className="text-gray-600"><strong>Obs:</strong> {entry.pref}</p>}
-                      </div>
-                    </div>
+        {/* Lista (tabela) */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600">
+                <tr>
+                  <th className="text-left px-4 py-3">Cliente</th>
+                  <th className="text-left px-4 py-3">Contato</th>
+                  <th className="text-left px-4 py-3">Serviço</th>
+                  <th className="text-left px-4 py-3">Profissional</th>
+                  <th className="text-left px-4 py-3">Preferência</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-right px-4 py-3">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {loading && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-gray-500">
+                      Carregando...
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-gray-500">
+                      Nenhum item encontrado.
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  asArray(filtered).map((it) => (
+                    <tr key={it.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-gray-900">
+                          {it.client?.name || it.clientName || "—"}
+                        </div>
+                        <div className="text-gray-500 text-xs">
+                          Criado em {formatDate(it.createdAt)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">{it.client?.phone || it.phone || "—"}</td>
+                      <td className="px-4 py-3">{it.service?.name || "—"}</td>
+                      <td className="px-4 py-3">{it.professional?.name || "—"}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs text-gray-600">
+                          {it.preferredDate ? `Dia ${formatDate(it.preferredDate)}` : "—"}
+                          {it.preferredTime ? ` • ${it.preferredTime}` : ""}
+                        </div>
+                        {it.pref && <div className="text-xs text-gray-500">{it.pref}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge status={it.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 justify-end">
+                          <button
+                            className="px-2 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50"
+                            onClick={() => onNotify(it.id)}
+                            title="Notificar/Marcar como notificado"
+                          >
+                            <Bell className="w-4 h-4" />
+                          </button>
 
-                    <div className="flex items-center gap-2 self-end sm:self-start flex-shrink-0">
-                      <button
-                        className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700"
-                        onClick={() => onNotify(entry.id)}
-                        title="Notificar/Marcar como notificado"
-                      >
-                        <Bell className="w-4 h-4" /> Notificar
-                      </button>
+                          {/* ✅ Agendar → abre drawer de horários */}
+                          <button
+                            className="px-2 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50"
+                            onClick={() => openScheduleDrawer(it)}
+                            title="Agendar (escolher horário)"
+                          >
+                            <CalendarIcon className="w-4 h-4" />
+                          </button>
 
-                      <button
-                        className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-green-500 hover:bg-green-600 text-white"
-                        onClick={() => openScheduleDrawer(entry)}
-                        title="Agendar (escolher horário)"
-                      >
-                        <CalendarIcon className="w-4 h-4" /> Agendar
-                      </button>
-
-                      <select
-                        className="px-2 py-2 text-sm border rounded-lg"
-                        value={entry.status}
-                        onChange={(e) => onStatus(entry.id, e.target.value)}
-                        title="Alterar status"
-                      >
-                        {STATUS_OPTIONS.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        className="p-2 rounded-lg bg-white border hover:bg-gray-50"
-                        onClick={() => onEdit(entry)}
-                        title="Editar"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="p-2 rounded-lg bg-white border hover:bg-red-50 text-red-600"
-                        onClick={() => onDelete(entry.id)}
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                          <select
+                            className="px-2 py-1 text-xs border rounded-lg"
+                            value={it.status}
+                            onChange={(e) => onStatus(it.id, e.target.value)}
+                            title="Alterar status"
+                          >
+                            {asArray(STATUS_OPTIONS).map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="px-2 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50"
+                            onClick={() => onEdit(it)}
+                            title="Editar"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            className="px-2 py-1 text-xs rounded-lg border bg-white hover:bg-gray-50 text-rose-600"
+                            onClick={() => onDelete(it.id)}
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
           </div>
-        ) : (
-          <div className="text-center py-16 bg-white rounded-xl shadow-lg border border-gray-200">
-            <Users className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-xl font-semibold text-gray-800">Nenhum item na lista</h3>
-            <p className="text-gray-500 mt-2">Use os filtros ou adicione um novo cliente à espera.</p>
-          </div>
-        )}
+        </div>
 
-        {/* Formulário (criar/editar espera) - visual moderno */}
+        {/* Formulário (criar/editar espera) */}
         {openForm && (
           <FormModal
             onClose={() => setOpenForm(false)}
@@ -445,7 +625,7 @@ export default function WaitlistPage() {
           />
         )}
 
-        {/* Drawer de Horários (moderno) */}
+        {/* Drawer de Horários */}
         {openSlots && (
           <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
             <SlotsContent
@@ -467,7 +647,7 @@ export default function WaitlistPage() {
           </BaseModal>
         )}
 
-        {/* AppointmentModal (pré-preenchido após escolher horário) */}
+        {/* ✅ AppointmentModal (pré-preenchido ao escolher um horário) */}
         {isModalOpen && (
           <AppointmentModal
             isOpen={isModalOpen}
@@ -484,12 +664,6 @@ export default function WaitlistPage() {
             clients={clients}
             services={services}
             staff={staff}
-            // Se seu AppointmentModal aceitar initialData, descomente:
-            // initialData={{
-            //   clientId: activeWaitItem?.clientId ?? "",
-            //   serviceId: activeWaitItem?.serviceId ?? "",
-            //   professionalId: activeWaitItem?.professionalId ?? slotPro ?? "",
-            // }}
           />
         )}
       </div>
@@ -497,7 +671,7 @@ export default function WaitlistPage() {
   );
 }
 
-/* ------------------ Form modal (create/edit) — moderno ------------------ */
+/* ========================== Form modal (create/edit) ========================== */
 function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
   const [clientId, setClientId] = useState(editing?.clientId || "");
   const [clientName, setClientName] = useState(editing?.clientName || "");
@@ -525,7 +699,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
       phone: clientId ? undefined : phone || undefined,
       serviceId: serviceId || undefined,
       professionalId: professionalId || undefined,
-      preferredDate: preferredDate || undefined, // YYYY-MM-DD
+      preferredDate: preferredDate || undefined,
       preferredTime: preferredTime || undefined,
       pref: pref || undefined,
       notes: notes || undefined,
@@ -560,72 +734,79 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[720px]">
-        <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between pb-4 border-b">
-            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[640px]">
+        <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border p-5">
+          <div className="flex items-center justify-between pb-3 border-b">
+            <h3 className="font-semibold flex items-center gap-2 text-lg">
               <PlusCircle className="w-5 h-5" />
-              {isEdit ? "Editar na Espera" : "Novo na Espera"}
+              {isEdit ? "Editar Espera" : "Novo na Espera"}
             </h3>
-            <button className="p-2 rounded-full hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
-              <X className="w-5 h-5" />
+            <button className="p-1 rounded hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          <form className="pt-4 space-y-6" onSubmit={handleSubmit}>
+          <form className="pt-4 space-y-4" onSubmit={handleSubmit}>
             {/* Cliente (ID OU nome/telefone) */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Cliente (cadastrado)</label>
-              <select
-                className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
-                value={clientId}
-                onChange={(e) => {
-                  setClientId(e.target.value);
-                  if (e.target.value) {
-                    setClientName("");
-                    setPhone("");
-                  }
-                }}
-              >
-                <option value="">— Selecionar —</option>
-                {asArray(clients).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ""}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-600">Cliente (cadastrado)</label>
+                <select
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={clientId}
+                  onChange={(e) => {
+                    setClientId(e.target.value);
+                    if (e.target.value) {
+                      setClientName("");
+                      setPhone("");
+                    }
+                  }}
+                >
+                  <option value="">— Selecionar —</option>
+                  {asArray(clients).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                {clients.length === 0 && (
+                  <div className="text-[11px] text-amber-700 mt-1">
+                    Nenhum cliente listado. Verifique o painel de diagnóstico acima.
+                  </div>
+                )}
+              </div>
+              <div />
+              {!clientId && (
+                <>
+                  <div>
+                    <label className="text-xs text-gray-600">Nome (se não tiver cadastro)</label>
+                    <input
+                      className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="Ex.: Maria Silva"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Telefone</label>
+                    <input
+                      className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="Ex.: (11) 99999-9999"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
-            {!clientId && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nome (se não tiver cadastro)</label>
-                  <input
-                    className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="Ex.: Maria Silva"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
-                  <input
-                    className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Ex.: (11) 99999-9999"
-                  />
-                </div>
-              </div>
-            )}
-
             {/* Preferências */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Serviço</label>
+                <label className="text-xs text-gray-600">Serviço</label>
                 <select
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
                   value={serviceId}
                   onChange={(e) => setServiceId(e.target.value)}
                 >
@@ -636,11 +817,16 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                     </option>
                   ))}
                 </select>
+                {services.length === 0 && (
+                  <div className="text-[11px] text-amber-700 mt-1">
+                    Nenhum serviço listado. Verifique o painel de diagnóstico acima.
+                  </div>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Profissional</label>
+                <label className="text-xs text-gray-600">Profissional</label>
                 <select
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
                   value={professionalId}
                   onChange={(e) => setProfessionalId(e.target.value)}
                 >
@@ -651,32 +837,37 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                     </option>
                   ))}
                 </select>
+                {staff.length === 0 && (
+                  <div className="text-[11px] text-amber-700 mt-1">
+                    Nenhum profissional listado. Verifique o painel de diagnóstico acima.
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Data preferida</label>
+                <label className="text-xs text-gray-600">Data preferida</label>
                 <input
                   type="date"
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
                   value={preferredDate}
                   onChange={(e) => setPreferredDate(e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Hora preferida</label>
+                <label className="text-xs text-gray-600">Hora preferida</label>
                 <input
                   type="time"
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
                   value={preferredTime}
                   onChange={(e) => setPreferredTime(e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Preferência (livre)</label>
+                <label className="text-xs text-gray-600">Preferência (livre)</label>
                 <input
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
                   value={pref}
                   onChange={(e) => setPref(e.target.value)}
                   placeholder="Ex.: Manhã / Sábado / Após as 18h"
@@ -685,36 +876,45 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
+              <label className="text-xs text-gray-600">Observações</label>
               <input
-                className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Informações adicionais importantes"
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-              >
-                {asArray(STATUS_OPTIONS).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-600">Status</label>
+                <select
+                  className="border rounded-lg px-3 py-2 w-full focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/30"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  {asArray(STATUS_OPTIONS).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-1">
-              <button type="button" onClick={onClose} className="rounded-lg bg-white border border-gray-300 px-6 py-2.5 font-medium text-gray-700 hover:bg-gray-50">
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg border bg-white hover:bg-gray-50"
+              >
                 Cancelar
               </button>
-              <button type="submit" className="rounded-lg bg-[#4A544A] px-8 py-2.5 font-medium text-white hover:bg-opacity-80 flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5" />
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
                 {isEdit ? "Salvar alterações" : "Adicionar à espera"}
               </button>
             </div>
@@ -725,20 +925,20 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
   );
 }
 
-/* ------------------ Drawer/Modal de Horários — moderno ------------------ */
+/* ========================== Drawer/Modal de Horários ========================== */
 function BaseModal({ title, children, onClose }) {
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[640px]">
-        <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between pb-4 border-b">
-            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-            <button className="p-2 rounded-full hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
-              <X className="w-5 h-5" />
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[560px]">
+        <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border p-5">
+          <div className="flex items-center justify-between pb-3 border-b">
+            <h3 className="font-semibold">{title}</h3>
+            <button className="p-1 rounded hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
+              <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="pt-4">{children}</div>
+          <div className="pt-3">{children}</div>
         </div>
       </div>
     </div>
@@ -755,22 +955,22 @@ function SlotsContent({
   onReload, onPick
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Data</label>
+          <label className="text-xs text-gray-600">Data</label>
           <input
             type="date"
-            className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+            className="border rounded-lg px-3 py-2 w-full"
             value={formatDateInput(date)}
             onChange={(e) => setDate(e.target.value ? new Date(e.target.value) : new Date())}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Profissional</label>
+          <label className="text-xs text-gray-600">Profissional</label>
           <select
-            className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+            className="border rounded-lg px-3 py-2 w-full"
             value={proId || ""}
             onChange={(e) => setProId(e.target.value)}
           >
@@ -783,9 +983,9 @@ function SlotsContent({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Serviço (fallback)</label>
+          <label className="text-xs text-gray-600">Serviço (fallback)</label>
           <select
-            className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+            className="border rounded-lg px-3 py-2 w-full"
             value={serviceId || ""}
             onChange={(e) => setServiceId(e.target.value)}
           >
@@ -798,12 +998,12 @@ function SlotsContent({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Duração (min)</label>
+          <label className="text-xs text-gray-600">Duração (min)</label>
           <input
             type="number"
             min={10}
             step={5}
-            className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+            className="border rounded-lg px-3 py-2 w-full"
             value={minutes}
             onChange={(e) => setMinutes(Number(e.target.value) || DEFAULT_SLOT_MINUTES)}
           />
@@ -814,29 +1014,19 @@ function SlotsContent({
         <div className="text-sm text-gray-600">
           {new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(date)}
         </div>
-        <button
-          onClick={onReload}
-          className="rounded-lg bg-white border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-          title="Recarregar"
-        >
-          <Filter className="w-4 h-4" /> Recarregar
+        <button onClick={onReload} className="px-3 py-2 text-xs rounded-lg border bg-white hover:bg-gray-50" title="Recarregar">
+          Recarregar
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Loader2 className="w-4 h-4 animate-spin" /> Carregando horários...
-        </div>
+        <div className="text-sm text-gray-500">Carregando horários...</div>
       ) : slots.length === 0 ? (
         <div className="text-sm text-gray-500">Sem horários disponíveis para os filtros selecionados.</div>
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {asArray(slots).map((s) => (
-            <button
-              key={s}
-              onClick={() => onPick(s)}
-              className="px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
-            >
+            <button key={s} onClick={() => onPick(s)} className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50">
               {s}
             </button>
           ))}
@@ -844,9 +1034,10 @@ function SlotsContent({
       )}
 
       <div className="text-xs text-gray-500">
-        Profissional: <span className="font-medium">{proId || "—"}</span> • Duração:{" "}
-        <span className="font-medium">{minutes} min</span>
+        Profissional: <span className="font-medium">{proId || "—"}</span> • Duração: <span className="font-medium">{minutes} min</span>
       </div>
     </div>
   );
 }
+
+export default WaitlistPage;
