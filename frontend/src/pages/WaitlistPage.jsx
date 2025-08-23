@@ -8,7 +8,6 @@ import api from "../services/api";
 import toast from "react-hot-toast";
 
 import { asArray } from "../utils/asArray";
-// 👉 Ajuste o caminho abaixo se necessário
 import AppointmentModal from "../components/schedule/AppointmentModal";
 
 const STATUS_OPTIONS = [
@@ -23,14 +22,14 @@ const DEFAULT_SLOT_MINUTES = 30;
 /* ------------------ Utils ------------------ */
 function Badge({ status }) {
   const map = {
-    WAITING: "bg-amber-100 text-amber-800",
-    NOTIFIED: "bg-sky-100 text-sky-800",
-    SCHEDULED: "bg-emerald-100 text-emerald-800",
-    CANCELLED: "bg-rose-100 text-rose-800",
+    WAITING: "bg-amber-50 text-amber-700 border-amber-200",
+    NOTIFIED: "bg-sky-50 text-sky-700 border-sky-200",
+    SCHEDULED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    CANCELLED: "bg-rose-50 text-rose-700 border-rose-200",
   };
   const label = STATUS_OPTIONS.find((s) => s.id === status)?.label || status;
   return (
-    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${map[status] || "bg-gray-100 text-gray-800"}`}>
+    <span className={`text-xs px-2 py-1 rounded border ${map[status] || "bg-gray-50 text-gray-700 border-gray-200"}`}>
       {label}
     </span>
   );
@@ -56,6 +55,8 @@ function formatDateInput(d) {
     return "";
   }
 }
+const norm = (res) =>
+  Array.isArray(res?.data) ? res.data : (res?.data?.items || res?.data?.results || []);
 
 /* ------------------ Página ------------------ */
 function WaitlistPage() {
@@ -89,26 +90,71 @@ function WaitlistPage() {
   const [selectedSlot, setSelectedSlot] = useState(null); // {start, end}
   const [selectedEvent, setSelectedEvent] = useState(null); // para edição (não usamos aqui)
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
+  const fetchWaitlist = useCallback(async () => {
     try {
-      const [w, c, s, st] = await Promise.all([
-        api.get("/waitlist"),
-        api.get("/clients"),
-        api.get("/services"),
-        api.get("/staff"),
-      ]);
+      const w = await api.get("/waitlist");
       setItems(w.data || []);
-      setClients(c.data || []);
-      setServices(s.data || []);
-      setStaff(st.data || []);
     } catch (e) {
       console.error(e);
       toast.error("Erro ao carregar a lista de espera.");
-    } finally {
-      setLoading(false);
     }
   }, []);
+
+  const fetchClients = useCallback(async () => {
+    try {
+      // tenta a rota “leve”
+      const r1 = await api.get("/clients/min", { params: { q: "", take: 100, skip: 0 } });
+      const items = norm(r1).map((c) => ({ id: c.id, name: c.name, phone: c.phone }));
+      setClients(items);
+    } catch {
+      try {
+        const r2 = await api.get("/clients", { params: { pageSize: 100, page: 1 } });
+        const items = norm(r2).map((c) => ({ id: c.id, name: c.name, phone: c.phone }));
+        setClients(items);
+      } catch (e) {
+        console.error(e);
+        setClients([]);
+        toast.error("Não foi possível carregar clientes.");
+      }
+    }
+  }, []);
+
+  const fetchServices = useCallback(async () => {
+    try {
+      // tenta a rota de seleção
+      const r1 = await api.get("/services/select", { params: { q: "", take: 200, skip: 0 } });
+      const items = norm(r1);
+      setServices(items);
+    } catch {
+      try {
+        const r2 = await api.get("/services", { params: { pageSize: 200, page: 1 } });
+        const items = norm(r2);
+        setServices(items);
+      } catch (e) {
+        console.error(e);
+        setServices([]);
+        toast.error("Não foi possível carregar serviços.");
+      }
+    }
+  }, []);
+
+  const fetchStaff = useCallback(async () => {
+    try {
+      const st = await api.get("/staff", { params: { pageSize: 200, page: 1 } });
+      setStaff(norm(st));
+    } catch (e) {
+      console.error(e);
+      setStaff([]);
+      toast.error("Não foi possível carregar colaboradores.");
+    }
+  }, []);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    // cada fetch com try/catch próprio para não derrubar os demais
+    await Promise.allSettled([fetchWaitlist(), fetchClients(), fetchServices(), fetchStaff()]);
+    setLoading(false);
+  }, [fetchWaitlist, fetchClients, fetchServices, fetchStaff]);
 
   useEffect(() => {
     fetchAll();
@@ -171,8 +217,6 @@ function WaitlistPage() {
   };
 
   /* ------------------ Drawer de horários ------------------ */
-
-  // Busca com duration; fallback com serviceId se necessário
   const fetchAvailableSlots = useCallback(
     async (targetDate = slotDate, proId = slotPro, minutes = slotMinutes) => {
       try {
@@ -215,7 +259,6 @@ function WaitlistPage() {
   const openScheduleDrawer = (waitItem) => {
     setActiveWaitItem(waitItem || null);
 
-    // Pré-seleciona filtros a partir do item
     const baseDate = waitItem?.preferredDate ? new Date(waitItem.preferredDate) : new Date();
     setSlotDate(baseDate);
     setSlotPro(waitItem?.professionalId || "");
@@ -226,7 +269,6 @@ function WaitlistPage() {
     setTimeout(() => fetchAvailableSlots(baseDate, waitItem?.professionalId || "", DEFAULT_SLOT_MINUTES), 0);
   };
 
-  // Usuário escolheu um horário: calculamos start/end e abrimos o AppointmentModal
   const handlePickSlot = (hhmm) => {
     const [h, m] = String(hhmm).split(":").map(Number);
     const start = new Date(slotDate);
@@ -240,7 +282,6 @@ function WaitlistPage() {
     setIsModalOpen(true);
   };
 
-  // Salvar do AppointmentModal: cria agendamento e atualiza waitlist
   const handleSaveAppointment = async (formData) => {
     const isEditing = selectedEvent && selectedEvent.id;
     const p = isEditing
@@ -250,7 +291,6 @@ function WaitlistPage() {
     await toast.promise(p, {
       loading: isEditing ? "Atualizando agendamento..." : "Criando agendamento...",
       success: async () => {
-        // se veio de waitlist, marca o item como SCHEDULED
         if (activeWaitItem?.id) {
           try {
             await api.put(`/waitlist/${activeWaitItem.id}`, { status: "SCHEDULED" });
@@ -286,217 +326,227 @@ function WaitlistPage() {
     });
   };
 
-  /* ------------------ Render (moderno) ------------------ */
+  /* ------------------ Render ------------------ */
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Header */}
-        <header className="flex flex-col sm:flex-row justify-between items-center mb-10">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <Users className="w-7 h-7" /> Lista de Espera
-            </h1>
-            <p className="text-md text-gray-600 mt-1">
-              Gerencie interessados e agende quando houver horário disponível.
-            </p>
-          </div>
-          <button
-            onClick={onCreate}
-            className="mt-4 sm:mt-0 flex items-center gap-2 bg-[#8C7F8A] hover:bg-opacity-80 text-white font-semibold py-2 px-5 rounded-lg shadow-md"
-          >
-            <UserPlus className="w-5 h-5" /> Novo
-          </button>
-        </header>
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl md:text-2xl font-semibold flex items-center gap-2">
+            <Users className="w-6 h-6" /> Lista de Espera
+          </h1>
+          <p className="text-sm text-gray-500">
+            Gerencie interessados e agende diretamente quando houver horário disponível.
+          </p>
+        </div>
+        <button
+          onClick={onCreate}
+          className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+        >
+          <UserPlus className="w-4 h-4" /> Novo
+        </button>
+      </div>
 
-        {/* Filtros */}
-        <div className="bg-white rounded-xl shadow p-4 mb-6 border border-gray-200">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Filtros */}
+      <div className="bg-white border rounded p-3 mb-4">
+        <div className="flex flex-col md:flex-row gap-2 items-stretch md:items-end">
+          <div className="flex-1">
+            <label className="text-xs text-gray-600">Busca</label>
             <input
-              className="w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50 md:col-span-2"
-              placeholder="Buscar por nome, telefone, preferência, observações..."
+              className="border rounded px-2 py-2 w-full"
+              placeholder="Nome, telefone, preferência, observações..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-            <div className="flex gap-2">
-              <select
-                className="w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">Todos os Status</option>
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={fetchAll}
-                className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 flex items-center gap-2"
-                title="Recarregar"
-              >
-                <Filter className="w-4 h-4" /> Recarregar
-              </button>
-            </div>
           </div>
-        </div>
-
-        {/* Lista (cards) */}
-        {loading ? (
-          <p className="text-center text-gray-500 py-10">A carregar...</p>
-        ) : filtered.length > 0 ? (
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200">
-            <ul className="divide-y divide-gray-200">
-              {filtered.map((entry) => (
-                <li key={entry.id} className="p-4 sm:p-6 hover:bg-gray-50">
-                  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-4 flex-wrap">
-                        <p className="text-lg font-bold text-gray-900">
-                          {entry.client?.name || entry.clientName || "—"}
-                        </p>
-                        <Badge status={entry.status} />
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {entry.client?.phone || entry.phone || "—"} • Criado em {formatDate(entry.createdAt)}
-                      </p>
-                      <div className="mt-3 text-sm text-gray-700 space-y-1">
-                        <p><strong>Serviço:</strong> {entry.service?.name || "Qualquer"}</p>
-                        <p><strong>Profissional:</strong> {entry.professional?.name || "Qualquer"}</p>
-                        <p>
-                          <strong>Preferência:</strong>{" "}
-                          {entry.preferredDate ? `Dia ${formatDate(entry.preferredDate)}` : "Qualquer data"}
-                          {entry.preferredTime ? ` • ${entry.preferredTime}` : ""}
-                        </p>
-                        {entry.pref && <p className="text-gray-600"><strong>Preferência livre:</strong> {entry.pref}</p>}
-                        {entry.notes && <p className="text-gray-600"><strong>Obs.:</strong> {entry.notes}</p>}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-end sm:self-start flex-shrink-0">
-                      <button
-                        className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-white border hover:bg-gray-50"
-                        onClick={() => onNotify(entry.id)}
-                        title="Notificar/Marcar como notificado"
-                      >
-                        <Bell className="w-4 h-4" /> Notificar
-                      </button>
-
-                      <button
-                        className="flex items-center gap-2 text-sm font-semibold py-2 px-3 rounded-lg bg-green-500 hover:bg-green-600 text-white"
-                        onClick={() => openScheduleDrawer(entry)}
-                        title="Agendar (escolher horário)"
-                      >
-                        <CalendarIcon className="w-4 h-4" /> Agendar
-                      </button>
-
-                      <select
-                        className="px-2 py-2 text-sm border rounded-lg bg-white"
-                        value={entry.status}
-                        onChange={(e) => onStatus(entry.id, e.target.value)}
-                        title="Alterar status"
-                      >
-                        {STATUS_OPTIONS.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        className="text-gray-600 hover:text-gray-900 p-2 rounded-full hover:bg-gray-100"
-                        onClick={() => onEdit(entry)}
-                        title="Editar"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="text-red-600 hover:text-red-700 p-2 rounded-full hover:bg-red-500/10"
-                        onClick={() => onDelete(entry.id)}
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </li>
+          <div className="w-full md:w-56">
+            <label className="text-xs text-gray-600">Status</label>
+            <select
+              className="border rounded px-2 py-2 w-full"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {asArray(STATUS_OPTIONS).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
               ))}
-            </ul>
+            </select>
           </div>
-        ) : (
-          <div className="text-center py-16 bg-white rounded-xl shadow-lg border border-gray-200">
-            <Users className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-xl font-semibold text-gray-800">Nenhum item na lista</h3>
-            <p className="text-gray-500 mt-2">Use os filtros ou adicione um novo cliente à espera.</p>
-          </div>
-        )}
-
-        {/* Formulário (criar/editar espera) */}
-        {openForm && (
-          <FormModal
-            onClose={() => setOpenForm(false)}
-            onSaved={(saved, isEdit) => {
-              setOpenForm(false);
-              setItems((prev) => {
-                if (isEdit) return asArray(prev).map((x) => (x.id === saved.id ? saved : x));
-                return [saved, ...prev];
-              });
-            }}
-            editing={editing}
-            clients={clients}
-            services={services}
-            staff={staff}
-          />
-        )}
-
-        {/* Drawer de Horários */}
-        {openSlots && (
-          <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
-            <SlotsContent
-              date={slotDate}
-              setDate={setSlotDate}
-              proId={slotPro}
-              setProId={setSlotPro}
-              serviceId={slotServiceId}
-              setServiceId={setSlotServiceId}
-              minutes={slotMinutes}
-              setMinutes={setSlotMinutes}
-              staff={staff}
-              services={services}
-              loading={slotsLoading}
-              slots={availableSlots}
-              onReload={() => fetchAvailableSlots(slotDate, slotPro, slotMinutes)}
-              onPick={handlePickSlot}
-            />
-          </BaseModal>
-        )}
-
-        {/* AppointmentModal (pré-preenchido ao escolher um horário) */}
-        {isModalOpen && (
-          <AppointmentModal
-            isOpen={isModalOpen}
-            onClose={() => {
-              setIsModalOpen(false);
-              setSelectedSlot(null);
-              setSelectedEvent(null);
-              setActiveWaitItem(null);
-            }}
-            onSave={handleSaveAppointment}
-            onDelete={handleDeleteAppointment}
-            event={selectedEvent}
-            slot={selectedSlot}
-            clients={clients}
-            services={services}
-            staff={staff}
-            // Se seu AppointmentModal aceitar initialData, você pode habilitar:
-            // initialData={{
-            //   clientId: activeWaitItem?.clientId ?? "",
-            //   serviceId: activeWaitItem?.serviceId ?? "",
-            //   professionalId: activeWaitItem?.professionalId ?? slotPro ?? "",
-            // }}
-          />
-        )}
+          <button
+            onClick={fetchAll}
+            className="px-3 py-2 rounded border bg-white hover:bg-gray-50 flex items-center gap-2"
+            title="Recarregar"
+          >
+            <Filter className="w-4 h-4" /> Aplicar / Recarregar
+          </button>
+        </div>
       </div>
+
+      {/* Tabela */}
+      <div className="bg-white border rounded overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="text-left px-3 py-2">Cliente</th>
+                <th className="text-left px-3 py-2">Contato</th>
+                <th className="text-left px-3 py-2">Serviço</th>
+                <th className="text-left px-3 py-2">Profissional</th>
+                <th className="text-left px-3 py-2">Preferência</th>
+                <th className="text-left px-3 py-2">Status</th>
+                <th className="text-right px-3 py-2">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-4 text-gray-500">
+                    Carregando...
+                  </td>
+                </tr>
+              )}
+              {!loading && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-4 text-gray-500">
+                    Nenhum item encontrado.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                asArray(filtered).map((it) => (
+                  <tr key={it.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{it.client?.name || it.clientName || "—"}</div>
+                      <div className="text-gray-500 text-xs">Criado em {formatDate(it.createdAt)}</div>
+                    </td>
+                    <td className="px-3 py-2">{it.client?.phone || it.phone || "—"}</td>
+                    <td className="px-3 py-2">{it.service?.name || "—"}</td>
+                    <td className="px-3 py-2">{it.professional?.name || "—"}</td>
+                    <td className="px-3 py-2">
+                      <div className="text-xs text-gray-600">
+                        {it.preferredDate ? `Dia ${formatDate(it.preferredDate)}` : "—"}
+                        {it.preferredTime ? ` • ${it.preferredTime}` : ""}
+                      </div>
+                      {it.pref && <div className="text-xs text-gray-500">{it.pref}</div>}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge status={it.status} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2 justify-end">
+                        <button
+                          className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
+                          onClick={() => onNotify(it.id)}
+                          title="Notificar/Marcar como notificado"
+                        >
+                          <Bell className="w-4 h-4" />
+                        </button>
+
+                        {/* Agendar → abre drawer de horários */}
+                        <button
+                          className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
+                          onClick={() => openScheduleDrawer(it)}
+                          title="Agendar (escolher horário)"
+                        >
+                          <CalendarIcon className="w-4 h-4" />
+                        </button>
+
+                        <select
+                          className="px-2 py-1 text-xs border rounded"
+                          value={it.status}
+                          onChange={(e) => onStatus(it.id, e.target.value)}
+                          title="Alterar status"
+                        >
+                          {asArray(STATUS_OPTIONS).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50"
+                          onClick={() => onEdit(it)}
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50 text-rose-600"
+                          onClick={() => onDelete(it.id)}
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Formulário (criar/editar espera) */}
+      {openForm && (
+        <FormModal
+          onClose={() => setOpenForm(false)}
+          onSaved={(saved, isEdit) => {
+            setOpenForm(false);
+            setItems((prev) => {
+              if (isEdit) return asArray(prev).map((x) => (x.id === saved.id ? saved : x));
+              return [saved, ...prev];
+            });
+          }}
+          editing={editing}
+          clients={clients}
+          services={services}
+          staff={staff}
+        />
+      )}
+
+      {/* Drawer de Horários */}
+      {openSlots && (
+        <BaseModal onClose={() => setOpenSlots(false)} title="Horários disponíveis">
+          <SlotsContent
+            date={slotDate}
+            setDate={setSlotDate}
+            proId={slotPro}
+            setProId={setSlotPro}
+            serviceId={slotServiceId}
+            setServiceId={setSlotServiceId}
+            minutes={slotMinutes}
+            setMinutes={setSlotMinutes}
+            staff={staff}
+            services={services}
+            loading={slotsLoading}
+            slots={availableSlots}
+            onReload={() => fetchAvailableSlots(slotDate, slotPro, slotMinutes)}
+            onPick={handlePickSlot}
+          />
+        </BaseModal>
+      )}
+
+      {/* AppointmentModal (pré-preenchido ao escolher um horário) */}
+      {isModalOpen && (
+        <AppointmentModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedSlot(null);
+            setSelectedEvent(null);
+            setActiveWaitItem(null);
+          }}
+          onSave={handleSaveAppointment}
+          onDelete={handleDeleteAppointment}
+          event={selectedEvent}
+          slot={selectedSlot}
+          clients={clients}
+          services={services}
+          staff={staff}
+        />
+      )}
     </div>
   );
 }
@@ -529,7 +579,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
       phone: clientId ? undefined : phone || undefined,
       serviceId: serviceId || undefined,
       professionalId: professionalId || undefined,
-      preferredDate: preferredDate || undefined, // YYYY-MM-DD
+      preferredDate: preferredDate || undefined,
       preferredTime: preferredTime || undefined,
       pref: pref || undefined,
       notes: notes || undefined,
@@ -564,26 +614,26 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:max-w-2xl px-0 md:px-0">
-        <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-gray-200 p-6">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[620px]">
+        <div className="bg-white rounded-t-2xl md:rounded-xl shadow-lg border p-4">
           <div className="flex items-center justify-between pb-2 border-b">
-            <h3 className="text-xl font-semibold flex items-center gap-2">
+            <h3 className="font-semibold flex items-center gap-2">
               <PlusCircle className="w-5 h-5" />
-              {isEdit ? "Editar na Espera" : "Novo na Espera"}
+              {isEdit ? "Editar Espera" : "Novo na Espera"}
             </h3>
-            <button className="p-2 rounded-full hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
-              <X className="w-5 h-5" />
+            <button className="p-1 rounded hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          <form className="pt-4 space-y-5" onSubmit={handleSubmit}>
+          <form className="pt-3 space-y-3" onSubmit={handleSubmit}>
             {/* Cliente (ID OU nome/telefone) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Cliente (cadastrado)</label>
+                <label className="text-xs text-gray-600">Cliente (cadastrado)</label>
                 <select
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded px-2 py-2 w-full"
                   value={clientId}
                   onChange={(e) => {
                     setClientId(e.target.value);
@@ -601,37 +651,37 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                   ))}
                 </select>
               </div>
+              <div />
+              {!clientId && (
+                <>
+                  <div>
+                    <label className="text-xs text-gray-600">Nome (se não tiver cadastro)</label>
+                    <input
+                      className="border rounded px-2 py-2 w-full"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="Ex.: Maria Silva"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Telefone</label>
+                    <input
+                      className="border rounded px-2 py-2 w-full"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="Ex.: (11) 99999-9999"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
-            {!clientId && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nome (se não tiver cadastro)</label>
-                  <input
-                    className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="Ex.: Maria Silva"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
-                  <input
-                    className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Ex.: (11) 99999-9999"
-                  />
-                </div>
-              </div>
-            )}
-
             {/* Preferências */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Serviço</label>
+                <label className="text-xs text-gray-600">Serviço</label>
                 <select
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded px-2 py-2 w-full"
                   value={serviceId}
                   onChange={(e) => setServiceId(e.target.value)}
                 >
@@ -644,9 +694,9 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Profissional</label>
+                <label className="text-xs text-gray-600">Profissional</label>
                 <select
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded px-2 py-2 w-full"
                   value={professionalId}
                   onChange={(e) => setProfessionalId(e.target.value)}
                 >
@@ -660,29 +710,29 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Data preferida</label>
+                <label className="text-xs text-gray-600">Data preferida</label>
                 <input
                   type="date"
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded px-2 py-2 w-full"
                   value={preferredDate}
                   onChange={(e) => setPreferredDate(e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Hora preferida</label>
+                <label className="text-xs text-gray-600">Hora preferida</label>
                 <input
                   type="time"
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded px-2 py-2 w-full"
                   value={preferredTime}
                   onChange={(e) => setPreferredTime(e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Preferência (livre)</label>
+                <label className="text-xs text-gray-600">Preferência (livre)</label>
                 <input
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                  className="border rounded px-2 py-2 w-full"
                   value={pref}
                   onChange={(e) => setPref(e.target.value)}
                   placeholder="Ex.: Manhã / Sábado / Após as 18h"
@@ -691,23 +741,19 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
+              <label className="text-xs text-gray-600">Observações</label>
               <input
-                className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+                className="border rounded px-2 py-2 w-full"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Informações adicionais importantes"
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                  className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
+                <label className="text-xs text-gray-600">Status</label>
+                <select className="border rounded px-2 py-2 w-full" value={status} onChange={(e) => setStatus(e.target.value)}>
                   {asArray(STATUS_OPTIONS).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.label}
@@ -717,19 +763,12 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-lg bg-white border border-gray-300 px-5 py-2.5 font-medium text-gray-700 hover:bg-gray-50"
-              >
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button type="button" onClick={onClose} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">
                 Cancelar
               </button>
-              <button
-                type="submit"
-                className="rounded-lg bg-[#4A544A] px-7 py-2.5 font-medium text-white hover:bg-opacity-90 flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-5 h-5" />
+              <button type="submit" className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
                 {isEdit ? "Salvar alterações" : "Adicionar à espera"}
               </button>
             </div>
@@ -744,16 +783,16 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
 function BaseModal({ title, children, onClose }) {
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:max-w-xl px-0 md:px-0">
-        <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl border border-gray-200 p-6">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[560px]">
+        <div className="bg-white rounded-t-2xl md:rounded-xl shadow-lg border p-4">
           <div className="flex items-center justify-between pb-2 border-b">
-            <h3 className="text-lg font-semibold">{title}</h3>
-            <button className="p-2 rounded-full hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
-              <X className="w-5 h-5" />
+            <h3 className="font-semibold">{title}</h3>
+            <button className="p-1 rounded hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
+              <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="pt-4">{children}</div>
+          <div className="pt-3">{children}</div>
         </div>
       </div>
     </div>
@@ -770,22 +809,22 @@ function SlotsContent({
   onReload, onPick
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Data</label>
+          <label className="text-xs text-gray-600">Data</label>
           <input
             type="date"
-            className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+            className="border rounded px-2 py-2 w-full"
             value={formatDateInput(date)}
             onChange={(e) => setDate(e.target.value ? new Date(e.target.value) : new Date())}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Profissional</label>
+          <label className="text-xs text-gray-600">Profissional</label>
           <select
-            className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+            className="border rounded px-2 py-2 w-full"
             value={proId || ""}
             onChange={(e) => setProId(e.target.value)}
           >
@@ -798,9 +837,9 @@ function SlotsContent({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Serviço (fallback)</label>
+          <label className="text-xs text-gray-600">Serviço (fallback)</label>
           <select
-            className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+            className="border rounded px-2 py-2 w-full"
             value={serviceId || ""}
             onChange={(e) => setServiceId(e.target.value)}
           >
@@ -813,12 +852,12 @@ function SlotsContent({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Duração (min)</label>
+          <label className="text-xs text-gray-600">Duração (min)</label>
           <input
             type="number"
             min={10}
             step={5}
-            className="block w-full rounded-lg border-gray-300 focus:border-[#8C7F8A] focus:ring-2 focus:ring-[#8C7F8A]/50"
+            className="border rounded px-2 py-2 w-full"
             value={minutes}
             onChange={(e) => setMinutes(Number(e.target.value) || DEFAULT_SLOT_MINUTES)}
           />
@@ -829,11 +868,7 @@ function SlotsContent({
         <div className="text-sm text-gray-600">
           {new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(date)}
         </div>
-        <button
-          onClick={onReload}
-          className="px-3 py-2 text-sm rounded-lg border bg-white hover:bg-gray-50"
-          title="Recarregar"
-        >
+        <button onClick={onReload} className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50" title="Recarregar">
           Recarregar
         </button>
       </div>
@@ -841,17 +876,11 @@ function SlotsContent({
       {loading ? (
         <div className="text-sm text-gray-500">Carregando horários...</div>
       ) : slots.length === 0 ? (
-        <div className="text-sm text-gray-500">
-          Sem horários disponíveis para os filtros selecionados.
-        </div>
+        <div className="text-sm text-gray-500">Sem horários disponíveis para os filtros selecionados.</div>
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {asArray(slots).map((s) => (
-            <button
-              key={s}
-              onClick={() => onPick(s)}
-              className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm font-medium"
-            >
+            <button key={s} onClick={() => onPick(s)} className="px-3 py-2 rounded border bg-white hover:bg-gray-50">
               {s}
             </button>
           ))}
@@ -859,8 +888,7 @@ function SlotsContent({
       )}
 
       <div className="text-xs text-gray-500">
-        Profissional: <span className="font-medium">{proId || "—"}</span> • Duração:{" "}
-        <span className="font-medium">{minutes} min</span>
+        Profissional: <span className="font-medium">{proId || "—"}</span> • Duração: <span className="font-medium">{minutes} min</span>
       </div>
     </div>
   );
