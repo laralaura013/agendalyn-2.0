@@ -337,6 +337,25 @@ async function handleIncomingMessage(msg) {
   sessions.set(to, session);
 }
 
+/** ================== PROMPTS AUXILIARES (agora definidos!) ================== */
+async function askService(to) {
+  const services = await listServices();
+  if (!services.length) {
+    await sendText(to, 'Não há serviços cadastrados no sistema.');
+    return;
+  }
+  await sendChoices(to, 'Escolha um serviço:', services.map((s) => s.name));
+}
+
+async function askProfessional(to) {
+  const staff = await listStaff();
+  if (!staff.length) {
+    await sendText(to, 'Nenhum profissional disponível para agendamento.');
+    return;
+  }
+  await sendChoices(to, 'Escolha um profissional:', staff.map((s) => s.name));
+}
+
 /** ================== Acesso ao seu backend/banco ================== */
 async function listServices() {
   try {
