@@ -1,4 +1,4 @@
-// src/pages/Dashboard.jsx
+// Dashboard com cores nos números, chips navegáveis e gráficos reativos ao tema
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
@@ -10,6 +10,12 @@ import NeuCard from "../components/ui/NeuCard";
 import NeuButton from "../components/ui/NeuButton";
 import "../styles/neumorphism.css";
 import { asArray } from "../utils/asArray";
+
+const cssVar = (name) =>
+  (typeof window !== "undefined"
+    ? getComputedStyle(document.documentElement).getPropertyValue(name)
+    : ""
+  ).trim();
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -24,10 +30,12 @@ export default function Dashboard() {
   const [monthly, setMonthly] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [themeTick, setThemeTick] = useState(0); // força recriar charts ao trocar tema
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    const load = async () => {
       try {
         const [{ data: sum }, { data: rev }] = await Promise.all([
           api.get("/dashboard/summary"),
@@ -51,16 +59,22 @@ export default function Dashboard() {
       } finally {
         if (mounted) setLoading(false);
       }
-    })();
+    };
+
+    load();
+    // escuta mudança de tema enviada pelo AdminLayout
+    const onTheme = () => setThemeTick((x) => x + 1);
+    window.addEventListener("themechange", onTheme);
     return () => {
       mounted = false;
+      window.removeEventListener("themechange", onTheme);
     };
   }, []);
 
   const fmtBRL = (v) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));
 
-  // Paleta fixa para manter purge-safe do Tailwind
+  // Paleta fixa para classes Tailwind purged-safe
   const ACCENT = {
     emerald: { value: "text-emerald-700", icon: "text-emerald-600", chip: "text-emerald-700" },
     blue: { value: "text-blue-700", icon: "text-blue-600", chip: "text-blue-700" },
@@ -121,11 +135,14 @@ export default function Dashboard() {
     const ctx = barCanvasRef.current;
     if (!ctx) return;
 
-    // destrói se já existir (evita duplicar no StrictMode)
     if (barInstanceRef.current) {
       barInstanceRef.current.destroy();
       barInstanceRef.current = null;
     }
+
+    const GRID = cssVar("--chart-grid") || "#D6DEE8";
+    const TICK = cssVar("--chart-tick") || "#8a99b1";
+    const ACCENT = cssVar("--accent-color") || "#7c3aed";
 
     barInstanceRef.current = new Chart(ctx, {
       type: "bar",
@@ -135,7 +152,7 @@ export default function Dashboard() {
           {
             label: "Faturamento (R$)",
             data: barValues,
-            backgroundColor: "rgba(124, 58, 237, 0.9)", // roxo
+            backgroundColor: ACCENT,
             borderRadius: 8,
             barThickness: 30,
           },
@@ -145,15 +162,22 @@ export default function Dashboard() {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: { grid: { display: false }, ticks: { color: "#8a99b1" } },
+          x: { grid: { display: false }, ticks: { color: TICK } },
           y: {
-            grid: { color: "#D6DEE8" },
-            ticks: { color: "#8a99b1", callback: (v) => fmtBRL(v) },
+            grid: { color: GRID },
+            ticks: { color: TICK, callback: (v) => fmtBRL(v) },
           },
         },
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: (ctx) => fmtBRL(ctx.parsed.y) } },
+          tooltip: {
+            backgroundColor: cssVar("--bg-color") || "#fff",
+            titleColor: cssVar("--text-color") || "#333",
+            bodyColor: cssVar("--text-color") || "#333",
+            borderColor: cssVar("--dark-shadow") || "#ccc",
+            borderWidth: 1,
+            callbacks: { label: (ctx) => fmtBRL(ctx.parsed.y) },
+          },
         },
       },
     });
@@ -164,7 +188,7 @@ export default function Dashboard() {
         barInstanceRef.current = null;
       }
     };
-  }, [barLabels, barValues]);
+  }, [barLabels, barValues, themeTick]);
 
   /* ====================== Chart.js — Doughnut (Produtos) ====================== */
   const doughnutRef = useRef(null);
@@ -179,14 +203,13 @@ export default function Dashboard() {
     [summary.productStats]
   );
 
-  // paleta suave; se tiver mais itens, ciclo as cores
   const baseColors = useMemo(
     () => [
       "rgba(124,58,237,0.9)", // purple
       "rgba(16,185,129,0.9)", // emerald
       "rgba(251,191,36,0.9)", // amber
       "rgba(59,130,246,0.9)", // blue
-      "rgba(244,63,94,0.9)", // rose
+      "rgba(244,63,94,0.9)",  // rose
       "rgba(14,165,233,0.9)", // sky
     ],
     []
@@ -196,20 +219,16 @@ export default function Dashboard() {
     const hasData = prodLabels.length > 0 && prodValues.some((v) => v > 0);
     const canvas = doughnutRef.current;
 
-    // destruir se não houver dados ou canvas
-    if (!hasData || !canvas) {
-      if (doughnutInstanceRef.current) {
-        doughnutInstanceRef.current.destroy();
-        doughnutInstanceRef.current = null;
-      }
-      return;
-    }
+    if (!canvas) return;
 
-    // reconstroi sempre que mudar para evitar estados duplicados
     if (doughnutInstanceRef.current) {
       doughnutInstanceRef.current.destroy();
       doughnutInstanceRef.current = null;
     }
+
+    if (!hasData) return;
+
+    const TICK = cssVar("--chart-tick") || "#5a677c";
 
     const colors = prodLabels.map((_, i) => baseColors[i % baseColors.length]);
 
@@ -218,11 +237,7 @@ export default function Dashboard() {
       data: {
         labels: prodLabels,
         datasets: [
-          {
-            data: prodValues,
-            backgroundColor: colors,
-            borderWidth: 0,
-          },
+          { data: prodValues, backgroundColor: colors, borderWidth: 0 },
         ],
       },
       options: {
@@ -232,12 +247,15 @@ export default function Dashboard() {
         plugins: {
           legend: {
             position: "bottom",
-            labels: { boxWidth: 12, color: "#5a677c" },
+            labels: { boxWidth: 12, color: TICK },
           },
           tooltip: {
-            callbacks: {
-              label: (ctx) => `${ctx.label}: ${fmtBRL(ctx.parsed)}`,
-            },
+            backgroundColor: cssVar("--bg-color") || "#fff",
+            titleColor: cssVar("--text-color") || "#333",
+            bodyColor: cssVar("--text-color") || "#333",
+            borderColor: cssVar("--dark-shadow") || "#ccc",
+            borderWidth: 1,
+            callbacks: { label: (ctx) => `${ctx.label}: ${fmtBRL(ctx.parsed)}` },
           },
         },
       },
@@ -249,7 +267,7 @@ export default function Dashboard() {
         doughnutInstanceRef.current = null;
       }
     };
-  }, [prodLabels, prodValues, baseColors]);
+  }, [prodLabels, prodValues, baseColors, themeTick]);
 
   /* ====================== UI ====================== */
   if (loading) {
