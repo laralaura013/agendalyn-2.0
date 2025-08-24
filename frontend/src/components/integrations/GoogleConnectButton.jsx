@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
  * Botão para conectar/desconectar Google Calendar
  * @param {string} staffId - ID do profissional logado
  * @param {boolean} isConnected - Status atual da conexão
- * @param {function} onStatusChange - Função para atualizar status no componente pai
+ * @param {function} onStatusChange - (connected:boolean, email?:string) => void
  */
 export default function GoogleConnectButton({ staffId, isConnected, onStatusChange }) {
   const [loading, setLoading] = useState(false);
@@ -14,12 +14,18 @@ export default function GoogleConnectButton({ staffId, isConnected, onStatusChan
   const connect = async () => {
     try {
       setLoading(true);
+
+      // Guarda de onde saímos, pra facilitar o retorno e limpeza da URL
+      sessionStorage.setItem('GOOGLE_OAUTH_RETURN_TO', window.location.href);
+
+      // Se o backend aceitar, já manda um redirect de volta pro /settings
+      const preferedRedirect = `${window.location.origin}/settings?tab=integrations`;
       const { data } = await api.get('/integrations/google/auth-url', {
-        params: { staffId },
+        params: { staffId, redirectUri: preferedRedirect },
       });
+
       if (data?.url) {
-        // Redireciona para o Google OAuth
-        window.location.href = data.url;
+        window.location.href = data.url; // redireciona mesmo (mais confiável)
       } else {
         toast.error('Não foi possível gerar o link de conexão.');
       }
@@ -36,9 +42,7 @@ export default function GoogleConnectButton({ staffId, isConnected, onStatusChan
       setLoading(true);
       await api.post('/integrations/google/disconnect', { staffId });
       toast.success('Google Calendar desconectado.');
-      if (onStatusChange) {
-        onStatusChange(false, ''); // Atualiza estado no pai
-      }
+      onStatusChange?.(false, '');
     } catch (err) {
       console.error(err);
       toast.error('Erro ao desconectar do Google.');
