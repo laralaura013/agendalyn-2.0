@@ -173,59 +173,14 @@ const getSafeUser = () => {
   }
 };
 
-/* ========================== ErrorBoundary para evitar tela branca ========================== */
-class SettingsErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, info) {
-    console.error("[Settings] crash:", error, info);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
-          <div className="max-w-3xl mx-auto p-6">
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="font-semibold text-red-700">Ops! Algo quebrou ao renderizar as Configurações.</p>
-              <p className="text-sm text-red-700/80 mt-1">
-                Clique em <b>Limpar URL</b> para remover parâmetros de retorno do Google, ou recarregue.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => window.location.replace(window.location.pathname)}
-                  className="px-3 py-1.5 rounded-lg border bg-white text-sm"
-                >
-                  Limpar URL
-                </button>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="px-3 py-1.5 rounded-lg bg-[#4a544a] text-white text-sm"
-                >
-                  Recarregar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-/* ========================== Abas ========================== */
+/* ========================== Tabs ========================== */
 const GeneralSettingsTab = ({ companyForm, setCompanyForm, saveCompany }) => (
   <div className="space-y-6">
     <Section title="Informações da Empresa" icon={Building} desc="Esses dados aparecem no agendamento e em recibos.">
       <form onSubmit={saveCompany} className="space-y-4">
         <div>
           <Label>Nome da empresa</Label>
-        <Input
+          <Input
             type="text"
             value={companyForm.name}
             onChange={(e) => setCompanyForm((s) => ({ ...s, name: e.target.value }))}
@@ -490,33 +445,52 @@ const IntegrationsTab = ({ staffId, googleConnected, setGoogleConnected, googleE
   );
 };
 
-/* ========================== Gate de retorno do OAuth ========================== */
-const OAuthReturnGate = ({ onFinalize }) => {
-  const [working, setWorking] = useState(false);
+/* ========================== ErrorBoundary para evitar tela branca ========================== */
+class SettingsErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("[Settings] crash:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
+          <div className="max-w-3xl mx-auto p-6">
+            <div className="rounded-xl border border-red-2 00 bg-red-50 p-4">
+              <p className="font-semibold text-red-700">Ops! Algo quebrou ao renderizar as Configurações.</p>
+              <p className="text-sm text-red-700/80 mt-1">
+                Clique em <b>Limpar URL</b> para remover parâmetros de retorno do Google, ou recarregue.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => window.location.replace(window.location.pathname + (window.location.hash || ""))}
+                  className="px-3 py-1.5 rounded-lg border bg-white text-sm"
+                >
+                  Limpar URL
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-3 py-1.5 rounded-lg bg-[#4a544a] text-white text-sm"
+                >
+                  Recarregar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
-  useEffect(() => {
-    (async () => {
-      setWorking(true);
-      try {
-        await onFinalize();
-      } finally {
-        setWorking(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return (
-    <div className="flex items-center justify-center h-[60vh]" style={{ backgroundColor: theme.colors.background }}>
-      <div className="flex items-center gap-3" style={{ color: theme.colors.textBody }}>
-        <Loader2 className="h-6 w-6 animate-spin" />
-        <p className="text-lg">Finalizando conexão com o Google...</p>
-      </div>
-    </div>
-  );
-};
-
-/* ========================== Página (inner) ========================== */
+/* ========================== Página ========================== */
 const SettingsPageInner = () => {
   const [activeTab, setActiveTab] = useState("general");
   const [loading, setLoading] = useState(true);
@@ -564,61 +538,66 @@ const SettingsPageInner = () => {
   const staffId = userData?.id || "";
   const bookingUrl = useMemo(() => `${window.location.origin}/agendar/${companyId}`, [companyId]);
 
-  /* -------- helpers: limpar URL -------- */
+  /* -------- helpers: limpar URL preservando rota (hash) -------- */
   const clearUrlParams = () => {
-    const clean = window.location.pathname;
-    window.history.replaceState({}, "", clean);
+    const { pathname, hash } = window.location;
+
+    // Mantém a rota dentro do hash (#/settings), mas remove qualquer query dentro do hash
+    // ex.: #/settings?code=...&state=... -> #/settings
+    const cleanHash = hash ? "#" + hash.replace(/^#/, "").split("?")[0] : "";
+
+    // Remove a query "normal" (?code=...) sem mexer na rota do hash
+    window.history.replaceState({}, "", pathname + cleanHash);
   };
 
-  /* -------- Detecta se é retorno do OAuth -------- */
-  const oauthParams = useMemo(() => {
-    // pega tanto search (?code=...) quanto hash (#state=...)
-    const s = new URLSearchParams(window.location.search);
-    const h = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  /* -------- util: obter params do OAuth de search e do hash -------- */
+  const getOAuthParams = () => {
+    const s = new URLSearchParams(window.location.search || "");
+    const hashStr = (window.location.hash || "").replace(/^#/, "");
+    const hashQuery = hashStr.includes("?") ? hashStr.split("?")[1] : "";
+    const h = new URLSearchParams(hashQuery);
+
     const code = s.get("code") || h.get("code");
     const state = s.get("state") || h.get("state");
     const error = s.get("error") || h.get("error");
-    const googleMarker = s.get("google") || h.get("google"); // opcional
+    const googleMarker = s.get("google") || h.get("google"); // ex.: ?google=success
     return { code, state, error, googleMarker };
-  }, []);
+  };
 
-  const isOAuthReturn = !!(oauthParams.code || oauthParams.error || oauthParams.googleMarker);
-
-  /* -------- Finaliza OAuth do Google -------- */
+  /* -------- Finaliza OAuth do Google se voltou com ?code/state (search ou hash) -------- */
   const finalizeGoogleOAuthIfNeeded = useCallback(async () => {
-    const { code, state, error } = oauthParams;
-    if (error) {
-      console.warn("Google OAuth erro:", error);
-      toast.error("Conexão cancelada no Google.");
-      clearUrlParams();
-      return;
-    }
-    if (!code) {
-      clearUrlParams();
-      return;
-    }
     try {
-      console.log("[OAuth] Recebi code/state, iniciando troca…");
-      const attempts = [
-        () => api.post("/integrations/google/oauth/callback", { code, state }),
-        () => api.post("/integrations/google/exchange", { code, state }),
-        () =>
-          api.get(
-            `/integrations/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || "")}`
-          ),
-      ];
-      let ok = false;
-      for (const t of attempts) {
-        try {
-          await t();
-          ok = true;
-          break;
-        } catch (e) {
-          // tenta o próximo
+      const { code, state, error, googleMarker } = getOAuthParams();
+      if (!code && !googleMarker && !error) return;
+
+      if (error) {
+        toast.error("Conexão com Google cancelada.");
+        return clearUrlParams();
+      }
+
+      // tenta finalizar no backend (múltiplos endpoints possíveis)
+      if (code) {
+        const tries = [
+          () => api.post("/integrations/google/oauth/callback", { code, state }),
+          () => api.post("/integrations/google/exchange", { code, state }),
+          () =>
+            api.get(
+              `/integrations/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(
+                state || ""
+              )}`
+            ),
+        ];
+        for (const t of tries) {
+          try {
+            await t();
+            break;
+          } catch {
+            // tenta próximo
+          }
         }
       }
-      if (!ok) throw new Error("Nenhum endpoint de callback aceitou o code.");
-      await fetchGoogleStatus(); // atualiza estado visual
+
+      await fetchGoogleStatus();
       toast.success("Google Calendar conectado!");
     } catch (e) {
       console.error("Finalize Google OAuth error:", e);
@@ -626,8 +605,7 @@ const SettingsPageInner = () => {
     } finally {
       clearUrlParams();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oauthParams]);
+  }, [/* deps vazios de estados, só usamos helpers e fetchGoogleStatus abaixo */]);
 
   /* -------- Fetchers -------- */
   const fetchCompanyProfile = useCallback(async () => {
@@ -666,11 +644,10 @@ const SettingsPageInner = () => {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      // Se é retorno do OAuth, não renderiza nada além do Gate
-      if (isOAuthReturn) return;
       setLoading(true);
       try {
         await Promise.all([fetchCompanyProfile(), fetchGoogleStatus(), fetchWhatsSettings(), fetchMetaStatus()]);
+        await finalizeGoogleOAuthIfNeeded(); // trata retorno do Google e limpa URL SEM perder a rota
       } catch (e) {
         console.error(e);
         toast.error("Falha ao carregar configurações.");
@@ -681,7 +658,7 @@ const SettingsPageInner = () => {
     return () => {
       mounted = false;
     };
-  }, [isOAuthReturn, fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus]);
+  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus, finalizeGoogleOAuthIfNeeded]);
 
   /* -------- Ações -------- */
   const saveCompany = async (e) => {
@@ -787,11 +764,6 @@ const SettingsPageInner = () => {
     );
   };
 
-  // Gate: se voltou do Google com code/erro → só finaliza OAuth e evita tela branca
-  if (isOAuthReturn) {
-    return <OAuthReturnGate onFinalize={finalizeGoogleOAuthIfNeeded} />;
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen" style={{ backgroundColor: theme.colors.background }}>
@@ -832,11 +804,7 @@ const SettingsPageInner = () => {
         </div>
 
         {activeTab === "general" && (
-          <GeneralSettingsTab
-            companyForm={companyForm}
-            setCompanyForm={setCompanyForm}
-            saveCompany={saveCompany}
-          />
+          <GeneralSettingsTab companyForm={companyForm} setCompanyForm={setCompanyForm} saveCompany={saveCompany} />
         )}
 
         {activeTab === "whatsapp" && (
@@ -928,7 +896,9 @@ const WebhookHelp = () => {
         <li>Acesse o Meta Business → WhatsApp → Configuração → Webhooks.</li>
         <li>Edite e cole a Webhook URL acima.</li>
         <li>Defina o mesmo Verify Token no Meta e no backend.</li>
-        <li>Salve e verifique: o status deve ficar <em>Verificado</em>.</li>
+        <li>
+          Salve e verifique: o status deve ficar <em>Verificado</em>.
+        </li>
       </ol>
     </div>
   );
