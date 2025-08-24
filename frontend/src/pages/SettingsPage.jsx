@@ -350,7 +350,7 @@ const WhatsappSettingsTab = ({
         </div>
       </Section>
 
-      {/* Teste rápido opcional (mantido do seu código) */}
+      {/* Teste rápido */}
       <Section title="Teste rápido" icon={Send} desc="Envie uma mensagem de teste para validar a integração.">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
@@ -445,8 +445,53 @@ const IntegrationsTab = ({ staffId, googleConnected, setGoogleConnected, googleE
   );
 };
 
+/* ========================== ErrorBoundary para evitar tela branca ========================== */
+class SettingsErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("[Settings] crash:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
+          <div className="max-w-3xl mx-auto p-6">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <p className="font-semibold text-red-700">Ops! Algo quebrou ao renderizar as Configurações.</p>
+              <p className="text-sm text-red-700/80 mt-1">
+                Clique em <b>Limpar URL</b> para remover parâmetros de retorno do Google, ou recarregue.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => window.location.replace(window.location.pathname)}
+                  className="px-3 py-1.5 rounded-lg border bg-white text-sm"
+                >
+                  Limpar URL
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-3 py-1.5 rounded-lg bg-[#4a544a] text-white text-sm"
+                >
+                  Recarregar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 /* ========================== Página ========================== */
-const SettingsPage = () => {
+const SettingsPageInner = () => {
   const [activeTab, setActiveTab] = useState("general");
   const [loading, setLoading] = useState(true);
 
@@ -493,6 +538,44 @@ const SettingsPage = () => {
   const staffId = userData?.id || "";
   const bookingUrl = useMemo(() => `${window.location.origin}/agendar/${companyId}`, [companyId]);
 
+  /* -------- helpers: limpar URL -------- */
+  const clearUrlParams = () => {
+    const clean = window.location.pathname;
+    window.history.replaceState({}, "", clean);
+  };
+
+  /* -------- Finaliza OAuth do Google se voltou com ?code/state ou marcador -------- */
+  const finalizeGoogleOAuthIfNeeded = useCallback(async () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const state = params.get("state");
+      const googleMarker = params.get("google"); // ex.: pending/success/error
+      if (!code && !googleMarker) return;
+
+      // tenta finalizar no backend (múltiplos endpoints possíveis)
+      if (code) {
+        const tries = [
+          () => api.post("/integrations/google/oauth/callback", { code, state }),
+          () => api.post("/integrations/google/exchange", { code, state }),
+          () => api.get(`/integrations/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || "")}`),
+        ];
+        for (const t of tries) {
+          try { await t(); break; } catch { /* tenta próximo */ }
+        }
+      }
+
+      await fetchGoogleStatus();
+      toast.success("Google Calendar conectado!");
+    } catch (e) {
+      console.error("Finalize Google OAuth error:", e);
+      toast.error("Falha ao concluir conexão com Google.");
+    } finally {
+      clearUrlParams();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* -------- Fetchers -------- */
   const fetchCompanyProfile = useCallback(async () => {
     const { data } = await api.get("/company/profile");
@@ -528,6 +611,7 @@ const SettingsPage = () => {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
       setLoading(true);
       try {
@@ -537,14 +621,16 @@ const SettingsPage = () => {
           fetchWhatsSettings(),
           fetchMetaStatus(),
         ]);
+        await finalizeGoogleOAuthIfNeeded(); // trata retorno do Google e limpa URL
       } catch (e) {
         console.error(e);
         toast.error("Falha ao carregar configurações.");
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     })();
-  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus]);
+    return () => { mounted = false; };
+  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus, finalizeGoogleOAuthIfNeeded]);
 
   /* -------- Ações -------- */
   const saveCompany = async (e) => {
@@ -792,4 +878,11 @@ const WebhookHelp = () => {
   );
 };
 
-export default SettingsPage;
+/* ===== Export com ErrorBoundary para evitar tela branca ===== */
+export default function SettingsPage() {
+  return (
+    <SettingsErrorBoundary>
+      <SettingsPageInner />
+    </SettingsErrorBoundary>
+  );
+}
