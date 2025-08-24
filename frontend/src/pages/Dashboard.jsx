@@ -1,4 +1,3 @@
-// Dashboard com cores nos números, chips navegáveis e gráficos reativos ao tema
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
@@ -11,14 +10,30 @@ import NeuButton from "../components/ui/NeuButton";
 import "../styles/neumorphism.css";
 import { asArray } from "../utils/asArray";
 
-const cssVar = (name) =>
-  (typeof window !== "undefined"
-    ? getComputedStyle(document.documentElement).getPropertyValue(name)
-    : ""
-  ).trim();
+/* Util p/ ler variáveis CSS (tema claro/escuro) */
+const readCSSVar = (name) =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const useThemeColors = () => {
+  const get = () => ({
+    text: readCSSVar("--text-color"),
+    textMuted: readCSSVar("--text-color-muted"),
+    grid: readCSSVar("--chart-grid"),
+  });
+  const [colors, setColors] = useState(get);
+
+  useEffect(() => {
+    const handler = () => setColors(get());
+    window.addEventListener("theme:changed", handler);
+    return () => window.removeEventListener("theme:changed", handler);
+  }, []);
+
+  return colors;
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const theme = useThemeColors();
 
   const [summary, setSummary] = useState({
     revenueToday: 0,
@@ -30,18 +45,15 @@ export default function Dashboard() {
   const [monthly, setMonthly] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [themeTick, setThemeTick] = useState(0); // força recriar charts ao trocar tema
 
   useEffect(() => {
     let mounted = true;
-
-    const load = async () => {
+    (async () => {
       try {
         const [{ data: sum }, { data: rev }] = await Promise.all([
           api.get("/dashboard/summary"),
           api.get("/dashboard/revenue-by-month"),
         ]);
-
         if (!mounted) return;
 
         setSummary({
@@ -50,6 +62,9 @@ export default function Dashboard() {
           newClientsThisMonth: sum?.newClientsThisMonth ?? 0,
           occupationRate: sum?.occupationRate ?? 0,
           productStats: Array.isArray(sum?.productStats) ? sum.productStats : [],
+          revenueVarPct: sum?.revenueVarPct ?? 0,
+          appointmentsVarPct: sum?.appointmentsVarPct ?? 0,
+          clientsVarPct: sum?.clientsVarPct ?? 0,
         });
 
         setMonthly(Array.isArray(rev) ? rev : []);
@@ -59,27 +74,21 @@ export default function Dashboard() {
       } finally {
         if (mounted) setLoading(false);
       }
-    };
-
-    load();
-    // escuta mudança de tema enviada pelo AdminLayout
-    const onTheme = () => setThemeTick((x) => x + 1);
-    window.addEventListener("themechange", onTheme);
+    })();
     return () => {
       mounted = false;
-      window.removeEventListener("themechange", onTheme);
     };
   }, []);
 
   const fmtBRL = (v) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));
 
-  // Paleta fixa para classes Tailwind purged-safe
+  // Paleta fixa para os ícones / valores
   const ACCENT = {
-    emerald: { value: "text-emerald-700", icon: "text-emerald-600", chip: "text-emerald-700" },
-    blue: { value: "text-blue-700", icon: "text-blue-600", chip: "text-blue-700" },
-    purple: { value: "text-purple-700", icon: "text-purple-600", chip: "text-purple-700" },
-    slate: { value: "text-slate-700", icon: "text-slate-600", chip: "text-slate-700" },
+    emerald: { value: "text-emerald-500", icon: "text-emerald-400", chip: "text-emerald-600" },
+    blue: { value: "text-sky-400", icon: "text-sky-300", chip: "text-sky-500" },
+    purple: { value: "text-accent", icon: "text-accent", chip: "text-accent-strong" },
+    slate: { value: "text-base-color", icon: "text-muted-color", chip: "text-base-color" },
   };
 
   const cards = useMemo(
@@ -132,19 +141,15 @@ export default function Dashboard() {
   const barValues = useMemo(() => asArray(monthly).map((d) => Number(d?.value || 0)), [monthly]);
 
   useEffect(() => {
-    const ctx = barCanvasRef.current;
-    if (!ctx) return;
+    const el = barCanvasRef.current;
+    if (!el) return;
 
     if (barInstanceRef.current) {
       barInstanceRef.current.destroy();
       barInstanceRef.current = null;
     }
 
-    const GRID = cssVar("--chart-grid") || "#D6DEE8";
-    const TICK = cssVar("--chart-tick") || "#8a99b1";
-    const ACCENT = cssVar("--accent-color") || "#7c3aed";
-
-    barInstanceRef.current = new Chart(ctx, {
+    barInstanceRef.current = new Chart(el, {
       type: "bar",
       data: {
         labels: barLabels,
@@ -152,7 +157,7 @@ export default function Dashboard() {
           {
             label: "Faturamento (R$)",
             data: barValues,
-            backgroundColor: ACCENT,
+            backgroundColor: "rgba(124, 58, 237, 0.9)",
             borderRadius: 8,
             barThickness: 30,
           },
@@ -162,33 +167,24 @@ export default function Dashboard() {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: { grid: { display: false }, ticks: { color: TICK } },
+          x: { grid: { display: false }, ticks: { color: theme.textMuted } },
           y: {
-            grid: { color: GRID },
-            ticks: { color: TICK, callback: (v) => fmtBRL(v) },
+            grid: { color: theme.grid },
+            ticks: { color: theme.textMuted, callback: (v) => fmtBRL(v) },
           },
         },
         plugins: {
           legend: { display: false },
-          tooltip: {
-            backgroundColor: cssVar("--bg-color") || "#fff",
-            titleColor: cssVar("--text-color") || "#333",
-            bodyColor: cssVar("--text-color") || "#333",
-            borderColor: cssVar("--dark-shadow") || "#ccc",
-            borderWidth: 1,
-            callbacks: { label: (ctx) => fmtBRL(ctx.parsed.y) },
-          },
+          tooltip: { callbacks: { label: (ctx) => fmtBRL(ctx.parsed.y) } },
         },
       },
     });
 
     return () => {
-      if (barInstanceRef.current) {
-        barInstanceRef.current.destroy();
-        barInstanceRef.current = null;
-      }
+      barInstanceRef.current?.destroy();
+      barInstanceRef.current = null;
     };
-  }, [barLabels, barValues, themeTick]);
+  }, [barLabels, barValues, theme]);
 
   /* ====================== Chart.js — Doughnut (Produtos) ====================== */
   const doughnutRef = useRef(null);
@@ -205,12 +201,12 @@ export default function Dashboard() {
 
   const baseColors = useMemo(
     () => [
-      "rgba(124,58,237,0.9)", // purple
-      "rgba(16,185,129,0.9)", // emerald
-      "rgba(251,191,36,0.9)", // amber
-      "rgba(59,130,246,0.9)", // blue
-      "rgba(244,63,94,0.9)",  // rose
-      "rgba(14,165,233,0.9)", // sky
+      "rgba(124,58,237,0.9)",
+      "rgba(16,185,129,0.9)",
+      "rgba(251,191,36,0.9)",
+      "rgba(59,130,246,0.9)",
+      "rgba(244,63,94,0.9)",
+      "rgba(14,165,233,0.9)",
     ],
     []
   );
@@ -219,16 +215,16 @@ export default function Dashboard() {
     const hasData = prodLabels.length > 0 && prodValues.some((v) => v > 0);
     const canvas = doughnutRef.current;
 
-    if (!canvas) return;
+    if (!hasData || !canvas) {
+      doughnutInstanceRef.current?.destroy();
+      doughnutInstanceRef.current = null;
+      return;
+    }
 
     if (doughnutInstanceRef.current) {
       doughnutInstanceRef.current.destroy();
       doughnutInstanceRef.current = null;
     }
-
-    if (!hasData) return;
-
-    const TICK = cssVar("--chart-tick") || "#5a677c";
 
     const colors = prodLabels.map((_, i) => baseColors[i % baseColors.length]);
 
@@ -236,9 +232,7 @@ export default function Dashboard() {
       type: "doughnut",
       data: {
         labels: prodLabels,
-        datasets: [
-          { data: prodValues, backgroundColor: colors, borderWidth: 0 },
-        ],
+        datasets: [{ data: prodValues, backgroundColor: colors, borderWidth: 0 }],
       },
       options: {
         responsive: true,
@@ -247,14 +241,9 @@ export default function Dashboard() {
         plugins: {
           legend: {
             position: "bottom",
-            labels: { boxWidth: 12, color: TICK },
+            labels: { boxWidth: 12, color: theme.textMuted },
           },
           tooltip: {
-            backgroundColor: cssVar("--bg-color") || "#fff",
-            titleColor: cssVar("--text-color") || "#333",
-            bodyColor: cssVar("--text-color") || "#333",
-            borderColor: cssVar("--dark-shadow") || "#ccc",
-            borderWidth: 1,
             callbacks: { label: (ctx) => `${ctx.label}: ${fmtBRL(ctx.parsed)}` },
           },
         },
@@ -262,17 +251,15 @@ export default function Dashboard() {
     });
 
     return () => {
-      if (doughnutInstanceRef.current) {
-        doughnutInstanceRef.current.destroy();
-        doughnutInstanceRef.current = null;
-      }
+      doughnutInstanceRef.current?.destroy();
+      doughnutInstanceRef.current = null;
     };
-  }, [prodLabels, prodValues, baseColors, themeTick]);
+  }, [prodLabels, prodValues, baseColors, theme]);
 
   /* ====================== UI ====================== */
   if (loading) {
     return (
-      <p className="text-center py-20 text-[var(--text-color)] opacity-70 animate-pulse">
+      <p className="text-center py-20 text-muted-color animate-pulse">
         Carregando painel…
       </p>
     );
@@ -280,7 +267,7 @@ export default function Dashboard() {
 
   if (errorMessage) {
     return (
-      <p className="text-center py-20 text-red-600">
+      <p className="text-center py-20 text-danger">
         Erro ao carregar dashboard: {errorMessage}
       </p>
     );
@@ -304,7 +291,7 @@ export default function Dashboard() {
         {cards.map((c) => {
           const accent = ACCENT[c.accent];
           const pctColor =
-            (c.pct ?? 0) > 0 ? "text-emerald-600" : (c.pct ?? 0) < 0 ? "text-rose-600" : "text-slate-500";
+            (c.pct ?? 0) > 0 ? "text-ok" : (c.pct ?? 0) < 0 ? "text-danger" : "text-muted-color";
 
           return (
             <motion.div
@@ -315,7 +302,7 @@ export default function Dashboard() {
             >
               <NeuCard className="p-5">
                 <div className="flex items-center justify-between">
-                  <div className="font-semibold text-[var(--text-color)]">{c.label}</div>
+                  <div className="font-semibold text-base-color">{c.label}</div>
                   <div className="neumorphic-inset p-2 rounded-xl">{c.icon}</div>
                 </div>
 
@@ -345,7 +332,7 @@ export default function Dashboard() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <NeuCard className="p-4 md:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[var(--text-color)]">Faturamento Mensal</h2>
+            <h2 className="text-lg font-semibold text-base-color">Faturamento Mensal</h2>
           </div>
           <div className="neu-card-inset p-3 rounded-2xl">
             <div className="h-80">
@@ -358,9 +345,7 @@ export default function Dashboard() {
       {/* Estatísticas de Produtos (Doughnut) */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <NeuCard className="p-4 md:p-6">
-          <h2 className="text-lg font-semibold text-[var(--text-color)] mb-4">
-            Estatísticas de Produtos
-          </h2>
+          <h2 className="text-lg font-semibold text-base-color mb-4">Estatísticas de Produtos</h2>
 
           {hasProductStats ? (
             <div className="neu-card-inset p-3 rounded-2xl">
@@ -371,9 +356,9 @@ export default function Dashboard() {
           ) : (
             <div className="neu-card-inset p-6 rounded-2xl flex flex-col items-center justify-center text-center">
               <div className="neumorphic-inset p-4 rounded-full mb-3">
-                <PackageX className="w-10 h-10 text-[var(--text-color)] opacity-60" />
+                <PackageX className="w-10 h-10 text-muted-color" />
               </div>
-              <p className="text-[var(--text-color)] opacity-80">
+              <p className="text-base-color opacity-80">
                 Nenhum dado de estatísticas de produtos disponível.
               </p>
             </div>

@@ -1,163 +1,140 @@
-/* ==========================================================================
-   Neumorphism theme (Light + Dark)
-   Mantém suas classes originais e adiciona suporte a tema escuro
-   ========================================================================== */
+/* ===== Tema Neumórfico =====
+ * Agora com suporte a Claro/Escuro via [data-theme]
+ * Basta trocar document.documentElement.dataset.theme = 'dark' | 'light'
+*/
 
-:root{
-  /* Cores base (claro) */
+/* ---------- LIGHT (padrão) ---------- */
+:root {
   --bg-color: #e0e5ec;
+  --surface-1: #e8edf4;
   --light-shadow: #ffffff;
   --dark-shadow: #a3b1c6;
 
-  --text-color: #5a677c;
-  --text-color-light: #8a99b1;
+  --text-color: #2b3445;
+  --text-color-muted: #8a99b1;
+  --grid-color: #d6dee8;
 
-  --accent-color: #355E3B; /* verde musgo escuro */
-
-  /* Aux */
-  --chip-bg: rgba(255,255,255,0.7);
-  --chip-text: var(--text-color);
-  --card-border: rgba(0,0,0,.05);
-
-  /* Charts */
-  --chart-grid: #D6DEE8;
-  --chart-tick: #8a99b1;
+  --accent-color: #7c3aed;         /* roxo suave p/ destaques */
+  --accent-strong: #5b21b6;
+  --ok: #10b981;
+  --warn: #f59e0b;
+  --danger: #ef4444;
 }
 
-/* Tema escuro */
-[data-theme="dark"]{
-  --bg-color: #0f172a;       /* slate-900 */
-  --light-shadow: #1f2937;   /* top-left soft */
-  --dark-shadow: #070b16;    /* bottom-right */
+/* ---------- DARK ---------- */
+:root[data-theme="dark"] {
+  /* base “navy” */
+  --bg-color: #0f172a;             /* slate-900 */
+  --surface-1: #111a31;            /* leve variação para dentro de cartões */
+  --light-shadow: #1a2236;         /* destaque claro (de cima/esq) */
+  --dark-shadow: #060a12;          /* sombra escura (baixo/dir) */
 
-  --text-color: #e5e7eb;         /* slate-200 */
-  --text-color-light: #94a3b8;   /* slate-400 */
+  --text-color: #e5e7eb;
+  --text-color-muted: #94a3b8;
+  --grid-color: #1e293b;
 
-  --accent-color: #a78bfa;       /* roxo claro */
-
-  --chip-bg: rgba(255,255,255,.08);
-  --chip-text: #e5e7eb;
-  --card-border: rgba(255,255,255,.06);
-
-  --chart-grid: #273244;
-  --chart-tick: #94a3b8;
+  --accent-color: #a78bfa;         /* roxo claro p/ dark */
+  --accent-strong: #7c3aed;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
 }
 
-/* Fundo global */
-html, body{
+/* ---------- Superfícies ---------- */
+.neu-surface {
   background: var(--bg-color);
-  color: var(--text-color);
 }
 
-/* ===== bloco com relevo “para fora” ===== */
-.neumorphic{
+/* bloco com relevo “para fora” */
+.neumorphic {
   background: var(--bg-color);
-  border: 1px solid var(--card-border);
   border-radius: 20px;
   box-shadow:
     8px 8px 16px var(--dark-shadow),
     -8px -8px 16px var(--light-shadow);
 }
 
-/* ===== bloco “pressionado/para dentro” ===== */
-.neumorphic-inset{
+/* bloco “pressionado/para dentro” */
+.neumorphic-inset {
   background: var(--bg-color);
-  border: 1px solid var(--card-border);
-  border-radius: 20px;
+  border-radius: 16px;
   box-shadow:
     inset 8px 8px 16px var(--dark-shadow),
     inset -8px -8px 16px var(--light-shadow);
 }
 
 /* hover sutil */
-.hover\:shadow-neu-hover:hover{
+.hover\:shadow-neu-hover:hover {
   box-shadow:
     6px 6px 12px var(--dark-shadow),
     -6px -6px 12px var(--light-shadow);
 }
 
-.neumorphic-interactive{
-  transition: box-shadow .2s ease, color .2s ease, transform .1s ease, opacity .15s ease;
+.neumorphic-interactive {
+  transition: box-shadow .2s ease, color .2s ease, transform .08s ease, opacity .15s ease;
 }
 
-.neumorphic-interactive:active{
+.neumorphic-interactive:active {
   transform: translateY(0.5px);
 }
 
 /* estado ativo: pressionado */
 .neumorphic-interactive.active,
-.neumorphic-interactive:active{
+.neumorphic-interactive:active {
   box-shadow:
     inset 6px 6px 12px var(--dark-shadow),
     inset -6px -6px 12px var(--light-shadow);
 }
 
-.neumorphic-interactive.active .nav-text{
-  color: var(--accent-color);
-  font-weight: 600;
-}
-
-/* container da sidebar */
-.sidebar-neu{
-  border-radius: 0 25px 25px 0;
-  padding: 1rem;
-}
-
-/* ====== Cards ====== */
-.neu-card{
+/* ---------- Cards ---------- */
+.neu-card {
   background: var(--bg-color);
-  border: 1px solid var(--card-border);
   border-radius: 20px;
   box-shadow:
     8px 8px 16px var(--dark-shadow),
     -8px -8px 16px var(--light-shadow);
 }
 
-.neu-card-inset{
+.neu-card-inset {
   background: var(--bg-color);
-  border: 1px solid var(--card-border);
   border-radius: 20px;
   box-shadow:
     inset 8px 8px 16px var(--dark-shadow),
     inset -8px -8px 16px var(--light-shadow);
 }
 
-/* ====== Botões ====== */
-.neu-btn{
+/* ---------- Botões / Chips ---------- */
+.neu-btn {
   background: var(--bg-color);
-  border: 1px solid var(--card-border);
   border-radius: 14px;
   padding: .625rem 1rem; /* 10px 16px */
   box-shadow:
     6px 6px 12px var(--dark-shadow),
     -6px -6px 12px var(--light-shadow);
   color: var(--text-color);
-  font-weight: 600;
-  transition: box-shadow .15s ease, transform .05s ease, opacity .15s ease;
+  font-weight: 700;
+  letter-spacing: .1px;
+  transition: box-shadow .15s ease, transform .05s ease, opacity .15s ease, color .15s ease;
 }
 
-.neu-btn:hover{
+.neu-btn:hover {
   box-shadow:
     4px 4px 10px var(--dark-shadow),
     -4px -4px 10px var(--light-shadow);
 }
 
-.neu-btn:active{
+.neu-btn:active {
   box-shadow:
     inset 6px 6px 12px var(--dark-shadow),
     inset -6px -6px 12px var(--light-shadow);
   transform: translateY(0.5px);
 }
 
-/* variações */
-.neu-btn-primary{ color: var(--accent-color); }
-.neu-btn-danger{ color: #b03a2e; }
+.neu-btn-primary { color: var(--accent-color); }
+.neu-btn-danger  { color: var(--danger); }
 
-/* ===== Chips / pill buttons ===== */
-.neu-chip{
-  background: var(--chip-bg);
-  color: var(--chip-text);
-  border: 1px solid var(--card-border);
+.neu-chip {
+  background: var(--bg-color);
   border-radius: 999px;
   padding: .35rem .7rem;
   box-shadow:
@@ -165,7 +142,32 @@ html, body{
     -4px -4px 8px var(--light-shadow);
   font-weight: 700;
   font-size: .8rem;
+  color: var(--text-color);
+  opacity: .95;
 }
 
-/* wrappers úteis */
-.neu-surface{ background: transparent; }
+/* ---------- Tipografia utilitária ---------- */
+.text-base-color   { color: var(--text-color); }
+.text-muted-color  { color: var(--text-color-muted); }
+.text-accent       { color: var(--accent-color); }
+.text-accent-strong{ color: var(--accent-strong); }
+.text-ok           { color: var(--ok); }
+.text-warn         { color: var(--warn); }
+.text-danger       { color: var(--danger); }
+
+/* ---------- Sidebar (curvatura lateral) ---------- */
+.sidebar-neu {
+  border-radius: 0 25px 25px 0;
+  padding: 1rem;
+}
+
+/* ajuda os inputs dentro de cartões “inset” no dark */
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  color: var(--text-color);
+  background: transparent;
+}
+
+/* grid dos gráficos usa a variável (Chart.js lê via JS) */
+:root { --chart-grid: var(--grid-color); --chart-text: var(--text-color-muted); }
