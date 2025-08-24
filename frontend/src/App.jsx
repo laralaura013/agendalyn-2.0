@@ -1,5 +1,5 @@
 // frontend/src/App.jsx
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import ReloadPrompt from "./components/pwa/ReloadPrompt";
@@ -79,6 +79,38 @@ function AdminLayoutWrapper() {
 }
 
 function App() {
+  // 🔒 Força tema claro e desativa dark mode (temporariamente)
+  useEffect(() => {
+    try {
+      localStorage.setItem("theme", "light");
+    } catch {}
+
+    const root = document.documentElement;
+    const body = document.body;
+
+    root.classList.remove("dark");
+    body.classList.remove("dark");
+    root.setAttribute("data-theme", "light");
+    body.setAttribute("data-theme", "light");
+
+    // “mata” qualquer prefers-color-scheme: dark
+    const style = document.createElement("style");
+    style.setAttribute("data-force-light", "true");
+    style.innerHTML = `
+      :root { color-scheme: light; }
+      @media (prefers-color-scheme: dark) {
+        :root { color-scheme: light; }
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      // limpa o style injetado ao desmontar (opcional)
+      const s = document.querySelector('style[data-force-light="true"]');
+      if (s) s.remove();
+    };
+  }, []);
+
   return (
     <>
       <Toaster

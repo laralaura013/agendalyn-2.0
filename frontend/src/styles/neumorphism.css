@@ -1,41 +1,46 @@
-/* ==========================================================================
-   Tema Neumórfico – claro/escuro
-   Ative o modo escuro com: <html data-theme="dark"> ou <body data-theme="dark">
-   ========================================================================== */
+/* =============================================================================
+   Tema Neumórfico — CLARO com contraste melhor
+   (modo escuro temporariamente desativado mapeando os mesmos tokens)
+   ============================================================================= */
 
 /* ---------- Tokens (Claro) ---------- */
 :root{
-  --bg-color: #e0e5ec;
-  --light-shadow: #ffffff;
-  --dark-shadow: #a3b1c6;
+  /* Fundo e superfícies (um pouco mais acinzentadas) */
+  --bg-color:           #eef1f5;      /* era #e0e5ec — menos branco, mais conforto */
+  --light-shadow:       #ffffff;
+  --dark-shadow:        rgba(15,23,42,.12); /* sombra mais “real” que azulada */
 
-  --text-color: #5a677c;
-  --text-color-muted: #8a99b1;
+  /* Texto com mais contraste */
+  --text-color:         #0f172a;      /* slate-900 */
+  --text-color-muted:   #475569;      /* slate-600 */
 
-  --accent-color: #355E3B;             /* Verde musgo escuro (brand) */
-  --accent-contrast: #ffffff;
+  /* Marca / realces */
+  --accent-color:       #355E3B;      /* verde musgo escuro */
+  --accent-contrast:    #ffffff;
 
-  --border-color: #cfd8e3;             /* bordas sutis neutras */
-  --muted-bg: #eef2f7;                 /* superfícies internas/hover */
-  --ring-color: rgba(53, 94, 59, 0.35);/* focus ring baseado no accent */
+  /* Bordas e superfícies internas */
+  --border-color:       #d9dee7;      /* um pouco mais visível */
+  --muted-bg:           #f3f5f9;      /* listas, cabeçalhos de tabela, etc */
+
+  /* Focus ring */
+  --ring-color:         rgba(53, 94, 59, 0.28);
 }
 
-/* ---------- Tokens (Escuro) ---------- */
+/* ---------- Tokens (Escuro) — DESATIVADO (espelha o claro) ---------- */
 [data-theme="dark"]{
-  --bg-color: #1c2432;                 /* fundo dark (slate/blue-ink) */
-  --light-shadow: #252f41;             /* sombra clara (leve mais clara que bg) */
-  --dark-shadow: #131a26;              /* sombra escura */
-  --text-color: #d7deea;
-  --text-color-muted: #9aa6b8;
-  --accent-color: #60a672;             /* verde suavizado pro dark */
-  --accent-contrast: #0b1320;
-
-  --border-color: #2a3242;
-  --muted-bg: #20293a;
-  --ring-color: rgba(96, 166, 114, 0.45);
+  --bg-color:           #eef1f5;
+  --light-shadow:       #ffffff;
+  --dark-shadow:        rgba(15,23,42,.12);
+  --text-color:         #0f172a;
+  --text-color-muted:   #475569;
+  --accent-color:       #355E3B;
+  --accent-contrast:    #ffffff;
+  --border-color:       #d9dee7;
+  --muted-bg:           #f3f5f9;
+  --ring-color:         rgba(53, 94, 59, 0.28);
 }
 
-/* Transição suave ao alternar tema */
+/* Transição suave */
 html, body{
   background: var(--bg-color);
   color: var(--text-color);
@@ -43,26 +48,24 @@ html, body{
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ==========================================================================
+/* =============================================================================
    Blocos Neumórficos
-   ========================================================================== */
+   ============================================================================= */
 
-/* relevo “para fora” */
 .neumorphic{
   background: var(--bg-color);
   border-radius: 20px;
   box-shadow:
-    8px 8px 16px var(--dark-shadow),
-    -8px -8px 16px var(--light-shadow);
+    8px 8px 22px var(--dark-shadow),
+    -8px -8px 18px rgba(255,255,255,.55);
 }
 
-/* relevo “para dentro” (pressionado) */
 .neumorphic-inset{
   background: var(--bg-color);
   border-radius: 20px;
   box-shadow:
-    inset 8px 8px 16px var(--dark-shadow),
-    inset -8px -8px 16px var(--light-shadow);
+    inset 8px 8px 16px rgba(15,23,42,.10),
+    inset -8px -8px 16px rgba(255,255,255,.55);
 }
 
 .neumorphic-interactive{
@@ -70,8 +73,8 @@ html, body{
 }
 .neumorphic-interactive:hover{
   box-shadow:
-    6px 6px 12px var(--dark-shadow),
-    -6px -6px 12px var(--light-shadow);
+    6px 6px 16px var(--dark-shadow),
+    -6px -6px 14px rgba(255,255,255,.50);
 }
 .neumorphic-interactive:active{
   transform: translateY(0.5px);
@@ -79,138 +82,120 @@ html, body{
 .neumorphic-interactive.active,
 .neumorphic-interactive:active{
   box-shadow:
-    inset 6px 6px 12px var(--dark-shadow),
-    inset -6px -6px 12px var(--light-shadow);
+    inset 6px 6px 12px rgba(15,23,42,.10),
+    inset -6px -6px 12px rgba(255,255,255,.50);
 }
 .neumorphic-interactive.active .nav-text{
   color: var(--accent-color);
   font-weight: 600;
 }
 
-/* Hover utilitária (nome preservado p/ compat.) */
+/* Hover utilitária (compat) */
 .hover\:shadow-neu-hover:hover{
   box-shadow:
-    6px 6px 12px var(--dark-shadow),
-    -6px -6px 12px var(--light-shadow);
+    6px 6px 16px var(--dark-shadow),
+    -6px -6px 14px rgba(255,255,255,.50);
 }
 
-/* Sidebar arredondada (nome preservado p/ compat.) */
+/* Sidebar (compat) */
 .sidebar-neu{
   border-radius: 0 25px 25px 0;
   padding: 1rem;
 }
 
-/* ==========================================================================
+/* =============================================================================
    Superfícies / Cards
-   ========================================================================== */
+   ============================================================================= */
 
-.neu-surface{
-  background: var(--bg-color);
-}
+.neu-surface{ background: var(--bg-color); }
 
 .neu-card{
   background: var(--bg-color);
   border-radius: 20px;
   box-shadow:
-    8px 8px 16px var(--dark-shadow),
-    -8px -8px 16px var(--light-shadow);
+    8px 8px 22px var(--dark-shadow),
+    -8px -8px 18px rgba(255,255,255,.55);
 }
 
 .neu-card-inset{
   background: var(--bg-color);
   border-radius: 20px;
   box-shadow:
-    inset 8px 8px 16px var(--dark-shadow),
-    inset -8px -8px 16px var(--light-shadow);
+    inset 8px 8px 16px rgba(15,23,42,.10),
+    inset -8px -8px 16px rgba(255,255,255,.55);
 }
 
-/* Variante com borda sutil (quando preferir borda a sombra) */
+/* Variante com borda sutil */
 .neu-border{
   border: 1px solid var(--border-color);
   border-radius: 16px;
   background: var(--bg-color);
 }
 
-/* ==========================================================================
+/* =============================================================================
    Botões / Chips
-   ========================================================================== */
+   ============================================================================= */
 
 .neu-btn{
   background: var(--bg-color);
   border-radius: 14px;
-  padding: .625rem 1rem; /* 10px 16px */
+  padding: .625rem 1rem;
   color: var(--text-color);
   font-weight: 600;
   box-shadow:
-    6px 6px 12px var(--dark-shadow),
-    -6px -6px 12px var(--light-shadow);
+    6px 6px 14px var(--dark-shadow),
+    -6px -6px 12px rgba(255,255,255,.50);
   transition: box-shadow .15s ease, transform .06s ease, opacity .15s ease, color .2s ease, background-color .2s ease;
   border: 0;
   cursor: pointer;
 }
 .neu-btn:hover{
   box-shadow:
-    4px 4px 10px var(--dark-shadow),
-    -4px -4px 10px var(--light-shadow);
+    4px 4px 12px var(--dark-shadow),
+    -4px -4px 10px rgba(255,255,255,.48);
 }
 .neu-btn:active{
   box-shadow:
-    inset 6px 6px 12px var(--dark-shadow),
-    inset -6px -6px 12px var(--light-shadow);
+    inset 6px 6px 12px rgba(15,23,42,.10),
+    inset -6px -6px 12px rgba(255,255,255,.48);
   transform: translateY(0.5px);
 }
 
-.neu-btn[disabled],
-.neu-btn:disabled{
-  opacity: .55;
-  cursor: not-allowed;
-}
+.neu-btn[disabled], .neu-btn:disabled{ opacity: .55; cursor: not-allowed; }
 
-/* primário: usa a cor de acento no texto (e ring) */
-.neu-btn-primary{
-  color: var(--accent-color);
-}
+/* primário usa a cor de acento no texto (e ring) */
+.neu-btn-primary{ color: var(--accent-color); }
 
-/* “perigo”: só muda a cor do texto p/ não perder o relevo */
-.neu-btn-danger{
-  color: #b03a2e;
-}
+/* “perigo” só muda a cor do texto */
+.neu-btn-danger{ color: #b03a2e; }
 
 .neu-chip{
   background: var(--bg-color);
   border-radius: 999px;
   padding: .35rem .7rem;
   box-shadow:
-    4px 4px 8px var(--dark-shadow),
-    -4px -4px 8px var(--light-shadow);
+    4px 4px 10px var(--dark-shadow),
+    -4px -4px 10px rgba(255,255,255,.48);
   font-weight: 600;
   color: var(--text-color);
   font-size: .8rem;
   transition: transform .08s ease, opacity .15s ease;
 }
-.neu-chip:hover{
-  transform: translateY(-1px);
-}
+.neu-chip:hover{ transform: translateY(-1px); }
 
-/* Botão com estado "ativo" (toggle) */
 .neu-btn.is-active{
   box-shadow:
-    inset 6px 6px 12px var(--dark-shadow),
-    inset -6px -6px 12px var(--light-shadow);
+    inset 6px 6px 12px rgba(15,23,42,.10),
+    inset -6px -6px 12px rgba(255,255,255,.50);
   color: var(--accent-color);
 }
 
-/* ==========================================================================
+/* =============================================================================
    Campos de formulário
-   ========================================================================== */
+   ============================================================================= */
 
-/* Wrapper opcional para agrupar label+campo */
-.field-neu{
-  display: grid;
-  gap: .35rem;
-}
+.field-neu{ display: grid; gap: .35rem; }
 
-/* Inputs/Selects/Areas com estética do tema */
 .input-neu,
 .select-neu,
 .textarea-neu{
@@ -222,16 +207,14 @@ html, body{
   color: var(--text-color);
   border: 1px solid var(--border-color);
   box-shadow:
-    inset 2px 2px 4px var(--dark-shadow),
-    inset -2px -2px 4px var(--light-shadow);
+    inset 2px 2px 4px rgba(15,23,42,.08),
+    inset -2px -2px 4px rgba(255,255,255,.55);
   transition: box-shadow .15s ease, border-color .15s ease, background-color .2s ease, color .2s ease;
   outline: none;
 }
 
 .input-neu::placeholder,
-.textarea-neu::placeholder{
-  color: var(--text-color-muted);
-}
+.textarea-neu::placeholder{ color: var(--text-color-muted); }
 
 .input-neu:focus,
 .select-neu:focus,
@@ -239,42 +222,36 @@ html, body{
   border-color: var(--accent-color);
   box-shadow:
     0 0 0 3px var(--ring-color),
-    inset 2px 2px 4px var(--dark-shadow),
-    inset -2px -2px 4px var(--light-shadow);
+    inset 2px 2px 4px rgba(15,23,42,.08),
+    inset -2px -2px 4px rgba(255,255,255,.55);
 }
 
-/* estados desabilitados */
 .input-neu:disabled,
 .select-neu:disabled,
-.textarea-neu:disabled{
-  opacity: .65;
-  cursor: not-allowed;
-}
+.textarea-neu:disabled{ opacity: .65; cursor: not-allowed; }
 
-/* ==========================================================================
+/* =============================================================================
    Títulos, textos e helpers
-   ========================================================================== */
+   ============================================================================= */
 
 .text-muted{ color: var(--text-color-muted); }
 .text-accent{ color: var(--accent-color); }
 
-/* para superfícies “muted” internas (listas, painéis) */
 .surface-muted{
   background: var(--muted-bg);
   border: 1px solid var(--border-color);
   border-radius: 14px;
 }
 
-/* Divider sutil */
 .hr-neu{
   height: 1px;
   background: linear-gradient(to right, transparent, var(--border-color), transparent);
   border: 0;
 }
 
-/* ==========================================================================
+/* =============================================================================
    Tabelas
-   ========================================================================== */
+   ============================================================================= */
 
 .table-neu{
   width: 100%;
@@ -284,11 +261,8 @@ html, body{
   border-radius: 14px;
   overflow: hidden;
 }
-.table-neu thead{
-  background: var(--muted-bg);
-}
-.table-neu th,
-.table-neu td{
+.table-neu thead{ background: var(--muted-bg); }
+.table-neu th, .table-neu td{
   padding: .6rem .75rem;
   border-bottom: 1px solid var(--border-color);
   text-align: left;
@@ -298,41 +272,36 @@ html, body{
   background: color-mix(in srgb, var(--muted-bg) 85%, transparent);
 }
 
-/* ==========================================================================
-   Modal / Drawer básicos (quando não usar componente)
-   ========================================================================== */
+/* =============================================================================
+   Modal / Drawer
+   ============================================================================= */
 
 .modal-neu{
   background: var(--bg-color);
   color: var(--text-color);
   border-radius: 20px;
   box-shadow:
-    10px 10px 20px var(--dark-shadow),
-    -10px -10px 20px var(--light-shadow);
+    12px 12px 26px var(--dark-shadow),
+    -10px -10px 22px rgba(255,255,255,.55);
 }
 
 .drawer-neu{
   background: var(--bg-color);
   color: var(--text-color);
   box-shadow:
-    -10px 0 20px var(--dark-shadow),
+    -10px 0 22px var(--dark-shadow),
     0 0 0 1px var(--border-color) inset;
 }
 
-/* ==========================================================================
+/* =============================================================================
    Scrollbar / Utilidades
-   ========================================================================== */
+   ============================================================================= */
 
 .no-scrollbar::-webkit-scrollbar{ width: 0; height: 0; }
 .no-scrollbar{ scrollbar-width: none; }
 
-::-webkit-scrollbar{
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track{
-  background: var(--bg-color);
-}
+::-webkit-scrollbar{ width: 10px; height: 10px; }
+::-webkit-scrollbar-track{ background: var(--bg-color); }
 ::-webkit-scrollbar-thumb{
   background: var(--border-color);
   border-radius: 8px;
@@ -342,20 +311,15 @@ html, body{
   background: color-mix(in srgb, var(--border-color) 80%, var(--text-color) 20%);
 }
 
-/* ==========================================================================
-   Compat: classes já existentes (mantidas)
-   ========================================================================== */
+/* =============================================================================
+   Compat
+   ============================================================================= */
 
 .neumorphic-interactive.active .nav-text{ color: var(--accent-color); font-weight: 600; }
-
-/* As classes abaixo já existiam na sua base e continuam válidas: */
 .neu-btn-primary{ color: var(--accent-color); }
 .neu-btn-danger{ color: #b03a2e; }
-
-/* Borda utilitária para inputs “padrão tailwind” quando você não usar input-neu */
 .border-neu{ border: 1px solid var(--border-color); }
 
-/* Pequenos badges */
 .badge{
   display: inline-flex;
   align-items: center;
@@ -369,11 +333,10 @@ html, body{
   border: 1px solid var(--border-color);
 }
 
-/* Estados (cores não agressivas para manter o look neumórfico) */
 .badge-emerald{ color: #0f5132; background: #d1fae5; border-color: #a7f3d0; }
 .badge-amber{   color: #7a4b00; background: #fef3c7; border-color: #fde68a; }
 .badge-rose{    color: #7f1d1d; background: #ffe4e6; border-color: #fecdd3; }
 
-/* ==========================================================================
+/* =============================================================================
    Fim
-   ========================================================================== */
+   ============================================================================= */
