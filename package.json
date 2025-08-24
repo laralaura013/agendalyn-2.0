@@ -1,14 +1,43 @@
 {
+  "name": "agendalyn-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\""
+  },
   "dependencies": {
-    "ionicons": "^8.0.13"
+    "axios": "^1.6.0",
+    "chart.js": "^4.0.0",
+    "date-fns": "^3.0.0",
+    "ionicons": "^8.0.13",
+    "lucide-react": "^0.468.0",
+    "react": "18.2.0",
+    "react-chartjs-2": "^5.0.0",
+    "react-dom": "18.2.0",
+    "react-hot-toast": "^2.0.0",
+    "react-router-dom": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
-    "@eslint/json": "^0.13.1",
-    "@eslint/markdown": "^7.2.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.20",
     "eslint": "^9.33.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "globals": "^16.3.0"
+    "globals": "^16.3.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.10",
+    "vite": "^5.4.0"
+  },
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
   }
 }

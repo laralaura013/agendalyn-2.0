@@ -5,17 +5,21 @@ import React from "react";
  * - Variante padrão (relevo) ou "inset" (pressionado)
  * - Usado no Dashboard para métricas e containers
  */
-export default function NeuCard({
-  inset = false,
-  className = "",
-  children,
-  as: Tag = "div",
-  ...rest
-}) {
+const NeuCard = React.forwardRef(function NeuCard(
+  { inset = false, className = "", children, as: Tag = "div", ...rest },
+  ref
+) {
+  // Se alguém passar um 'as' inválido, caímos para 'div' para evitar o erro #310
+  const isValidTag = typeof Tag === "string" || typeof Tag === "function";
+  const SafeTag = isValidTag ? Tag : "div";
+
   const base = inset ? "neu-card-inset" : "neu-card";
   return (
-    <Tag className={`${base} ${className}`} {...rest}>
+    <SafeTag ref={ref} className={`${base} ${className}`} {...rest}>
       {children}
-    </Tag>
+    </SafeTag>
   );
-}
+});
+
+NeuCard.displayName = "NeuCard";
+export default NeuCard;
