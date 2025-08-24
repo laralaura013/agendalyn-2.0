@@ -1,0 +1,127 @@
+/* ===== Tema Neumórfico (leve, moderno) ===== */
+:root{
+  --bg-color: #e0e5ec;
+  --light-shadow: #ffffff;
+  --dark-shadow: #a3b1c6;
+  --text-color: #5a677c;
+  --accent-color: #355E3B; /* verde musgo escuro */
+}
+
+/* bloco com relevo “para fora” */
+.neumorphic{
+  background: var(--bg-color);
+  box-shadow:
+    8px 8px 16px var(--dark-shadow),
+    -8px -8px 16px var(--light-shadow);
+}
+
+/* bloco “pressionado/para dentro” */
+.neumorphic-inset{
+  background: var(--bg-color);
+  box-shadow:
+    inset 8px 8px 16px var(--dark-shadow),
+    inset -8px -8px 16px var(--light-shadow);
+}
+
+/* hover sutil */
+.hover\:shadow-neu-hover:hover{
+  box-shadow:
+    6px 6px 12px var(--dark-shadow),
+    -6px -6px 12px var(--light-shadow);
+}
+
+.neumorphic-interactive{
+  transition: box-shadow .2s ease, color .2s ease, transform .1s ease;
+}
+
+.neumorphic-interactive:active{
+  transform: translateY(0.5px);
+}
+
+/* estado ativo: pressionado */
+.neumorphic-interactive.active,
+.neumorphic-interactive:active{
+  box-shadow:
+    inset 6px 6px 12px var(--dark-shadow),
+    inset -6px -6px 12px var(--light-shadow);
+}
+
+.neumorphic-interactive.active .nav-text{
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+/* container da sidebar */
+.sidebar-neu{
+  border-radius: 0 25px 25px 0;
+  padding: 1rem;
+}
+
+/* ====== Cards ====== */
+.neu-card{
+  background: var(--bg-color);
+  border-radius: 20px;
+  box-shadow:
+    8px 8px 16px var(--dark-shadow),
+    -8px -8px 16px var(--light-shadow);
+}
+
+.neu-card-inset{
+  background: var(--bg-color);
+  border-radius: 20px;
+  box-shadow:
+    inset 8px 8px 16px var(--dark-shadow),
+    inset -8px -8px 16px var(--light-shadow);
+}
+
+/* ====== Botões ====== */
+.neu-btn{
+  background: var(--bg-color);
+  border-radius: 14px;
+  padding: .625rem 1rem; /* 10px 16px */
+  box-shadow:
+    6px 6px 12px var(--dark-shadow),
+    -6px -6px 12px var(--light-shadow);
+  color: var(--text-color);
+  font-weight: 600;
+  transition: box-shadow .15s ease, transform .05s ease, opacity .15s ease;
+}
+
+.neu-btn:hover{
+  box-shadow:
+    4px 4px 10px var(--dark-shadow),
+    -4px -4px 10px var(--light-shadow);
+}
+
+.neu-btn:active{
+  box-shadow:
+    inset 6px 6px 12px var(--dark-shadow),
+    inset -6px -6px 12px var(--light-shadow);
+  transform: translateY(0.5px);
+}
+
+/* variações */
+.neu-btn-primary{
+  color: var(--accent-color);
+}
+
+.neu-btn-danger{
+  color: #b03a2e;
+}
+
+.neu-chip{
+  background: var(--bg-color);
+  border-radius: 999px;
+  padding: .35rem .7rem;
+  box-shadow:
+    4px 4px 8px var(--dark-shadow),
+    -4px -4px 8px var(--light-shadow);
+  font-weight: 600;
+  color: var(--text-color);
+  font-size: .8rem;
+}
+
+/* wrappers úteis */
+.neu-surface{
+  background: var(--bg-color);
+}

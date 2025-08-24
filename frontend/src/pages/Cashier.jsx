@@ -17,6 +17,10 @@ import api from '../services/api';
 import CashierControll from '../components/cashier/CashierControll';
 import { asArray } from '../utils/asArray';
 
+import NeuCard from '../components/ui/NeuCard';
+import NeuButton from '../components/ui/NeuButton';
+import '../styles/neumorphism.css';
+
 /* =========================================================================
  * Helpers
  * ========================================================================= */
@@ -140,14 +144,14 @@ const BarChartByMethod = ({ data }) => {
 };
 
 /* =========================================================================
- * Modal simples (inline)
+ * Modal simples (inline) – com visual neumórfico
  * ========================================================================= */
 const Modal = ({ open, onClose, children }) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[100]">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute right-0 left-0 top-10 mx-auto w-[96%] sm:w-[720px] bg-white rounded-xl shadow-lg">
+      <div className="absolute right-0 left-0 top-10 mx-auto w-[96%] sm:w-[720px] neu-card rounded-2xl">
         {children}
       </div>
     </div>
@@ -456,59 +460,53 @@ const Cashier = () => {
   if (loadingStatus) {
     return (
       <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
-        <p className="text-gray-500">Carregando informações do caixa...</p>
+        <p className="text-[var(--text-color)] opacity-70">Carregando informações do caixa...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+    <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8 neu-surface">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Controle de Caixa</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-color)]">Controle de Caixa</h1>
         <div className="flex gap-2">
-          <button
+          <NeuButton
             onClick={() => {
               Promise.all([fetchCashierStatus(), loadSummary(), loadByDay()]).then(() =>
                 toast.success('Atualizado!')
               );
             }}
-            className="inline-flex items-center gap-2 px-3 py-2 border rounded-md bg-white hover:bg-gray-50"
+            className="inline-flex items-center gap-2"
             title="Atualizar"
           >
             <RefreshCcw size={16} /> Atualizar
-          </button>
+          </NeuButton>
           {isOpen ? (
-            <button
-              onClick={handleCloseCashier}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700"
-            >
+            <NeuButton variant="danger" onClick={handleCloseCashier}>
               Fechar Caixa
-            </button>
+            </NeuButton>
           ) : (
-            <button
-              onClick={handleOpenCashier}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
-            >
+            <NeuButton variant="primary" onClick={handleOpenCashier}>
               Abrir Caixa
-            </button>
+            </NeuButton>
           )}
         </div>
       </div>
 
       {/* Status + Ações rápidas */}
-      <div className="mb-4">
-        <div className="rounded-xl border p-4 bg-white flex items-center justify-between">
+      <NeuCard className="p-4 mb-4">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div
+            <span
               className={`px-3 py-1 text-xs font-bold rounded-full ${
-                isOpen ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700'
+                isOpen ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'
               }`}
             >
               Caixa {isOpen ? 'Aberto' : 'Fechado'}
-            </div>
+            </span>
             {view.openingBalance !== null && (
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-[var(--text-color)] opacity-90">
                 Saldo inicial: <strong>{toBRL(view.openingBalance)}</strong>
               </div>
             )}
@@ -519,53 +517,51 @@ const Cashier = () => {
             </div>
           )}
         </div>
-      </div>
+      </NeuCard>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="rounded-2xl border bg-white p-4">
+        <NeuCard className="p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Entradas (Recebimentos)</span>
+            <span className="text-sm text-[var(--text-color)] opacity-90">Entradas (Recebimentos)</span>
             <ArrowDownCircle className="text-emerald-600" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-emerald-600">
+          <div className="mt-2 text-2xl font-bold text-emerald-700">
             {toBRL(summary.entries || view.income)}
           </div>
-        </div>
-        <div className="rounded-2xl border bg-white p-4">
+        </NeuCard>
+        <NeuCard className="p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Saídas (Pagamentos)</span>
+            <span className="text-sm text-[var(--text-color)] opacity-90">Saídas (Pagamentos)</span>
             <ArrowUpCircle className="text-red-600" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-red-600">
+          <div className="mt-2 text-2xl font-bold text-red-700">
             {toBRL(summary.exits || view.expense)}
           </div>
-        </div>
-        <div className="rounded-2xl border bg-white p-4">
+        </NeuCard>
+        <NeuCard className="p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Saldo do Dia</span>
-            <Wallet className="text-slate-700" />
+            <span className="text-sm text-[var(--text-color)] opacity-90">Saldo do Dia</span>
+            <Wallet className="text-[var(--text-color)]" />
           </div>
-          <div className="mt-2 text-2xl font-bold">
+          <div className="mt-2 text-2xl font-bold text-[var(--text-color)]">
             {toBRL(
               'balance' in summary ? summary.balance : Number(view.income || 0) - Number(view.expense || 0)
             )}
           </div>
-        </div>
+        </NeuCard>
       </div>
 
       {/* Filtros + Resumo por método */}
-      <div className="rounded-2xl border bg-white p-4 mb-6">
+      <NeuCard className="p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
           <label className="flex items-center gap-2">
             <CalendarDays size={16} />
             <input
               type="date"
               value={date}
-              onChange={(e) => {
-                setDate(e.target.value);
-              }}
-              className="border rounded-md px-3 py-1.5 text-sm"
+              onChange={(e) => setDate(e.target.value)}
+              className="border rounded-md px-3 py-1.5 text-sm w-full"
             />
           </label>
 
@@ -573,9 +569,7 @@ const Cashier = () => {
             <Filter size={16} />
             <select
               value={type}
-              onChange={(e) => {
-                setType(e.target.value);
-              }}
+              onChange={(e) => setType(e.target.value)}
               className="border rounded-md px-3 py-1.5 text-sm w-full"
             >
               {asArray(TYPE_OPTIONS).map((o) => (
@@ -588,9 +582,7 @@ const Cashier = () => {
 
           <select
             value={methodId}
-            onChange={(e) => {
-              setMethodId(e.target.value);
-            }}
+            onChange={(e) => setMethodId(e.target.value)}
             className="border rounded-md px-3 py-1.5 text-sm w-full"
           >
             <option value="">Método de pagamento (todos)</option>
@@ -603,9 +595,7 @@ const Cashier = () => {
 
           <select
             value={userId}
-            onChange={(e) => {
-              setUserId(e.target.value);
-            }}
+            onChange={(e) => setUserId(e.target.value)}
             className="border rounded-md px-3 py-1.5 text-sm w-full"
           >
             <option value="">Usuário (todos)</option>
@@ -620,9 +610,7 @@ const Cashier = () => {
             <Search size={16} />
             <input
               value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-              }}
+              onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar no resumo diário…"
               className="border rounded-md px-3 py-1.5 text-sm w-full"
             />
@@ -632,108 +620,111 @@ const Cashier = () => {
         {/* Por método (mini-resumo) + gráfico */}
         {summary.byMethod?.length > 0 && (
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border p-3">
-              <div className="text-sm font-semibold mb-2">Resumo por método</div>
+            <NeuCard className="p-3">
+              <div className="text-sm font-semibold text-[var(--text-color)] mb-2">Resumo por método</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {asArray(summary.byMethod).map((bm, idx) => (
-                  <div key={idx} className="rounded-lg border p-3">
-                    <div className="text-xs text-gray-500">Método</div>
-                    <div className="font-semibold">{bm.name || '—'}</div>
+                  <div key={idx} className="neu-card p-3 rounded-xl">
+                    <div className="text-xs opacity-80 text-[var(--text-color)]">Método</div>
+                    <div className="font-semibold text-[var(--text-color)]">{bm.name || '—'}</div>
                     <div className="mt-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Entradas</span>
+                        <span className="opacity-80 text-[var(--text-color)]">Entradas</span>
                         <span className="text-emerald-700">{toBRL(bm.entries || 0)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Saídas</span>
+                        <span className="opacity-80 text-[var(--text-color)]">Saídas</span>
                         <span className="text-red-700">{toBRL(bm.exits || 0)}</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </NeuCard>
 
-            <div className="rounded-xl border p-3">
-              <div className="text-sm font-semibold mb-2">Barras por método</div>
-              <BarChartByMethod data={summary.byMethod} />
-            </div>
+            <NeuCard className="p-3">
+              <div className="text-sm font-semibold text-[var(--text-color)] mb-2">Barras por método</div>
+              <div className="neu-card-inset rounded-2xl p-2">
+                <BarChartByMethod data={summary.byMethod} />
+              </div>
+            </NeuCard>
           </div>
         )}
-      </div>
+      </NeuCard>
 
       {/* Tabela — Resumo por dia */}
       <div className="flex items-center justify-between mb-2">
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-[var(--text-color)] opacity-80">
           {loadingTable ? 'Carregando…' : `${byDayRows.length} dia(s) no período`}
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={exportDaily}
-            className="inline-flex items-center gap-2 px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50"
-          >
+          <NeuButton onClick={exportDaily} className="inline-flex items-center gap-2">
             <Download size={16} /> Exportar CSV
-          </button>
+          </NeuButton>
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-white overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr className="text-left">
-              <th className="px-3 py-2">Data</th>
-              <th className="px-3 py-2 text-right">Entradas</th>
-              <th className="px-3 py-2 text-right">Saídas</th>
-              <th className="px-3 py-2 text-right">Saldo acumulado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {asArray(byDayRows).map((row, i) => {
-              const dt = row.date;
-              const inc = Number(row.income || 0);
-              const exp = Number(row.expense || 0);
-              const bal = Number(row.balance || 0);
-              return (
-                <tr key={dt || i} className="border-t">
-                  <td className="px-3 py-2">{dt}</td>
-                  <td className="px-3 py-2 text-right text-emerald-700">{toBRL(inc)}</td>
-                  <td className="px-3 py-2 text-right text-red-700">{toBRL(exp)}</td>
-                  <td className="px-3 py-2 text-right font-semibold">{toBRL(bal)}</td>
-                </tr>
-              );
-            })}
-            {!loadingTable && asArray(byDayRows).length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-gray-500">
-                  Nenhum registro encontrado para o dia selecionado.
-                </td>
+      <NeuCard className="p-0 overflow-hidden">
+        <div className="neu-card-inset rounded-2xl overflow-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left">
+                <th className="px-3 py-2">Data</th>
+                <th className="px-3 py-2 text-right">Entradas</th>
+                <th className="px-3 py-2 text-right">Saídas</th>
+                <th className="px-3 py-2 text-right">Saldo acumulado</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {asArray(byDayRows).map((row, i) => {
+                const dt = row.date;
+                const inc = Number(row.income || 0);
+                const exp = Number(row.expense || 0);
+                const bal = Number(row.balance || 0);
+                return (
+                  <tr key={dt || i} className="border-t">
+                    <td className="px-3 py-2">{dt}</td>
+                    <td className="px-3 py-2 text-right text-emerald-700">{toBRL(inc)}</td>
+                    <td className="px-3 py-2 text-right text-red-700">{toBRL(exp)}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{toBRL(bal)}</td>
+                  </tr>
+                );
+              })}
+              {!loadingTable && asArray(byDayRows).length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-[var(--text-color)] opacity-80">
+                    Nenhum registro encontrado para o dia selecionado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </NeuCard>
 
       {/* Modal Fechamento com contagem */}
       <Modal open={closeOpenModal} onClose={() => setCloseOpenModal(false)}>
         <div className="p-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold">Fechar Caixa — Contagem de Dinheiro</h3>
-            <button
+            <h3 className="text-lg font-semibold text-[var(--text-color)]">
+              Fechar Caixa — Contagem de Dinheiro
+            </h3>
+            <NeuButton
               onClick={() => setCloseOpenModal(false)}
-              className="p-2 rounded hover:bg-gray-100"
+              className="!px-2 !py-2"
               aria-label="Fechar"
             >
               <X size={18} />
-            </button>
+            </NeuButton>
           </div>
-          <p className="text-sm text-gray-600 mb-3">
+          <p className="text-sm text-[var(--text-color)] opacity-80 mb-3">
             Informe a quantidade de cada cédula/moeda. Calculamos o total e a diferença esperada.
           </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {asArray(DENOMS).map((v) => (
-              <div key={v} className="rounded-lg border p-3 flex flex-col gap-1">
-                <span className="text-xs text-gray-500">R$ {v.toFixed(2)}</span>
+              <div key={v} className="neu-card p-3 rounded-xl flex flex-col gap-1">
+                <span className="text-xs text-[var(--text-color)] opacity-80">R$ {v.toFixed(2)}</span>
                 <input
                   type="number"
                   min="0"
@@ -749,16 +740,16 @@ const Cashier = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-            <div className="rounded-lg border p-3">
-              <div className="text-sm text-gray-600">Total contado</div>
-              <div className="text-xl font-semibold">{toBRL(countedTotal)}</div>
-            </div>
-            <div className="rounded-lg border p-3">
-              <div className="text-sm text-gray-600">Total esperado</div>
-              <div className="text-xl font-semibold">{toBRL(expectedTotal)}</div>
-            </div>
-            <div className="rounded-lg border p-3">
-              <div className="text-sm text-gray-600">Diferença</div>
+            <NeuCard className="p-3">
+              <div className="text-sm text-[var(--text-color)] opacity-80">Total contado</div>
+              <div className="text-xl font-semibold text-[var(--text-color)]">{toBRL(countedTotal)}</div>
+            </NeuCard>
+            <NeuCard className="p-3">
+              <div className="text-sm text-[var(--text-color)] opacity-80">Total esperado</div>
+              <div className="text-xl font-semibold text-[var(--text-color)]">{toBRL(expectedTotal)}</div>
+            </NeuCard>
+            <NeuCard className="p-3">
+              <div className="text-sm text-[var(--text-color)] opacity-80">Diferença</div>
               <div
                 className={`text-xl font-semibold ${
                   Number(diffTotal) < 0 ? 'text-red-700' : 'text-emerald-700'
@@ -766,11 +757,11 @@ const Cashier = () => {
               >
                 {toBRL(diffTotal)}
               </div>
-            </div>
+            </NeuCard>
           </div>
 
           <div className="mt-4">
-            <label className="text-sm font-medium">Observação</label>
+            <label className="text-sm font-medium text-[var(--text-color)]">Observação</label>
             <textarea
               value={closeNote}
               onChange={(e) => setCloseNote(e.target.value)}
@@ -781,15 +772,14 @@ const Cashier = () => {
           </div>
 
           <div className="flex items-center justify-end gap-2 mt-4">
-            <button onClick={() => setCloseOpenModal(false)} className="px-3 py-2 rounded-md border hover:bg-gray-50">
-              Cancelar
-            </button>
-            <button
+            <NeuButton onClick={() => setCloseOpenModal(false)}>Cancelar</NeuButton>
+            <NeuButton
+              variant="danger"
               onClick={confirmClose}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700"
+              className="inline-flex items-center gap-2"
             >
               <Check size={16} /> Confirmar Fechamento
-            </button>
+            </NeuButton>
           </div>
         </div>
       </Modal>

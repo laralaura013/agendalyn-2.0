@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, LogOut } from 'lucide-react';
 import Sidebar from '../dashboard/Sidebar';
+import "../../styles/neumorphism.css"; // garante variáveis/cores no layout também
 
 /** Título dinâmico por rota */
 function usePageTitle() {
@@ -57,42 +58,47 @@ export default function AdminLayout() {
   }, [navigate]);
 
   return (
-    <div className="relative min-h-screen flex bg-gray-50">
+    // aplica o fundo cinza claro do tema neumórfico
+    <div className="relative min-h-screen flex" style={{ background: "var(--bg-color)" }}>
       <Sidebar
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
-      
-      {/* Conteúdo principal que ocupa o espaço restante */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        
-        {/* Header */}
-        <header className="flex-shrink-0 flex h-16 items-center justify-between border-b bg-white px-4 sm:px-6">
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="text-gray-500 md:hidden"
-            aria-label="Abrir menu"
-          >
-            <Menu size={24} />
-          </button>
-          
-          {/* Título da página (visível apenas em telas maiores) */}
-          <div className="hidden md:block">
-            <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
-          </div>
 
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
-          >
-            <LogOut size={16} />
-            <span>Sair</span>
-          </button>
+      {/* Conteúdo */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header com leve cartão */}
+        <header className="flex-shrink-0 flex h-16 items-center justify-between px-4 sm:px-6">
+          <div className="neumorphic w-full h-12 flex items-center justify-between px-3 rounded-2xl">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden"
+              aria-label="Abrir menu"
+            >
+              <Menu size={22} />
+            </button>
+
+            <div className="hidden md:block">
+              <h1 className="text-[var(--text-color)] text-[17px] font-semibold">{title}</h1>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="neumorphic-interactive px-3 py-2 rounded-xl text-[var(--text-color)]"
+            >
+              <span className="inline-flex items-center gap-2">
+                <LogOut size={16} />
+                <span>Sair</span>
+              </span>
+            </button>
+          </div>
         </header>
 
-        {/* Conteúdo da Página com scroll próprio */}
+        {/* Corpo com espaçamento e fundo neutro */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-           <Outlet />
+          <div className="neumorphic rounded-3xl p-4 sm:p-6">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

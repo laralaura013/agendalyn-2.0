@@ -19,6 +19,9 @@ import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
 import { asArray } from "../utils/asArray";
+import NeuCard from "../components/ui/NeuCard";
+import NeuButton from "../components/ui/NeuButton";
+import "../styles/neumorphism.css";
 
 const DEFAULT_SLOT_MINUTES = 30;
 
@@ -448,27 +451,28 @@ export default function Schedule() {
 
   /* ====================== UI ====================== */
   return (
-    <>
-      <div className="relative w-full">
-        {/* ====== TOPO MOBILE ====== */}
-        <div className="md:hidden bg-white border-b">
-          <div className="flex items-center justify-between px-4 py-3">
-            <button onClick={goPrev} className="p-2 rounded hover:bg-gray-50" aria-label="Anterior">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div className="text-base font-semibold capitalize">
-              {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date)}
-            </div>
-            <button onClick={goNext} className="p-2 rounded hover:bg-gray-50" aria-label="Próximo">
-              <ChevronRight className="w-5 h-5" />
-            </button>
+    <div className="space-y-4 neu-surface">
+      {/* ====== TOPO MOBILE ====== */}
+      <NeuCard className="p-0 md:hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <NeuButton onClick={goPrev} className="!px-2 !py-2" aria-label="Anterior">
+            <ChevronLeft className="w-5 h-5" />
+          </NeuButton>
+          <div className="text-base font-semibold capitalize text-[var(--text-color)]">
+            {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date)}
           </div>
-
+          <NeuButton onClick={goNext} className="!px-2 !py-2" aria-label="Próximo">
+            <ChevronRight className="w-5 h-5" />
+          </NeuButton>
+        </div>
+        <div className="p-2 pt-0">
           <MobileDaysStrip date={date} onChangeDate={(d) => { setDate(d); setView("day"); }} />
         </div>
+      </NeuCard>
 
-        {/* ====== TOOLBAR DESKTOP ====== */}
-        <div className="hidden md:flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+      {/* ====== TOOLBAR DESKTOP ====== */}
+      <NeuCard className="hidden md:block p-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
             <ProfessionalsSelect
               value={selectedPro || ""}
@@ -476,72 +480,77 @@ export default function Schedule() {
               options={asArray(staff).map((s) => ({ id: s.id, name: s.name }))}
             />
             <div className="flex items-center gap-1">
-              <button onClick={goPrev} className="px-2 py-1.5 border rounded hover:bg-gray-50" title="Anterior">
+              <NeuButton onClick={goPrev} className="!px-2 !py-1.5" title="Anterior">
                 <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button onClick={goToday} className="px-3 py-1.5 border rounded hover:bg-gray-50">
+              </NeuButton>
+              <NeuButton onClick={goToday} className="!px-3 !py-1.5">
                 Hoje
-              </button>
-              <button onClick={goNext} className="px-2 py-1.5 border rounded hover:bg-gray-50" title="Próximo">
+              </NeuButton>
+              <NeuButton onClick={goNext} className="!px-2 !py-1.5" title="Próximo">
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </NeuButton>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <ViewToggle value={view} onChange={setView} />
-            <button
+            <NeuButton
               onClick={() => {
                 setOpenSlots(true);
                 const ac = new AbortController();
                 fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
               }}
-              className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center gap-2"
+              className="flex items-center gap-2"
               title="Horários disponíveis"
             >
               <CalendarIcon className="w-4 h-4" />
               Horários
-            </button>
-            <button
-              onClick={openEmptyModal}
-              className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
-            >
+            </NeuButton>
+            <NeuButton variant="primary" onClick={openEmptyModal} className="flex items-center gap-2">
               <PlusCircle className="w-4 h-4" />
               Encaixe
-            </button>
+            </NeuButton>
           </div>
         </div>
+      </NeuCard>
 
-        {/* ====== Header data (desktop) ====== */}
-        <div className="hidden md:flex w-full bg-white border rounded px-4 py-2 text-sm md:text-base items-center justify-between mb-4">
-          <span className="font-medium capitalize">{pageTitle}</span>
-          <span className="text-gray-500">
-            {asArray(staff).find((p) => p.id === selectedPro)?.name ?? ""}
-          </span>
-        </div>
+      {/* ====== Header data (desktop) ====== */}
+      <NeuCard className="hidden md:flex items-center justify-between px-4 py-2">
+        <span className="font-medium capitalize text-[var(--text-color)]">{pageTitle}</span>
+        <span className="opacity-80 text-[var(--text-color)]">
+          {asArray(staff).find((p) => p.id === selectedPro)?.name ?? ""}
+        </span>
+      </NeuCard>
 
-        {/* ====== grid ====== */}
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 xl:col-span-9 2xl:col-span-10 bg-white border rounded overflow-hidden">
+      {/* ====== grid ====== */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Calendário */}
+        <div className="col-span-12 xl:col-span-9 2xl:col-span-10">
+          <NeuCard className="p-3 md:p-4">
             {loading ? (
-              <p className="text-sm text-gray-500 p-4">Carregando dados da agenda...</p>
+              <p className="text-sm text-[var(--text-color)] opacity-80 p-2">Carregando dados da agenda...</p>
             ) : (
-              <Calendar
-                events={combinedEvents}
-                onSelectSlot={handleSelectSlot}
-                onSelectEvent={handleSelectEvent}
-                view={view}
-                date={date}
-                onView={(v) => setView(v)}
-                onNavigate={(d) => setDate(d)}
-              />
+              <div className="neu-card-inset rounded-2xl p-2 md:p-3">
+                <Calendar
+                  events={combinedEvents}
+                  onSelectSlot={handleSelectSlot}
+                  onSelectEvent={handleSelectEvent}
+                  view={view}
+                  date={date}
+                  onView={(v) => setView(v)}
+                  onNavigate={(d) => setDate(d)}
+                />
+              </div>
             )}
-          </div>
+          </NeuCard>
+        </div>
 
-          {/* Sidebar desktop only */}
-          <aside className="hidden xl:block col-span-12 xl:col-span-3 2xl:col-span-2 bg-white border rounded p-3 md:p-4 space-y-4">
+        {/* Sidebar desktop only */}
+        <aside className="hidden xl:block col-span-12 xl:col-span-3 2xl:col-span-2 space-y-4">
+          {/* Bloqueio */}
+          <NeuCard className="p-4">
             <div className="flex items-start justify-between">
-              <label className="flex items-center gap-2 select-none">
+              <label className="flex items-center gap-2 select-none text-[var(--text-color)]">
                 <input
                   type="checkbox"
                   className="h-4 w-4"
@@ -550,69 +559,77 @@ export default function Schedule() {
                 />
                 <span className="text-sm font-medium">Bloquear horário</span>
               </label>
-              <button
+              <NeuButton
                 onClick={() => setOpenBlockTime(true)}
                 disabled={!blockEnabled}
-                className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black disabled:opacity-40 flex items-center gap-2"
+                className="flex items-center gap-2 disabled:opacity-40"
                 title="Bloquear intervalo"
               >
                 <Lock className="w-4 h-4" /> Bloquear
-              </button>
+              </NeuButton>
+            </div>
+          </NeuCard>
+
+          {/* Data + ações rápidas */}
+          <NeuCard className="p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                className="border rounded px-2 py-1.5 text-sm w-full"
+                value={formatDateInput(date)}
+                onChange={(e) => {
+                  const d = e.target.value ? new Date(e.target.valueAsNumber) : new Date();
+                  setDate(d);
+                }}
+              />
+              <NeuButton className="!px-3 !py-1.5" onClick={goToday} title="Ir para hoje">
+                Hoje
+              </NeuButton>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  className="border rounded px-2 py-1.5 text-sm w-full"
-                  value={formatDateInput(date)}
-                  onChange={(e) => {
-                    const d = e.target.value ? new Date(e.target.valueAsNumber) : new Date();
-                    setDate(d);
-                  }}
-                />
-                <button className="px-3 py-1.5 border rounded hover:bg-gray-50" onClick={goToday} title="Ir para hoje">
-                  Hoje
-                </button>
-              </div>
+            <div className="grid grid-cols-1 gap-2">
+              <NeuButton
+                onClick={() => {
+                  setOpenSlots(true);
+                  const ac = new AbortController();
+                  fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
+                }}
+                className="flex items-center justify-center gap-2"
+              >
+                <CalendarIcon className="w-4 h-4" />
+                Horários disponíveis
+              </NeuButton>
 
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  onClick={() => {
-                    setOpenSlots(true);
-                    const ac = new AbortController();
-                    fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
-                  }}
-                  className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-                >
-                  <CalendarIcon className="w-4 h-4" />
-                  Horários disponíveis
-                </button>
-                <button
-                  onClick={() => setOpenApptList(true)}
-                  className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center justify-center gap-2"
-                >
-                  <ClipboardList className="w-4 h-4" />
-                  Lista de Agendamentos
-                </button>
-                <button
-                  onClick={() => {
-                    setOpenWaitlist(true);
-                    const ac = new AbortController();
-                    fetchWaitlist(ac.signal);
-                  }}
-                  className="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2"
-                >
-                  <List className="w-4 h-4" />
-                  Lista de Espera
-                </button>
-              </div>
+              <NeuButton onClick={() => setOpenApptList(true)} className="flex items-center justify-center gap-2">
+                <ClipboardList className="w-4 h-4" />
+                Lista de Agendamentos
+              </NeuButton>
+
+              <NeuButton
+                variant="primary"
+                onClick={() => {
+                  setOpenWaitlist(true);
+                  const ac = new AbortController();
+                  fetchWaitlist(ac.signal);
+                }}
+                className="flex items-center justify-center gap-2"
+              >
+                <List className="w-4 h-4" />
+                Lista de Espera
+              </NeuButton>
             </div>
+          </NeuCard>
 
+          {/* Produtos/Serviços */}
+          <NeuCard className="p-0">
             <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
-              <div className="space-y-2">
-                <input type="text" placeholder="Buscar produto/serviço" className="border rounded px-2 py-1.5 text-sm w-full" />
-                <div className="max-h-40 overflow-auto border rounded divide-y text-sm">
+              <div className="space-y-2 mt-2">
+                <input
+                  type="text"
+                  placeholder="Buscar produto/serviço"
+                  className="border rounded px-2 py-1.5 text-sm w-full"
+                />
+                <div className="max-h-40 overflow-auto border rounded divide-y text-sm bg-white">
                   {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
                     <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
                       <span>{item}</span>
@@ -622,11 +639,17 @@ export default function Schedule() {
                 </div>
               </div>
             </Accordion>
+          </NeuCard>
+
+          {/* Legenda */}
+          <NeuCard className="p-0">
             <Accordion title="Legenda" open={openLegend} onToggle={() => setOpenLegend((v) => !v)}>
-              <Legend />
+              <div className="mt-2">
+                <Legend />
+              </div>
             </Accordion>
-          </aside>
-        </div>
+          </NeuCard>
+        </aside>
       </div>
 
       {/* ====== MODAIS ====== */}
@@ -714,7 +737,7 @@ export default function Schedule() {
           />
         </BaseModal>
       )}
-    </>
+    </div>
   );
 }
 
@@ -737,12 +760,14 @@ function ViewToggle({ value, onChange }) {
     { id: "month", label: "Mês" },
   ];
   return (
-    <div className="inline-flex items-center rounded overflow-hidden border bg-white">
+    <div className="inline-flex items-center rounded overflow-hidden">
       {asArray(opts).map((opt) => (
         <button
           key={opt.id}
           onClick={() => onChange(opt.id)}
-          className={`px-3 py-1.5 text-sm ${value === opt.id ? "bg-purple-600 text-white" : "hover:bg-gray-50"}`}
+          className={`px-3 py-1.5 text-sm ${
+            value === opt.id ? "neu-btn neu-btn-primary" : "neu-btn"
+          }`}
         >
           {opt.label}
         </button>
@@ -752,12 +777,12 @@ function ViewToggle({ value, onChange }) {
 }
 function Accordion({ title, open, onToggle, children }) {
   return (
-    <div className="border rounded">
-      <button onClick={onToggle} className="w-full flex items-center justify-between px-3 py-2">
+    <div className="rounded-2xl">
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-3 py-2 neu-btn rounded-2xl">
         <span className="text-sm font-medium">{title}</span>
         <ChevronRightIcon open={open} />
       </button>
-      {open && <div className="px-3 pb-3">{children}</div>}
+      {open && <div className="px-3 pb-3 pt-1">{children}</div>}
     </div>
   );
 }
@@ -794,10 +819,10 @@ function BaseModal({ title, children, onClose }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-lg border w-full max-w-lg">
+      <div className="relative neu-card rounded-2xl w-full max-w-lg">
         <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-semibold">{title}</h3>
-          <button className="p-1 rounded-full hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
+          <h3 className="font-semibold text-[var(--text-color)]">{title}</h3>
+          <button className="p-1 rounded-full hover:opacity-80" onClick={onClose} aria-label="Fechar">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -810,10 +835,10 @@ function SideDrawer({ title, children, onClose }) {
   return (
     <div className="fixed inset-0 z-[100]">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-white shadow-xl border-l flex flex-col">
+      <div className="absolute right-0 top-0 h-full w-full max-w-sm neu-card flex flex-col rounded-l-2xl">
         <div className="px-4 py-3 border-b flex items-center justify-between">
-          <h3 className="font-semibold">{title}</h3>
-          <button className="p-1 rounded-full hover:bg-gray-100" onClick={onClose} aria-label="Fechar">
+          <h3 className="font-semibold text-[var(--text-color)]">{title}</h3>
+          <button className="p-1 rounded-full hover:opacity-80" onClick={onClose} aria-label="Fechar">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -826,23 +851,23 @@ function SlotsModalContent({ date, loading, slots = [], onReload, onPick }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-[var(--text-color)] opacity-80">
           {new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(date)}
         </div>
-        <button onClick={onReload} className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50" title="Recarregar">
+        <NeuButton onClick={onReload} className="!px-2 !py-1 text-xs" title="Recarregar">
           Recarregar
-        </button>
+        </NeuButton>
       </div>
       {loading ? (
-        <div className="text-sm text-gray-500">Carregando horários...</div>
+        <div className="text-sm text-[var(--text-color)] opacity-80">Carregando horários...</div>
       ) : slots.length === 0 ? (
-        <div className="text-sm text-gray-500">Sem horários disponíveis para este dia.</div>
+        <div className="text-sm text-[var(--text-color)] opacity-80">Sem horários disponíveis para este dia.</div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {asArray(slots).map((s) => (
-            <button key={s} onClick={() => onPick(s)} className="px-3 py-2 rounded border bg-white hover:bg-gray-50">
+            <NeuButton key={s} onClick={() => onPick(s)} className="!px-3 !py-2">
               {s}
-            </button>
+            </NeuButton>
           ))}
         </div>
       )}
@@ -865,22 +890,28 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <button className="p-2 border rounded hover:bg-gray-50" onClick={onRefresh} title="Recarregar">
+        <NeuButton className="!px-2 !py-2" onClick={onRefresh} title="Recarregar">
           <Filter className="w-4 h-4" />
-        </button>
+        </NeuButton>
       </div>
-      <div className="divide-y border rounded max-h-[60vh] overflow-y-auto">
-        {filtered.length === 0 && <div className="p-3 text-sm text-gray-500">Nenhum agendamento.</div>}
+      <div className="divide-y rounded neu-card">
+        {filtered.length === 0 && (
+          <div className="p-3 text-sm text-[var(--text-color)] opacity-80">Nenhum agendamento.</div>
+        )}
         {asArray(filtered).map((ev) => (
-          <button key={ev.id} onClick={() => onOpen?.(ev.id)} className="p-3 w-full text-left flex items-center justify-between hover:bg-gray-50">
+          <button
+            key={ev.id}
+            onClick={() => onOpen?.(ev.id)}
+            className="p-3 w-full text-left flex items-center justify-between hover:opacity-90"
+          >
             <div className="text-sm">
-              <div className="font-medium">{ev.title}</div>
-              <div className="text-gray-500">
+              <div className="font-medium text-[var(--text-color)]">{ev.title}</div>
+              <div className="opacity-80 text-[var(--text-color)]">
                 {ev.start?.toLocaleTimeString?.([], { hour: "2-digit", minute: "2-digit" })} —{" "}
                 {ev.end?.toLocaleTimeString?.([], { hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
-            <span className="text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700">Abrir</span>
+            <span className="text-xs px-2 py-1 rounded neu-btn">Abrir</span>
           </button>
         ))}
       </div>
@@ -891,27 +922,29 @@ function WaitlistContent({ items = [], loading, onRefresh, onAgendar }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="font-medium">Pessoas na espera</div>
-        <button className="px-2 py-1.5 border rounded hover:bg-gray-50" onClick={onRefresh} title="Recarregar">
+        <div className="font-medium text-[var(--text-color)]">Pessoas na espera</div>
+        <NeuButton className="!px-3 !py-1.5" onClick={onRefresh} title="Recarregar">
           Recarregar
-        </button>
+        </NeuButton>
       </div>
       {loading ? (
-        <div className="text-sm text-gray-500">Carregando...</div>
+        <div className="text-sm text-[var(--text-color)] opacity-80">Carregando...</div>
       ) : items.length === 0 ? (
-        <div className="text-sm text-gray-500">Ninguém na lista de espera.</div>
+        <div className="text-sm text-[var(--text-color)] opacity-80">Ninguém na lista de espera.</div>
       ) : (
-        <div className="divide-y border rounded">
+        <div className="divide-y neu-card rounded">
           {asArray(items).map((it) => (
             <div key={it.id} className="p-3">
-              <div className="text-sm font-medium">{it.client?.name ?? it.clientName ?? "Cliente"}</div>
-              <div className="text-xs text-gray-500">
+              <div className="text-sm font-medium text-[var(--text-color)]">
+                {it.client?.name ?? it.clientName ?? "Cliente"}
+              </div>
+              <div className="text-xs opacity-80 text-[var(--text-color)]">
                 {(it.client?.phone ?? it.phone) || ""} {it.pref ? `• Preferência: ${it.pref}` : ""}
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <button className="px-2 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700" onClick={onAgendar}>
+                <NeuButton variant="primary" className="!px-2 !py-1 text-xs" onClick={onAgendar}>
                   Agendar
-                </button>
+                </NeuButton>
               </div>
             </div>
           ))}
@@ -940,22 +973,22 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
     >
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs text-gray-600">Data</label>
+          <label className="text-xs text-[var(--text-color)] opacity-80">Data</label>
           <input type="date" className="border rounded px-2 py-1.5 text-sm w-full" value={formatDateInput(date)} readOnly />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-xs text-gray-600">Início</label>
+            <label className="text-xs text-[var(--text-color)] opacity-80">Início</label>
             <input type="time" className="border rounded px-2 py-1.5 text-sm w-full" value={start} onChange={(e) => setStart(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-gray-600">Término</label>
+            <label className="text-xs text-[var(--text-color)] opacity-80">Término</label>
             <input type="time" className="border rounded px-2 py-1.5 text-sm w-full" value={end} onChange={(e) => setEnd(e.target.value)} />
           </div>
         </div>
       </div>
       <div>
-        <label className="text-xs text-gray-600">Motivo (opcional)</label>
+        <label className="text-xs text-[var(--text-color)] opacity-80">Motivo (opcional)</label>
         <input
           type="text"
           className="border rounded px-2 py-1.5 text-sm w-full"
@@ -965,13 +998,11 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
         />
       </div>
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50">
-          Cancelar
-        </button>
-        <button type="submit" className="px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-black flex items-center gap-2">
+        <NeuButton onClick={onCancel}>Cancelar</NeuButton>
+        <NeuButton variant="primary" type="submit" className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           Confirmar bloqueio
-        </button>
+        </NeuButton>
       </div>
     </form>
   );
@@ -990,16 +1021,18 @@ function MobileDaysStrip({ date, onChangeDate }) {
     a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
 
   return (
-    <div className="border-t">
-      <div className="flex gap-2 px-3 py-2 overflow-x-auto no-scrollbar">
+    <div className="pt-2">
+      <div className="flex gap-2 px-1 pb-2 overflow-x-auto no-scrollbar">
         {asArray(days).map((d) => {
           const active = isSameDay(d, date);
           return (
             <button
               key={d.toISOString()}
               onClick={() => onChangeDate?.(d)}
-              className={`flex flex-col items-center justify-center min-w-[44px] px-2 py-1 rounded-2xl border ${
-                active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-800 hover:bg-gray-50"
+              className={`flex flex-col items-center justify-center min-w-[44px] px-2 py-1 rounded-2xl ${
+                active
+                  ? "neu-btn neu-btn-primary"
+                  : "neu-btn"
               }`}
             >
               <span className="text-[11px] uppercase">
