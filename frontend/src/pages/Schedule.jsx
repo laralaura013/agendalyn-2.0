@@ -43,6 +43,7 @@ const formatDateInput = (d) =>
     "0"
   )}`;
 
+/** início/fim de períodos (para as visões) */
 const startOfWeek = (d) => {
   const copy = new Date(d);
   const day = copy.getDay();
@@ -60,6 +61,29 @@ const endOfWeek = (d) => {
 };
 const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
 const endOfMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+/** Normaliza respostas que podem vir como array direto ou {items|results: []} */
+function firstArray(res) {
+  const d = res?.data ?? res;
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.items)) return d.items;
+  if (Array.isArray(d?.results)) return d.results;
+  return [];
+}
+
+/** Tenta múltiplos caminhos, útil quando há variações (/api/...) */
+async function tryGet(paths = [], config) {
+  let lastErr;
+  for (const p of paths) {
+    try {
+      return await api.get(p, config);
+    } catch (e) {
+      lastErr = e;
+      if (e?.response?.status === 404) continue;
+    }
+  }
+  throw lastErr;
+}
 
 /* ====================== Componente ====================== */
 export default function Schedule() {
@@ -116,14 +140,24 @@ export default function Schedule() {
 
   /* --------- Loads --------- */
   const loadShared = useCallback(async (signal) => {
-    const [c, s, st] = await Promise.all([
-      api.get("/clients/min", { params: { take: 50 }, signal }),
-      api.get("/services", { signal }),
-      api.get("/staff", { signal }),
+    // tenta múltiplas rotas e normaliza o shape
+    const [cRes, sRes, stRes] = await Promise.all([
+      tryGet(["/clients/min", "/clients"], { params: { take: 100 }, signal }),
+      tryGet(["/services", "/api/services", "/dashboard/services"], { params: { take: 200 }, signal }),
+      tryGet(["/staff", "/api/staff"], { params: { take: 200 }, signal }),
     ]);
-    setClients(c.data?.items || c.data || []);
-    setServices(s.data || []);
-    setStaff(st.data || []);
+
+    setClients(firstArray(cRes));
+    setServices(
+      firstArray(sRes).map((s) => ({
+        id: s.id,
+        name: s.name,
+        price: Number(s.price ?? 0),
+        duration: s.duration ?? s.durationMinutes ?? null,
+        active: s.active ?? true,
+      }))
+    );
+    setStaff(firstArray(stRes));
   }, []);
 
   const fetchAppointments = useCallback(
@@ -183,6 +217,7 @@ export default function Schedule() {
           .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time))
           .filter(Boolean);
 
+        // fallback: algumas APIs só retornam slot com serviceId
         if (items.length === 0 && services?.[0]?.id) {
           res = await api.get("/public/available-slots", {
             params: { ...baseParams, serviceId: services[0].id },
@@ -620,7 +655,7 @@ export default function Schedule() {
             </div>
           </NeuCard>
 
-          {/* Produtos/Serviços */}
+          {/* Produtos/Serviços (dummy visual) */}
           <NeuCard className="p-0">
             <Accordion title="Produtos / Serviços" open={openProducts} onToggle={() => setOpenProducts((v) => !v)}>
               <div className="space-y-2 mt-2">
@@ -664,7 +699,7 @@ export default function Schedule() {
           event={selectedEvent}
           slot={selectedSlot}
           clients={clients}
-          services={services}
+          services={services}  {/* <— agora vem normalizado como array sempre */}
           staff={staff}
           onSave={handleSave}
           onDelete={handleDelete}
