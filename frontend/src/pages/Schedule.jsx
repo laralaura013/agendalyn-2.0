@@ -116,7 +116,6 @@ export default function Schedule() {
 
   /* --------- Loads --------- */
   const loadShared = useCallback(async (signal) => {
-    // ⚠️ usa a lista leve de clientes para o select (id/name/phone/email)
     const [c, s, st] = await Promise.all([
       api.get("/clients/min", { params: { take: 50 }, signal }),
       api.get("/services", { signal }),
@@ -581,6 +580,7 @@ export default function Schedule() {
                   const d = e.target.value ? new Date(e.target.valueAsNumber) : new Date();
                   setDate(d);
                 }}
+                style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
               />
               <NeuButton className="!px-3 !py-1.5" onClick={goToday} title="Ir para hoje">
                 Hoje
@@ -628,12 +628,16 @@ export default function Schedule() {
                   type="text"
                   placeholder="Buscar produto/serviço"
                   className="border rounded px-2 py-1.5 text-sm w-full"
+                  style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
                 />
-                <div className="max-h-40 overflow-auto border rounded divide-y text-sm bg-white">
+                <div className="max-h-40 overflow-auto rounded text-sm neu-card-inset divide-y">
                   {["Corte Masculino", "Barba", "Sobrancelha", "Hidratação"].map((item) => (
-                    <div key={item} className="px-3 py-2 flex items-center justify-between hover:bg-gray-50">
-                      <span>{item}</span>
-                      <button className="px-2 py-1 text-xs rounded border bg-white hover:bg-gray-50">Adicionar</button>
+                    <div
+                      key={item}
+                      className="px-3 py-2 flex items-center justify-between neumorphic-interactive rounded"
+                    >
+                      <span className="text-[var(--text-color)]">{item}</span>
+                      <button className="neu-btn !px-2 !py-1 text-xs">Adicionar</button>
                     </div>
                   ))}
                 </div>
@@ -744,7 +748,12 @@ export default function Schedule() {
 /* =============== Sub-componentes UI =============== */
 function ProfessionalsSelect({ value, onChange, options }) {
   return (
-    <select className="border rounded px-2 py-1.5 text-sm" value={value} onChange={(e) => onChange(e.target.value)}>
+    <select
+      className="border rounded px-2 py-1.5 text-sm"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
+    >
       {asArray(options).map((p) => (
         <option key={p.id} value={p.id}>
           {p.name}
@@ -765,9 +774,7 @@ function ViewToggle({ value, onChange }) {
         <button
           key={opt.id}
           onClick={() => onChange(opt.id)}
-          className={`px-3 py-1.5 text-sm ${
-            value === opt.id ? "neu-btn neu-btn-primary" : "neu-btn"
-          }`}
+          className={`px-3 py-1.5 text-sm ${value === opt.id ? "neu-btn neu-btn-primary" : "neu-btn"}`}
         >
           {opt.label}
         </button>
@@ -779,7 +786,7 @@ function Accordion({ title, open, onToggle, children }) {
   return (
     <div className="rounded-2xl">
       <button onClick={onToggle} className="w-full flex items-center justify-between px-3 py-2 neu-btn rounded-2xl">
-        <span className="text-sm font-medium">{title}</span>
+        <span className="text-sm font-medium text-[var(--text-color)]">{title}</span>
         <ChevronRightIcon open={open} />
       </button>
       {open && <div className="px-3 pb-3 pt-1">{children}</div>}
@@ -809,7 +816,7 @@ function Legend() {
       {asArray(items).map((it) => (
         <div key={it.label} className="flex items-center gap-2">
           <span className={`w-3 h-3 rounded-sm ${it.color}`} />
-          <span>{it.label}</span>
+          <span className="text-[var(--text-color)]">{it.label}</span>
         </div>
       ))}
     </div>
@@ -889,6 +896,7 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
           placeholder="Buscar cliente/serviço"
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
         />
         <NeuButton className="!px-2 !py-2" onClick={onRefresh} title="Recarregar">
           <Filter className="w-4 h-4" />
@@ -902,7 +910,7 @@ function AppointmentsListContent({ events = [], onOpen, onRefresh }) {
           <button
             key={ev.id}
             onClick={() => onOpen?.(ev.id)}
-            className="p-3 w-full text-left flex items-center justify-between hover:opacity-90"
+            className="p-3 w-full text-left flex items-center justify-between neumorphic-interactive rounded"
           >
             <div className="text-sm">
               <div className="font-medium text-[var(--text-color)]">{ev.title}</div>
@@ -974,16 +982,34 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-[var(--text-color)] opacity-80">Data</label>
-          <input type="date" className="border rounded px-2 py-1.5 text-sm w-full" value={formatDateInput(date)} readOnly />
+          <input
+            type="date"
+            className="border rounded px-2 py-1.5 text-sm w-full"
+            value={formatDateInput(date)}
+            readOnly
+            style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
+          />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-xs text-[var(--text-color)] opacity-80">Início</label>
-            <input type="time" className="border rounded px-2 py-1.5 text-sm w-full" value={start} onChange={(e) => setStart(e.target.value)} />
+            <input
+              type="time"
+              className="border rounded px-2 py-1.5 text-sm w-full"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
+            />
           </div>
           <div>
             <label className="text-xs text-[var(--text-color)] opacity-80">Término</label>
-            <input type="time" className="border rounded px-2 py-1.5 text-sm w-full" value={end} onChange={(e) => setEnd(e.target.value)} />
+            <input
+              type="time"
+              className="border rounded px-2 py-1.5 text-sm w-full"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
+            />
           </div>
         </div>
       </div>
@@ -995,6 +1021,7 @@ function BlockTimeForm({ date, proId, onSubmit, onCancel }) {
           placeholder="Ex.: Reunião, almoço..."
           value={reason}
           onChange={(e) => setReason(e.target.value)}
+          style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
         />
       </div>
       <div className="flex items-center justify-end gap-2 pt-2">
@@ -1030,9 +1057,7 @@ function MobileDaysStrip({ date, onChangeDate }) {
               key={d.toISOString()}
               onClick={() => onChangeDate?.(d)}
               className={`flex flex-col items-center justify-center min-w-[44px] px-2 py-1 rounded-2xl ${
-                active
-                  ? "neu-btn neu-btn-primary"
-                  : "neu-btn"
+                active ? "neu-btn neu-btn-primary" : "neu-btn"
               }`}
             >
               <span className="text-[11px] uppercase">
