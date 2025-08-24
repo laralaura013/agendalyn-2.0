@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   PlusCircle, Filter, X, Bell, Pencil, Trash2, CheckCircle2, Users, UserPlus,
-  Calendar as CalendarIcon, AlertTriangle, RefreshCw
+  Calendar as CalendarIcon
 } from "lucide-react";
 import api from "../services/api";
 import toast from "react-hot-toast";
@@ -77,32 +77,15 @@ function formatDateInput(d) {
   }
 }
 
-/* ========================== Fetch Inteligente ========================== */
-async function smartFetchList(kind, setDiag) {
-  const attempts = [];
-  const pushAttempt = (a) => {
-    attempts.push(a);
-    setDiag((prev) => ({
-      ...prev,
-      [kind]: { ...(prev?.[kind] || {}), attempts: [...attempts] },
-    }));
-  };
-
+/* ========================== Fetch silencioso com fallbacks ========================== */
+async function smartFetchList(kind) {
   const tryGet = async (url, params) => {
     try {
       const res = await api.get(url, { params });
       const rows = toSimpleList(res.data);
-      pushAttempt({ url, params, ok: true, status: res.status, count: rows.length });
       if (rows.length > 0) return rows;
       return null;
-    } catch (e) {
-      pushAttempt({
-        url,
-        params,
-        ok: false,
-        status: e?.response?.status,
-        error: e?.response?.data?.message || e?.message,
-      });
+    } catch {
       return null;
     }
   };
@@ -142,19 +125,8 @@ async function smartFetchList(kind, setDiag) {
 
   for (const [url, params] of candidates) {
     const rows = await tryGet(url, params);
-    if (rows && rows.length) {
-      setDiag((prev) => ({
-        ...prev,
-        [kind]: { ...(prev?.[kind] || {}), ok: true, used: { url, params }, count: rows.length },
-      }));
-      return rows;
-    }
+    if (rows && rows.length) return rows;
   }
-
-  setDiag((prev) => ({
-    ...prev,
-    [kind]: { ...(prev?.[kind] || {}), ok: false, used: null, count: 0 },
-  }));
   return [];
 }
 
@@ -190,14 +162,7 @@ function WaitlistPage() {
   const [selectedSlot, setSelectedSlot] = useState(null); // {start, end}
   const [selectedEvent, setSelectedEvent] = useState(null); // para edição (não usamos aqui)
 
-  // Diagnóstico de endpoints testados
-  const [diag, setDiag] = useState({
-    clients: { attempts: [] },
-    services: { attempts: [] },
-    staff: { attempts: [] },
-  });
-
-  /* ----------- Carregamento com fetch inteligente ----------- */
+  /* ----------- Carregamento ----------- */
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -207,9 +172,9 @@ function WaitlistPage() {
       });
 
       const [c, s, st] = await Promise.all([
-        smartFetchList("clients", setDiag),
-        smartFetchList("services", setDiag),
-        smartFetchList("staff", setDiag),
+        smartFetchList("clients"),
+        smartFetchList("services"),
+        smartFetchList("staff"),
       ]);
 
       setItems(pickItems(w.data));
@@ -394,11 +359,6 @@ function WaitlistPage() {
   };
 
   /* ========================== Render ========================== */
-  const showDiag =
-    (clients.length === 0 && (diag.clients?.attempts?.length || 0) > 0) ||
-    (services.length === 0 && (diag.services?.attempts?.length || 0) > 0) ||
-    (staff.length === 0 && (diag.staff?.attempts?.length || 0) > 0);
-
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -419,52 +379,6 @@ function WaitlistPage() {
             <UserPlus className="w-5 h-5" /> Novo
           </button>
         </header>
-
-        {/* Painel de diagnóstico */}
-        {showDiag && (
-          <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
-            <div className="flex items-center gap-2 font-semibold mb-2">
-              <AlertTriangle className="w-5 h-5" />
-              Diagnóstico: não encontrei dados para {clients.length === 0 ? "clientes" : ""} {services.length === 0 ? "serviços" : ""} {staff.length === 0 ? "profissionais" : ""}.
-            </div>
-            <p className="text-sm mb-3">
-              Garanta que há um <b>token no localStorage</b> e um <b>companyId</b> (ex.: <code>localStorage.companyId = "SEU_ID"</code>).
-              Abaixo estão as tentativas e respostas:
-            </p>
-            <div className="grid md:grid-cols-3 gap-3 text-xs">
-              {["clients", "services", "staff"].map((k) => (
-                <div key={k} className="rounded-lg border bg-white p-2">
-                  <div className="font-semibold mb-1 uppercase">{k}</div>
-                  {(diag[k]?.attempts || []).map((a, i) => (
-                    <div key={i} className="mb-1">
-                      <div className="font-mono break-all">
-                        {a.url}
-                        {a.params && Object.keys(a.params).length ? ` ${JSON.stringify(a.params)}` : ""}
-                      </div>
-                      <div>
-                        {a.ok ? (
-                          <span className="text-emerald-700">OK</span>
-                        ) : (
-                          <span className="text-rose-700">ERRO</span>
-                        )}
-                        {" • "}
-                        status: <b>{a.status || "—"}</b>
-                        {typeof a.count === "number" ? <> • itens: <b>{a.count}</b></> : null}
-                        {a.error ? <> • msg: <span className="italic">{a.error}</span></> : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={fetchAll}
-              className="mt-3 inline-flex items-center gap-2 rounded-lg border px-3 py-2 bg-white hover:bg-gray-50"
-            >
-              <RefreshCw className="w-4 h-4" /> Tentar novamente
-            </button>
-          </div>
-        )}
 
         {/* Filtros */}
         <div className="bg-white rounded-xl shadow p-4 mb-6 border border-gray-200">
@@ -772,7 +686,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                 </select>
                 {clients.length === 0 && (
                   <div className="text-[11px] text-amber-700 mt-1">
-                    Nenhum cliente listado. Verifique o painel de diagnóstico acima.
+                    Nenhum cliente listado. Verifique seu login/empresa ou cadastre clientes.
                   </div>
                 )}
               </div>
@@ -819,7 +733,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                 </select>
                 {services.length === 0 && (
                   <div className="text-[11px] text-amber-700 mt-1">
-                    Nenhum serviço listado. Verifique o painel de diagnóstico acima.
+                    Nenhum serviço listado. Verifique seu login/empresa ou cadastre serviços.
                   </div>
                 )}
               </div>
@@ -839,7 +753,7 @@ function FormModal({ onClose, onSaved, editing, clients, services, staff }) {
                 </select>
                 {staff.length === 0 && (
                   <div className="text-[11px] text-amber-700 mt-1">
-                    Nenhum profissional listado. Verifique o painel de diagnóstico acima.
+                    Nenhum profissional listado. Verifique seu login/empresa ou cadastre profissionais.
                   </div>
                 )}
               </div>
