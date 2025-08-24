@@ -23,7 +23,7 @@ import {
   Send,
 } from "lucide-react";
 
-/* ========================== Tema (Verde/Preto) ========================== */
+/* ========================== Tema ========================== */
 const theme = {
   colors: {
     primary: "#4a544a",
@@ -39,7 +39,7 @@ const theme = {
   },
 };
 
-/* ========================== UI Base ========================== */
+/* ========================== UI ========================== */
 const Section = ({ title, icon: Icon, desc, right, children }) => (
   <div className="bg-white border rounded-xl shadow-sm" style={{ borderColor: theme.colors.border }}>
     <div className="p-6 border-b" style={{ borderColor: theme.colors.border }}>
@@ -162,7 +162,7 @@ const Button = ({ children, onClick, variant = "primary", loading = false, icon:
   );
 };
 
-/* ========================== Helpers / Estado ========================== */
+/* ========================== Helpers ========================== */
 const getSafeUser = () => {
   try {
     const raw = localStorage.getItem("user");
@@ -225,7 +225,6 @@ const WhatsappSettingsTab = ({
   handleDisconnectMeta,
   metaLoading,
   disconnecting,
-  // bloco de teste rápido
   testTo,
   setTestTo,
   testText,
@@ -317,7 +316,6 @@ const WhatsappSettingsTab = ({
             </div>
           )}
 
-          {/* Textos do bot */}
           <div className="space-y-4">
             <div>
               <Label>Mensagem de Saudação</Label>
@@ -336,10 +334,7 @@ const WhatsappSettingsTab = ({
             </div>
           </div>
 
-          <div
-            className="flex justify-between items-center pt-4 border-t"
-            style={{ borderColor: theme.colors.border }}
-          >
+          <div className="flex justify-between items-center pt-4 border-t" style={{ borderColor: theme.colors.border }}>
             <div className="flex items-center gap-2">
               <StatusBadge status={wa.whatsappStatus} />
             </div>
@@ -350,7 +345,6 @@ const WhatsappSettingsTab = ({
         </div>
       </Section>
 
-      {/* Teste rápido */}
       <Section title="Teste rápido" icon={Send} desc="Envie uma mensagem de teste para validar a integração.">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
@@ -395,64 +389,55 @@ const WhatsappSettingsTab = ({
   );
 };
 
-const IntegrationsTab = ({ staffId, googleConnected, setGoogleConnected, googleEmail, setGoogleEmail, wa }) => {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Section title="Google Calendar" icon={Globe} desc="Sincronize agendamentos com sua agenda pessoal.">
-        {staffId ? (
-          <>
-            <GoogleConnectButton
-              staffId={staffId}
-              isConnected={googleConnected}
-              onStatusChange={(connected, email) => {
-                setGoogleConnected(connected);
-                setGoogleEmail(email || "");
-              }}
-            />
-            {googleConnected && googleEmail && (
-              <p
-                className="mt-3 text-xs flex items-center gap-1.5"
-                style={{ color: theme.colors.success }}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Conectado como <strong>{googleEmail}</strong>
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-red-600">Erro: ID do usuário não encontrado.</p>
-        )}
-      </Section>
+const IntegrationsTab = ({ staffId, googleConnected, setGoogleConnected, googleEmail, setGoogleEmail, wa }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <Section title="Google Calendar" icon={Globe} desc="Sincronize agendamentos com sua agenda pessoal.">
+      {staffId ? (
+        <>
+          <GoogleConnectButton
+            staffId={staffId}
+            isConnected={googleConnected}
+            onStatusChange={(connected, email) => {
+              setGoogleConnected(connected);
+              setGoogleEmail(email || "");
+            }}
+          />
+          {googleConnected && googleEmail && (
+            <p className="mt-3 text-xs flex items-center gap-1.5" style={{ color: theme.colors.success }}>
+              <CheckCircle2 className="h-4 w-4" />
+              Conectado como <strong>{googleEmail}</strong>
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-red-600">Erro: ID do usuário não encontrado.</p>
+      )}
+    </Section>
 
+    <Section title="Link de Agendamento" icon={QrCode} desc="Compartilhe para que seus clientes agendem via WhatsApp.">
+      <WhatsAppDeeplinkCard slug={wa.slug} />
+    </Section>
+
+    <div className="md:col-span-2">
       <Section
-        title="Link de Agendamento"
-        icon={QrCode}
-        desc="Compartilhe para que seus clientes agendem via WhatsApp."
+        title="Dados para Webhook (Meta)"
+        icon={PlugZap}
+        desc="Use estas informações para conectar um número próprio na plataforma da Meta."
       >
-        <WhatsAppDeeplinkCard slug={wa.slug} />
+        <WebhookHelp />
       </Section>
-
-      <div className="md:col-span-2">
-        <Section
-          title="Dados para Webhook (Meta)"
-          icon={PlugZap}
-          desc="Use estas informações para conectar um número próprio na plataforma da Meta."
-        >
-          <WebhookHelp />
-        </Section>
-      </div>
     </div>
-  );
-};
+  </div>
+);
 
-/* ========================== ErrorBoundary para evitar tela branca ========================== */
+/* ========================== ErrorBoundary ========================== */
 class SettingsErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+  static getDerivedStateFromError() {
+    return { hasError: true };
   }
   componentDidCatch(error, info) {
     console.error("[Settings] crash:", error, info);
@@ -462,10 +447,10 @@ class SettingsErrorBoundary extends React.Component {
       return (
         <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
           <div className="max-w-3xl mx-auto p-6">
-            <div className="rounded-xl border border-red-2 00 bg-red-50 p-4">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
               <p className="font-semibold text-red-700">Ops! Algo quebrou ao renderizar as Configurações.</p>
               <p className="text-sm text-red-700/80 mt-1">
-                Clique em <b>Limpar URL</b> para remover parâmetros de retorno do Google, ou recarregue.
+                Clique em <b>Limpar URL</b> para remover parâmetros do OAuth, ou recarregue.
               </p>
               <div className="mt-3 flex gap-2">
                 <button
@@ -474,10 +459,7 @@ class SettingsErrorBoundary extends React.Component {
                 >
                   Limpar URL
                 </button>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="px-3 py-1.5 rounded-lg bg-[#4a544a] text-white text-sm"
-                >
+                <button onClick={() => window.location.reload()} className="px-3 py-1.5 rounded-lg bg-[#4a544a] text-white text-sm">
                   Recarregar
                 </button>
               </div>
@@ -495,15 +477,12 @@ const SettingsPageInner = () => {
   const [activeTab, setActiveTab] = useState("general");
   const [loading, setLoading] = useState(true);
 
-  // company
   const [companyId, setCompanyId] = useState("");
   const [companyForm, setCompanyForm] = useState({ name: "", phone: "", address: "" });
 
-  // google
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleEmail, setGoogleEmail] = useState("");
 
-  // whatsapp
   const [wa, setWa] = useState({
     whatsappEnabled: false,
     useSharedWaba: true,
@@ -519,17 +498,16 @@ const SettingsPageInner = () => {
     whatsappStatus: null,
     whatsappLastCheckAt: null,
   });
+
   const [savingWa, setSavingWa] = useState(false);
   const [healthLoading, setHealthLoading] = useState(false);
 
-  // teste rápido
   const [testTo, setTestTo] = useState("");
   const [testText, setTestText] = useState("Teste do bot ✅");
   const [useTemplate, setUseTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("hello_world");
   const [lang, setLang] = useState("pt_BR");
 
-  // meta
   const [metaStatus, setMetaStatus] = useState({ connected: false });
   const [metaLoading, setMetaLoading] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -538,76 +516,34 @@ const SettingsPageInner = () => {
   const staffId = userData?.id || "";
   const bookingUrl = useMemo(() => `${window.location.origin}/agendar/${companyId}`, [companyId]);
 
-  /* -------- helpers: limpar URL preservando rota (hash) -------- */
-  const clearUrlParams = () => {
-    const { pathname, hash } = window.location;
-
-    // Mantém a rota dentro do hash (#/settings), mas remove qualquer query dentro do hash
-    // ex.: #/settings?code=...&state=... -> #/settings
-    const cleanHash = hash ? "#" + hash.replace(/^#/, "").split("?")[0] : "";
-
-    // Remove a query "normal" (?code=...) sem mexer na rota do hash
-    window.history.replaceState({}, "", pathname + cleanHash);
-  };
-
-  /* -------- util: obter params do OAuth de search e do hash -------- */
-  const getOAuthParams = () => {
-    const s = new URLSearchParams(window.location.search || "");
-    const hashStr = (window.location.hash || "").replace(/^#/, "");
-    const hashQuery = hashStr.includes("?") ? hashStr.split("?")[1] : "";
-    const h = new URLSearchParams(hashQuery);
-
-    const code = s.get("code") || h.get("code");
-    const state = s.get("state") || h.get("state");
-    const error = s.get("error") || h.get("error");
-    const googleMarker = s.get("google") || h.get("google"); // ex.: ?google=success
-    return { code, state, error, googleMarker };
-  };
-
-  /* -------- Finaliza OAuth do Google se voltou com ?code/state (search ou hash) -------- */
+  // Fallback leve: se por acaso o usuário caiu aqui por REDIRECT completo (?code na URL da janela principal),
+  // tentamos finalizar e limpar a URL, mas isso não deve ocorrer mais com o POPUP.
   const finalizeGoogleOAuthIfNeeded = useCallback(async () => {
     try {
-      const { code, state, error, googleMarker } = getOAuthParams();
-      if (!code && !googleMarker && !error) return;
+      const s = new URLSearchParams(window.location.search || "");
+      const hasCode = s.get("code");
+      if (!hasCode) return;
 
-      if (error) {
-        toast.error("Conexão com Google cancelada.");
-        return clearUrlParams();
+      try {
+        await api.post("/integrations/google/exchange", {
+          code: s.get("code"),
+          state: s.get("state"),
+        });
+      } catch {
+        // ignora, é só um fallback
       }
 
-      // tenta finalizar no backend (múltiplos endpoints possíveis)
-      if (code) {
-        const tries = [
-          () => api.post("/integrations/google/oauth/callback", { code, state }),
-          () => api.post("/integrations/google/exchange", { code, state }),
-          () =>
-            api.get(
-              `/integrations/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(
-                state || ""
-              )}`
-            ),
-        ];
-        for (const t of tries) {
-          try {
-            await t();
-            break;
-          } catch {
-            // tenta próximo
-          }
-        }
-      }
-
-      await fetchGoogleStatus();
-      toast.success("Google Calendar conectado!");
+      const { data } = await api.get(`/integrations/google/status/${staffId}`);
+      setGoogleConnected(!!data?.connected);
+      setGoogleEmail(data?.email || "");
+      // limpa query string mantendo hash/rota
+      const { pathname, hash } = window.location;
+      window.history.replaceState({}, "", pathname + (hash || ""));
     } catch (e) {
-      console.error("Finalize Google OAuth error:", e);
-      toast.error("Falha ao concluir conexão com Google.");
-    } finally {
-      clearUrlParams();
+      console.warn("OAuth finalize fallback falhou:", e);
     }
-  }, [/* deps vazios de estados, só usamos helpers e fetchGoogleStatus abaixo */]);
+  }, [staffId]);
 
-  /* -------- Fetchers -------- */
   const fetchCompanyProfile = useCallback(async () => {
     const { data } = await api.get("/company/profile");
     setCompanyId(data.id || "");
@@ -647,7 +583,7 @@ const SettingsPageInner = () => {
       setLoading(true);
       try {
         await Promise.all([fetchCompanyProfile(), fetchGoogleStatus(), fetchWhatsSettings(), fetchMetaStatus()]);
-        await finalizeGoogleOAuthIfNeeded(); // trata retorno do Google e limpa URL SEM perder a rota
+        await finalizeGoogleOAuthIfNeeded();
       } catch (e) {
         console.error(e);
         toast.error("Falha ao carregar configurações.");
@@ -660,7 +596,6 @@ const SettingsPageInner = () => {
     };
   }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus, finalizeGoogleOAuthIfNeeded]);
 
-  /* -------- Ações -------- */
   const saveCompany = async (e) => {
     e?.preventDefault?.();
     const p = api.put("/company/profile", companyForm);
@@ -718,9 +653,9 @@ const SettingsPageInner = () => {
       setMetaLoading(true);
       const { data } = await api.post("/integrations/meta/embedded/start");
       const win = window.open(data.url, "metaOnboard", "width=850,height=750");
-      const poll = setInterval(async () => {
+      const timer = setInterval(async () => {
         if (win?.closed) {
-          clearInterval(poll);
+          clearInterval(timer);
           await fetchMetaStatus();
           await fetchWhatsSettings();
         }
@@ -746,7 +681,6 @@ const SettingsPageInner = () => {
     }
   };
 
-  /* -------- Header / Tabs -------- */
   const TabButton = ({ id, label, icon: Icon }) => {
     const isActive = activeTab === id;
     return (
@@ -787,7 +721,7 @@ const SettingsPageInner = () => {
               Ajuste informações da empresa, integrações e o bot do WhatsApp.
             </p>
           </div>
-          <a href={`${window.location.origin}/agendar/${companyId}`} target="_blank" rel="noreferrer">
+          <a href={bookingUrl} target="_blank" rel="noreferrer">
             <Button variant="secondary" icon={LinkIcon}>
               Página de Agendamento
             </Button>
@@ -904,7 +838,7 @@ const WebhookHelp = () => {
   );
 };
 
-/* ===== Export com ErrorBoundary para evitar tela branca ===== */
+/* ===== Export com ErrorBoundary ===== */
 export default function SettingsPage() {
   return (
     <SettingsErrorBoundary>
