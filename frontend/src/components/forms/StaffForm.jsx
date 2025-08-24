@@ -1,27 +1,28 @@
-// src/components/staff/StaffForm.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { asArray } from '../../utils/asArray';
 
 /* ========================= Constantes ========================= */
 const ROLES = [
-  { value: 'STAFF', label: 'Colaborador(a)' },
-  { value: 'MANAGER', label: 'Gestor(a)' },
-  { value: 'ADMIN', label: 'Administrador(a)' },
-  { value: 'OWNER', label: 'Dono(a)' },
+  { value: 'STAFF',        label: 'Colaborador(a)' },
+  { value: 'BARBER',       label: 'Barbeiro(a)' },
+  { value: 'HAIRDRESSER',  label: 'Cabeleireiro(a)' },
+  { value: 'MANAGER',      label: 'Gestor(a)' },
+  { value: 'ADMIN',        label: 'Administrador(a)' },
+  { value: 'OWNER',        label: 'Dono(a)' },
 ];
 
 const weekDays = [
-  { key: 'sunday', label: 'Dom' },
-  { key: 'monday', label: 'Seg' },
-  { key: 'tuesday', label: 'Ter' },
+  { key: 'sunday',    label: 'Dom' },
+  { key: 'monday',    label: 'Seg' },
+  { key: 'tuesday',   label: 'Ter' },
   { key: 'wednesday', label: 'Qua' },
-  { key: 'thursday', label: 'Qui' },
-  { key: 'friday', label: 'Sex' },
-  { key: 'saturday', label: 'Sáb' },
+  { key: 'thursday',  label: 'Qui' },
+  { key: 'friday',    label: 'Sex' },
+  { key: 'saturday',  label: 'Sáb' },
 ];
 
 const DEFAULT_START = '09:00';
-const DEFAULT_END = '18:00';
+const DEFAULT_END   = '18:00';
 
 /* ========================= Helpers ========================= */
 const deepClone = (obj) => JSON.parse(JSON.stringify(obj));

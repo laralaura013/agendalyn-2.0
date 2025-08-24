@@ -1,4 +1,3 @@
-// src/pages/Staff.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import {
@@ -13,7 +12,7 @@ import {
 
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
-import StaffForm from '../components/staff/StaffForm'; // ✅ caminho corrigido
+import StaffForm from '../components/forms/StaffForm'; // ✅ caminho certo
 import api from '../services/api';
 
 import { asArray } from '../utils/asArray';
@@ -89,7 +88,7 @@ const Staff = () => {
     fetchStaff();
   }, [fetchStaff]);
 
-  // Debounce “limpo” da busca
+  // Debounce da busca
   useEffect(() => {
     const id = setTimeout(() => setQ(search), 400);
     return () => clearTimeout(id);
