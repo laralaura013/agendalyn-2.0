@@ -1,11 +1,20 @@
-// src/routes/googleRoutes.js
-import { Router } from 'express';
-
-const router = Router();
+// src/routes/integrations/google.js
+const express = require('express');
+const router = express.Router();
 
 /**
- * (Opcional) Gera a URL de OAuth para o frontend abrir no popup
- * GET /api/integrations/google/auth-url?staffId=...
+ * 👉 Troque por sua lógica real de troca/salva de tokens
+ * (se você já tem um serviço pronto, chame-o aqui)
+ */
+async function exchangeAndSaveTokens(code, state) {
+  // Exemplo:
+  // await googleService.exchangeAndSave({ code, state })
+  return true;
+}
+
+/**
+ * (Opcional) Endpoint para gerar a URL de OAuth
+ * Seu frontend chama GET /api/integrations/google/auth-url
  */
 router.get('/auth-url', async (req, res) => {
   try {
@@ -30,25 +39,24 @@ router.get('/auth-url', async (req, res) => {
 });
 
 /**
- * ✅ Callback chamado pelo Google.
- * Troque o "TODO" pela sua lógica real de exchange/salvar tokens.
- * Independente de sucesso/erro, redireciona pro front para não dar tela branca.
+ * ✅ Callback chamado pelo Google
+ * Salva tokens (se tiver lógica) e SEMPRE redireciona para o front
  */
 router.get('/callback', async (req, res) => {
   const FRONT = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
   try {
     const { code, state } = req.query;
-
-    // TODO: se você já tem um service/controller, chame aqui:
-    // await googleService.exchangeAndSaveTokens({ code, state });
-
-    // sucesso → volta ao app
+    if (code) {
+      // troque chaves por tokens e salve
+      await exchangeAndSaveTokens(code, state);
+    }
+    // sucesso → volta para /settings com marcador
     return res.redirect(`${FRONT}/settings?google=success`);
   } catch (e) {
     console.error('[google] callback error:', e);
-    // erro → mesmo assim volta ao app (sem tela branca)
+    // erro → mesmo assim volta para o front (sem tela branca)
     return res.redirect(`${FRONT}/settings?google=error`);
   }
 });
 
-export default router;
+module.exports = router;

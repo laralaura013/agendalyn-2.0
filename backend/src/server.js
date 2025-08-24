@@ -31,7 +31,7 @@ import publicRoutes from './routes/publicRoutes.js';
 import clientPortalRoutes from './routes/clientPortalRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
 import blockRoutes from './routes/blockRoutes.js';
-import googleRoutes from './routes/googleRoutes.js';
+import googleRoutes from './routes/googleRoutes.js'; // 👈 garante que essa import está aqui
 
 // Extras
 import financeRoutes from './routes/financeRoutes.js';
@@ -116,19 +116,14 @@ app.use(
 );
 
 /**
- * ⚠️ Webhook do WhatsApp precisa do RAW BODY.
- * Monte a rota de WhatsApp ANTES do express.json global.
- * Capturamos o buffer bruto em req.rawBody para validação HMAC.
- *
- * Importante: encadeamos o companyLogger para que
- * as rotas autenticadas (/settings, /health, /test) recebam req.companyId.
+ * ⚠️ WhatsApp precisa do RAW BODY.
  */
 app.use(
   '/api/integrations/whatsapp',
   express.json({
     limit: '2mb',
     verify: (req, _res, buf) => {
-      req.rawBody = buf; // Buffer para HMAC quando necessário
+      req.rawBody = buf;
     },
   }),
   companyLogger,
@@ -136,10 +131,7 @@ app.use(
 );
 
 /**
- * ⚠️ Meta (Embedded Signup) também usa webhook com possível validação HMAC.
- * O router de Meta já aplica express.json({ verify }) internamente,
- * então aqui só encadeamos o companyLogger para rotas autenticadas
- * (status, embedded/start, disconnect, send/template).
+ * ⚠️ Meta (Embedded Signup)
  */
 app.use('/api/integrations/meta', companyLogger, metaRoutes);
 
@@ -147,18 +139,14 @@ app.use('/api/integrations/meta', companyLogger, metaRoutes);
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-// Logger contextual (empresa/usuário) — para as demais rotas
+// Logger contextual
 app.use(companyLogger);
 
 /* ----------------------------- Rotas ------------------------------ */
-// Webhooks gerais primeiro
 app.use('/api/webhooks', webhookRoutes);
-
-// Rotas públicas e gerais
 app.use('/api/portal', clientPortalRoutes);
 app.use('/api/public', publicRoutes);
 
-// Auth e entidades
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/company', companyRoutes);
@@ -179,6 +167,8 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/commissions', commissionRoutes);
 app.use('/api/agenda/blocks', blockRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+
+/** 👇 Google (garante que está montado) */
 app.use('/api/integrations/google', googleRoutes);
 
 // Extras
@@ -186,7 +176,7 @@ app.use('/api/finance', financeRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/exports', exportRoutes);
 
-// Formas de pagamento (OrderDrawer)
+// Pagamentos
 app.use('/api/payment-methods', paymentMethodRoutes);
 
 /* --------------------------- Healthcheck -------------------------- */
@@ -198,8 +188,6 @@ app.get('/', (_req, res) =>
 );
 
 /* ---------------------- Lista de rotas (console) ------------------ */
-// Mostra tabela com as rotas registradas – útil em dev.
-// Desative definindo LIST_ROUTES=false no .env
 if (process.env.LIST_ROUTES !== 'false') {
   const table = listEndpoints(app).map((r) => ({
     methods: r.methods.join(','),

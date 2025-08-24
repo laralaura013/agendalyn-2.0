@@ -516,32 +516,27 @@ const SettingsPageInner = () => {
   const staffId = userData?.id || "";
   const bookingUrl = useMemo(() => `${window.location.origin}/agendar/${companyId}`, [companyId]);
 
-  // Fallback leve: se por acaso o usuário caiu aqui por REDIRECT completo (?code na URL da janela principal),
-  // tentamos finalizar e limpar a URL, mas isso não deve ocorrer mais com o POPUP.
-  const finalizeGoogleOAuthIfNeeded = useCallback(async () => {
-    try {
-      const s = new URLSearchParams(window.location.search || "");
-      const hasCode = s.get("code");
-      if (!hasCode) return;
+  // quando voltar de /settings?google=success|error
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search || "");
+    const googleFlag = s.get("google");
+    if (!googleFlag) return;
 
-      try {
-        await api.post("/integrations/google/exchange", {
-          code: s.get("code"),
-          state: s.get("state"),
-        });
-      } catch {
-        // ignora, é só um fallback
+    if (googleFlag === "success") toast.success("Google Calendar conectado!");
+    if (googleFlag === "error") toast.error("Falha ao conectar Google Calendar.");
+
+    // busca status atualizado e limpa URL
+    (async () => {
+      if (staffId) {
+        try {
+          const { data } = await api.get(`/integrations/google/status/${staffId}`);
+          setGoogleConnected(!!data?.connected);
+          setGoogleEmail(data?.email || "");
+        } catch {}
       }
-
-      const { data } = await api.get(`/integrations/google/status/${staffId}`);
-      setGoogleConnected(!!data?.connected);
-      setGoogleEmail(data?.email || "");
-      // limpa query string mantendo hash/rota
       const { pathname, hash } = window.location;
       window.history.replaceState({}, "", pathname + (hash || ""));
-    } catch (e) {
-      console.warn("OAuth finalize fallback falhou:", e);
-    }
+    })();
   }, [staffId]);
 
   const fetchCompanyProfile = useCallback(async () => {
@@ -583,7 +578,6 @@ const SettingsPageInner = () => {
       setLoading(true);
       try {
         await Promise.all([fetchCompanyProfile(), fetchGoogleStatus(), fetchWhatsSettings(), fetchMetaStatus()]);
-        await finalizeGoogleOAuthIfNeeded();
       } catch (e) {
         console.error(e);
         toast.error("Falha ao carregar configurações.");
@@ -591,10 +585,8 @@ const SettingsPageInner = () => {
         if (mounted) setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
-  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus, finalizeGoogleOAuthIfNeeded]);
+    return () => { mounted = false; };
+  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus]);
 
   const saveCompany = async (e) => {
     e?.preventDefault?.();
