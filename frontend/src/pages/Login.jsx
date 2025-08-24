@@ -1,24 +1,32 @@
 // src/pages/Login.jsx
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
-const Login = () => {
-  // login
+export default function Login() {
+  // ----- login -----
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // register
+  // ----- register -----
   const [rName, setRName] = useState('');
   const [rEmail, setREmail] = useState('');
   const [rPassword, setRPassword] = useState('');
-  const [rPhone, setRPhone] = useState(''); // opcional — remova se não usar
+  const [rPhone, setRPhone] = useState(''); // remova se não usar no backend
+  // ui
   const [loading, setLoading] = useState(false);
-
   const [isFlipped, setIsFlipped] = useState(false);
+
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { search } = useLocation();
+
+  // Se vier de /login?mode=register abre o verso já no cadastro
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get('mode') === 'register') setIsFlipped(true);
+  }, [search]);
 
   // ====== LOGIN ======
   const handleSubmit = async (e) => {
@@ -38,15 +46,21 @@ const Login = () => {
     }
   };
 
-  // ====== REGISTER (flip) ======
+  // ====== REGISTER ======
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = { name: rName, email: rEmail, password: rPassword, phone: rPhone || undefined };
+      const payload = {
+        name: rName,
+        email: rEmail,
+        password: rPassword,
+        ...(rPhone ? { phone: rPhone } : {}),
+      };
+
       const { data } = await api.post('/auth/register', payload);
 
-      // se API já retornar token/user, loga direto
+      // Se a API já devolver token/user, fazemos o login automático
       if (data?.token && data?.user) {
         login(data.token, data.user);
         localStorage.setItem('userData', JSON.stringify(data.user));
@@ -305,6 +319,4 @@ const Login = () => {
       </div>
     </>
   );
-};
-
-export default Login;
+}
