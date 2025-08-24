@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import toast from 'react-hot-toast';
 import { PlusCircle, X } from 'lucide-react';
 
-
+import NeuButton from '../../components/ui/NeuButton';
 import { asArray } from '../../utils/asArray';
+
 const normalizeList = (data) => {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.items)) return data.items;
@@ -22,7 +24,7 @@ const OrderForm = ({ onSave, onCancel }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    (async () => {
       try {
         setLoading(true);
         const [clientsRes, staffRes, servicesRes, productsRes] = await Promise.all([
@@ -37,9 +39,8 @@ const OrderForm = ({ onSave, onCancel }) => {
         setAvailableServices(normalizeList(servicesRes.data));
         setAvailableProducts(normalizeList(productsRes.data));
       } catch (error) {
-         
         console.error('Erro ao carregar dados:', error);
-        alert('Não foi possível carregar os dados necessários.');
+        toast.error('Não foi possível carregar os dados necessários.');
         setAvailableClients([]);
         setAvailableStaff([]);
         setAvailableServices([]);
@@ -47,8 +48,7 @@ const OrderForm = ({ onSave, onCancel }) => {
       } finally {
         setLoading(false);
       }
-    };
-    fetchData();
+    })();
   }, []);
 
   const handleItemChange = (index, field, value) => {
@@ -69,18 +69,17 @@ const OrderForm = ({ onSave, onCancel }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // validações simples
     if (!clientId) {
-      alert('Selecione um cliente.');
+      toast.error('Selecione um cliente.');
       return;
     }
     if (!userId) {
-      alert('Selecione um colaborador.');
+      toast.error('Selecione um colaborador.');
       return;
     }
     const hasInvalid = items.some((it) => !it.id || !it.type || Number(it.quantity) < 1);
     if (hasInvalid) {
-      alert('Preencha todos os itens corretamente.');
+      toast.error('Preencha todos os itens corretamente.');
       return;
     }
 
@@ -93,20 +92,32 @@ const OrderForm = ({ onSave, onCancel }) => {
     onSave({ clientId, userId, items: formattedItems });
   };
 
-  if (loading) return <p>Carregando dados...</p>;
+  if (loading) return <p className="text-[var(--text-color)]">Carregando dados...</p>;
+
+  const inputBase =
+    'w-full px-3 py-2 text-sm rounded-md outline-none border';
+  const inputStyle = { background: 'var(--bg-color)', color: 'var(--text-color)', borderColor: 'var(--dark-shadow)' };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <h2 className="text-2xl font-bold text-purple-700">Nova Comanda</h2>
+      <h2
+        className="text-2xl font-bold"
+        style={{ color: 'var(--accent-color)' }}
+      >
+        Nova Comanda
+      </h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium mb-1">Cliente</label>
+          <label className="block text-sm font-medium mb-1 text-[var(--text-color)]">
+            Cliente
+          </label>
           <select
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
             required
-            className="w-full px-4 py-3 text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className={inputBase}
+            style={inputStyle}
           >
             <option value="">Selecione um cliente</option>
             {asArray(availableClients).map((c) => (
@@ -118,12 +129,15 @@ const OrderForm = ({ onSave, onCancel }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Colaborador</label>
+          <label className="block text-sm font-medium mb-1 text-[var(--text-color)]">
+            Colaborador
+          </label>
           <select
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
             required
-            className="w-full px-4 py-3 text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className={inputBase}
+            style={inputStyle}
           >
             <option value="">Selecione um colaborador</option>
             {asArray(availableStaff).map((u) => (
@@ -135,18 +149,21 @@ const OrderForm = ({ onSave, onCancel }) => {
         </div>
       </div>
 
-      <hr className="my-4" />
-      <h3 className="text-lg font-semibold text-gray-700">Itens</h3>
+      <hr className="my-2 border-[var(--dark-shadow)]/40" />
+      <h3 className="text-lg font-semibold text-[var(--text-color)]">
+        Itens
+      </h3>
 
       <div className="space-y-4">
         {asArray(items).map((item, index) => (
           <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
             <div className="sm:col-span-3">
-              <label className="text-xs font-medium">Tipo</label>
+              <label className="text-xs font-medium text-[var(--text-color)]">Tipo</label>
               <select
                 value={item.type}
                 onChange={(e) => handleItemChange(index, 'type', e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded"
+                className={inputBase}
+                style={inputStyle}
               >
                 <option value="service">Serviço</option>
                 <option value="product">Produto</option>
@@ -154,12 +171,13 @@ const OrderForm = ({ onSave, onCancel }) => {
             </div>
 
             <div className="sm:col-span-6">
-              <label className="text-xs font-medium">Item</label>
+              <label className="text-xs font-medium text-[var(--text-color)]">Item</label>
               <select
                 value={item.id}
                 onChange={(e) => handleItemChange(index, 'id', e.target.value)}
                 required
-                className="w-full px-3 py-2 text-sm border rounded"
+                className={inputBase}
+                style={inputStyle}
               >
                 <option value="">Selecione</option>
                 {item.type === 'service'
@@ -177,7 +195,7 @@ const OrderForm = ({ onSave, onCancel }) => {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="text-xs font-medium">Qtd.</label>
+              <label className="text-xs font-medium text-[var(--text-color)]">Qtd.</label>
               <input
                 type="number"
                 value={item.quantity}
@@ -186,7 +204,8 @@ const OrderForm = ({ onSave, onCancel }) => {
                 }
                 min="1"
                 required
-                className="w-full px-3 py-2 text-sm border rounded"
+                className={inputBase}
+                style={inputStyle}
               />
             </div>
 
@@ -194,7 +213,7 @@ const OrderForm = ({ onSave, onCancel }) => {
               <button
                 type="button"
                 onClick={() => removeItem(index)}
-                className="p-2 text-red-600 hover:text-red-800"
+                className="p-2 text-red-600 hover:text-red-700"
                 title="Remover item"
               >
                 <X size={18} />
@@ -206,26 +225,18 @@ const OrderForm = ({ onSave, onCancel }) => {
         <button
           type="button"
           onClick={addItem}
-          className="flex items-center gap-2 w-full justify-center py-2 border-2 border-dashed border-purple-500 text-purple-600 rounded hover:bg-purple-50"
+          className="flex items-center gap-2 w-full justify-center py-2 border-2 border-dashed rounded"
+          style={{ borderColor: 'var(--accent-color)', color: 'var(--accent-color)', background: 'var(--bg-color)' }}
         >
           <PlusCircle size={18} /> Adicionar Item
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-5 py-3 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          className="px-6 py-3 bg-purple-700 text-white font-medium rounded-md hover:bg-purple-800 transition"
-        >
+      <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+        <NeuButton onClick={onCancel}>Cancelar</NeuButton>
+        <NeuButton variant="primary" type="submit">
           Salvar Comanda
-        </button>
+        </NeuButton>
       </div>
     </form>
   );

@@ -1,105 +1,224 @@
-import React, { useState, useEffect } from 'react';
-import api from '../../services/api';
+// src/components/forms/ProductForm.jsx
+import React, { useEffect, useState } from "react";
+import api from "../../services/api";
+import { asArray } from "../../utils/asArray";
 
-
-import { asArray } from '../../utils/asArray';
+/**
+ * Formulário de Produto “inteligente”:
+ * - Busca categorias e marcas para select
+ * - Validação simples
+ * - Retorna os dados normalizados via onSave(payload)
+ *
+ * Props:
+ * - initialData (obj opcional)
+ * - onSave(payload) (obrigatório)
+ * - onCancel() (opcional)
+ */
 const ProductForm = ({ initialData, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({
-    name: initialData?.name || '',
-    description: initialData?.description || '',
-    price: initialData?.price || '',
-    cost: initialData?.cost || '',
-    stock: initialData?.stock || 0,
-    categoryId: initialData?.categoryId || '',
-    brandId: initialData?.brandId || '',
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    price: "",
+    cost: "",
+    stock: "0",
+    categoryId: "",
+    brandId: "",
+    isActive: true,
   });
 
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingOpts, setLoadingOpts] = useState(false);
 
   useEffect(() => {
-    const fetchDropdownData = async () => {
+    // preencher com initialData
+    if (initialData) {
+      setForm({
+        name: initialData.name ?? "",
+        description: initialData.description ?? "",
+        price: initialData.price ?? "",
+        cost: initialData.cost ?? "",
+        stock: String(initialData.stock ?? "0"),
+        categoryId: initialData.categoryId ?? initialData.category?.id ?? "",
+        brandId: initialData.brandId ?? initialData.brand?.id ?? "",
+        isActive: !(initialData.isActive === false),
+      });
+    } else {
+      setForm({
+        name: "",
+        description: "",
+        price: "",
+        cost: "",
+        stock: "0",
+        categoryId: "",
+        brandId: "",
+        isActive: true,
+      });
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoadingOpts(true);
       try {
-        setLoading(true);
-        const [catRes, brandRes] = await Promise.all([
-          api.get('/categories'),
-          api.get('/brands')
-        ]);
-        setCategories(catRes.data);
-        setBrands(brandRes.data);
-      } catch (error) {
-        console.error("Erro ao carregar categorias e marcas", error);
-        alert("Não foi possível carregar dados de suporte para o formulário.");
+        const [c, b] = await Promise.allSettled([api.get("/categories"), api.get("/brands")]);
+        setCategories(c.status === "fulfilled" ? (Array.isArray(c.value.data) ? c.value.data : c.value.data?.items || []) : []);
+        setBrands(b.status === "fulfilled" ? (Array.isArray(b.value.data) ? b.value.data : b.value.data?.items || []) : []);
+      } catch {
+        setCategories([]);
+        setBrands([]);
       } finally {
-        setLoading(false);
+        setLoadingOpts(false);
       }
     };
-    fetchDropdownData();
+    load();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const change = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
-  const handleSubmit = (e) => {
+  const submit = (e) => {
     e.preventDefault();
-    onSave(formData);
-  };
+    if (!form.name.trim()) return alert("Informe o nome.");
+    const price = form.price === "" ? 0 : Number(form.price);
+    const stock = form.stock === "" ? 0 : Number(form.stock);
+    if (!(price >= 0)) return alert("Preço inválido.");
+    if (!(stock >= 0)) return alert("Estoque inválido.");
 
-  if (loading) return <p>A carregar formulário...</p>;
+    const payload = {
+      name: form.name.trim(),
+      description: form.description || "",
+      price,
+      stock,
+      cost: form.cost === "" ? null : Number(form.cost),
+      categoryId: form.categoryId || null,
+      brandId: form.brandId || null,
+      isActive: !!form.isActive,
+    };
+    onSave?.(payload);
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-2xl font-bold mb-4">{initialData ? 'Editar Produto' : 'Novo Produto'}</h2>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Nome do Produto</label>
-        <input type="text" name="name" value={formData.name} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required />
-      </div>
+    <form onSubmit={submit} className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-gray-700">Nome*</label>
+          <input
+            name="name"
+            value={form.name}
+            onChange={change}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+            required
+            placeholder="Ex.: Pomada Modeladora"
+          />
+        </div>
 
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700">Categoria (Opcional)</label>
-          <select name="categoryId" value={formData.categoryId} onChange={handleChange} className="mt-1 block w-full p-2 border rounded">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Categoria</label>
+          <select
+            name="categoryId"
+            value={form.categoryId}
+            onChange={change}
+            disabled={loadingOpts}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+          >
             <option value="">Nenhuma</option>
-            {asArray(categories).map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+            {asArray(categories).map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
           </select>
         </div>
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700">Marca (Opcional)</label>
-          <select name="brandId" value={formData.brandId} onChange={handleChange} className="mt-1 block w-full p-2 border rounded">
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Marca</label>
+          <select
+            name="brandId"
+            value={form.brandId}
+            onChange={change}
+            disabled={loadingOpts}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+          >
             <option value="">Nenhuma</option>
-            {asArray(brands).map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+            {asArray(brands).map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
           </select>
         </div>
-      </div>
 
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700">Preço de Venda (R$)</label>
-          <input type="number" step="0.01" name="price" value={formData.price} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required />
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Preço de venda (R$)*</label>
+          <input
+            type="number"
+            step="0.01"
+            name="price"
+            value={form.price}
+            onChange={change}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+            placeholder="70.00"
+            required
+          />
         </div>
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700">Quantidade em Stock</label>
-          <input type="number" name="stock" value={formData.stock} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" required />
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Estoque*</label>
+          <input
+            type="number"
+            name="stock"
+            value={form.stock}
+            onChange={change}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+            min="0"
+            required
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-gray-700">Preço de custo (R$) — opcional</label>
+          <input
+            type="number"
+            step="0.01"
+            name="cost"
+            value={form.cost}
+            onChange={change}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+            placeholder="25.00"
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-gray-700">Descrição</label>
+          <textarea
+            name="description"
+            value={form.description}
+            onChange={change}
+            rows={3}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2"
+            placeholder="Detalhes do produto…"
+          />
+        </div>
+
+        <div className="sm:col-span-2 flex items-center gap-2">
+          <input
+            id="isActive"
+            name="isActive"
+            type="checkbox"
+            checked={!!form.isActive}
+            onChange={change}
+            className="h-4 w-4"
+          />
+          <label htmlFor="isActive" className="text-sm text-gray-700">Produto ativo</label>
         </div>
       </div>
 
-      <div>
-          <label className="block text-sm font-medium text-gray-700">Preço de Custo (R$) (Opcional)</label>
-          <input type="number" step="0.01" name="cost" value={formData.cost} onChange={handleChange} className="mt-1 block w-full p-2 border rounded" />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Descrição (Opcional)</label>
-        <textarea name="description" value={formData.description} onChange={handleChange} rows="3" className="mt-1 block w-full p-2 border rounded"></textarea>
-      </div>
-
-      <div className="flex justify-end gap-4 pt-4">
-        <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300">Cancelar</button>
-        <button type="submit" className="px-4 py-2 bg-purple-700 text-white rounded-md hover:bg-purple-800">Salvar Produto</button>
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50">
+          Cancelar
+        </button>
+        <button type="submit" className="px-4 py-2 rounded-lg bg-[#8C7F8A] text-white hover:bg-opacity-90">
+          Salvar Produto
+        </button>
       </div>
     </form>
   );

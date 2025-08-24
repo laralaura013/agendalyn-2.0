@@ -1,9 +1,10 @@
-// src/components/cashier/CashierControll.jsx
 import React, { useState } from 'react';
 import Modal from '../dashboard/Modal';
 import TransactionForm from './TransactionForm';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import NeuButton from '../ui/NeuButton';
+import NeuCard from '../ui/NeuCard';
 
 // util simples p/ moeda -> número
 const toNumber = (v) => {
@@ -22,8 +23,11 @@ const toNumber = (v) => {
  *
  * Props opcionais de legado:
  *   - session, setSession (mantidos para compatibilidade com seu estado local)
+ *
+ * Prop extra:
+ *   - variant: 'compact' | 'full'  (default: 'compact')
  */
-const CashierControll = ({ session, setSession }) => {
+const CashierControll = ({ session, setSession, variant = 'compact' }) => {
   const [isOpeningModalOpen, setIsOpeningModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [openingBalance, setOpeningBalance] = useState('');
@@ -85,7 +89,6 @@ const CashierControll = ({ session, setSession }) => {
 
   // --------- NOVA TRANSAÇÃO (Entrada/Saída) ----------
   const handleSaveTransaction = async (data) => {
-    // data vem do TransactionForm (paymentMethodId, amount, description, etc.)
     const payload = {
       type: txType, // 'INCOME' | 'EXPENSE'
       amount: toNumber(data.amount),
@@ -129,27 +132,49 @@ const CashierControll = ({ session, setSession }) => {
     }
   };
 
-  // ------------- RENDER -------------
-  const closed = session?.status === 'CLOSED';
-
-  if (closed) {
+  // ------------- VARIANT: COMPACT -------------
+  if (variant === 'compact') {
+    const closed = session?.status === 'CLOSED';
     return (
       <>
-        <div className="bg-white p-6 rounded-lg shadow-md text-center">
-          <h2 className="text-xl font-semibold mb-4">O caixa está fechado.</h2>
-          <button
-            disabled={busy}
-            onClick={() => setIsOpeningModalOpen(true)}
-            className="px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-transform transform hover:scale-105 disabled:opacity-60"
-          >
-            Abrir Caixa
-          </button>
-        </div>
+        {closed ? (
+          <div className="flex items-center gap-2">
+            <NeuButton
+              variant="primary"
+              disabled={busy}
+              onClick={() => setIsOpeningModalOpen(true)}
+            >
+              Abrir Caixa
+            </NeuButton>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <NeuButton
+              onClick={() => {
+                setTxType('INCOME');
+                setIsTransactionModalOpen(true);
+              }}
+            >
+              Lançar Entrada
+            </NeuButton>
+            <NeuButton
+              onClick={() => {
+                setTxType('EXPENSE');
+                setIsTransactionModalOpen(true);
+              }}
+            >
+              Lançar Saída
+            </NeuButton>
+          </div>
+        )}
 
+        {/* Modal de abertura */}
         <Modal isOpen={isOpeningModalOpen} onClose={() => setIsOpeningModalOpen(false)}>
           <div className="p-4">
-            <h3 className="text-xl font-bold mb-4">Abrir Caixa</h3>
-            <label className="block text-sm font-medium text-gray-700">Valor de Abertura (Troco)</label>
+            <h3 className="text-lg font-semibold text-[var(--text-color)] mb-3">Abrir Caixa</h3>
+            <label className="block text-sm font-medium text-[var(--text-color)]">
+              Valor de Abertura (Troco)
+            </label>
             <input
               type="number"
               value={openingBalance}
@@ -159,63 +184,125 @@ const CashierControll = ({ session, setSession }) => {
               min="0"
               step="0.01"
             />
-            <button
-              disabled={busy}
-              onClick={handleOpenCashier}
-              className="w-full mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
-            >
-              Confirmar Abertura
-            </button>
+            <div className="flex justify-end gap-2 mt-4">
+              <NeuButton onClick={() => setIsOpeningModalOpen(false)}>Cancelar</NeuButton>
+              <NeuButton
+                variant="primary"
+                disabled={busy}
+                onClick={handleOpenCashier}
+              >
+                Confirmar Abertura
+              </NeuButton>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Modal de transação */}
+        <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)}>
+          <TransactionForm
+            type={txType}
+            onSave={handleSaveTransaction}
+            onCancel={() => setIsTransactionModalOpen(false)}
+          />
+        </Modal>
+      </>
+    );
+  }
+
+  // ------------- VARIANT: FULL (visual clássico) -------------
+  const closed = session?.status === 'CLOSED';
+
+  if (closed) {
+    return (
+      <>
+        <NeuCard className="p-6 text-center">
+          <h2 className="text-xl font-semibold mb-4 text-[var(--text-color)]">O caixa está fechado.</h2>
+          <NeuButton
+            variant="primary"
+            disabled={busy}
+            onClick={() => setIsOpeningModalOpen(true)}
+          >
+            Abrir Caixa
+          </NeuButton>
+        </NeuCard>
+
+        <Modal isOpen={isOpeningModalOpen} onClose={() => setIsOpeningModalOpen(false)}>
+          <div className="p-4">
+            <h3 className="text-lg font-semibold text-[var(--text-color)] mb-3">Abrir Caixa</h3>
+            <label className="block text-sm font-medium text-[var(--text-color)]">
+              Valor de Abertura (Troco)
+            </label>
+            <input
+              type="number"
+              value={openingBalance}
+              onChange={(e) => setOpeningBalance(e.target.value)}
+              className="w-full p-2 border rounded mt-2"
+              placeholder="Ex: 50,00"
+              min="0"
+              step="0.01"
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <NeuButton onClick={() => setIsOpeningModalOpen(false)}>Cancelar</NeuButton>
+              <NeuButton
+                variant="primary"
+                disabled={busy}
+                onClick={handleOpenCashier}
+              >
+                Confirmar Abertura
+              </NeuButton>
+            </div>
           </div>
         </Modal>
       </>
     );
   }
 
-  // Caixa ABERTO
+  // Caixa ABERTO (full)
   return (
     <>
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      <NeuCard className="p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Caixa Aberto</h2>
-          <button
+          <h2 className="text-xl font-semibold text-[var(--text-color)]">Caixa Aberto</h2>
+          <NeuButton
+            variant="danger"
             disabled={busy}
             onClick={handleCloseCashier}
-            className="px-5 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-60"
           >
             Fechar Caixa
-          </button>
+          </NeuButton>
         </div>
 
         {/* KPIs simples de legado (se vier via props) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div className="p-4 bg-gray-100 rounded-lg">
-            <h4 className="text-sm font-semibold text-gray-600">Saldo Inicial</h4>
-            <p className="text-lg font-bold">R$ {(Number(session?.openingBalance || 0)).toFixed(2)}</p>
-          </div>
-          <div className="p-4 bg-green-100 rounded-lg">
-            <h4 className="text-sm font-semibold text-green-800">Entradas</h4>
-            <p className="text-lg font-bold text-green-800">
+          <NeuCard className="p-4">
+            <h4 className="text-sm font-semibold text-[var(--text-color)] opacity-80">Saldo Inicial</h4>
+            <p className="text-lg font-bold text-[var(--text-color)]">
+              R$ {(Number(session?.openingBalance || 0)).toFixed(2)}
+            </p>
+          </NeuCard>
+          <NeuCard className="p-4">
+            <h4 className="text-sm font-semibold text-emerald-700">Entradas</h4>
+            <p className="text-lg font-bold text-emerald-700">
               R$ {Number(
                 (session?.transactions || [])
                   .filter((t) => t.type === 'INCOME')
                   .reduce((s, t) => s + Number(t.amount || 0), 0)
               ).toFixed(2)}
             </p>
-          </div>
-          <div className="p-4 bg-red-100 rounded-lg">
-            <h4 className="text-sm font-semibold text-red-800">Saídas</h4>
-            <p className="text-lg font-bold text-red-800">
+          </NeuCard>
+          <NeuCard className="p-4">
+            <h4 className="text-sm font-semibold text-red-700">Saídas</h4>
+            <p className="text-lg font-bold text-red-700">
               R$ {Number(
                 (session?.transactions || [])
                   .filter((t) => t.type === 'EXPENSE')
                   .reduce((s, t) => s + Number(t.amount || 0), 0)
               ).toFixed(2)}
             </p>
-          </div>
-          <div className="p-4 bg-blue-100 rounded-lg">
-            <h4 className="text-sm font-semibold text-blue-800">Saldo Atual</h4>
-            <p className="text-lg font-bold text-blue-800">
+          </NeuCard>
+          <NeuCard className="p-4">
+            <h4 className="text-sm font-semibold text-[var(--text-color)]">Saldo Atual</h4>
+            <p className="text-lg font-bold text-[var(--text-color)]">
               R$ {Number(
                 Number(session?.openingBalance || 0) +
                 (session?.transactions || []).reduce(
@@ -224,26 +311,25 @@ const CashierControll = ({ session, setSession }) => {
                 )
               ).toFixed(2)}
             </p>
-          </div>
+          </NeuCard>
         </div>
 
         <div className="mt-6 flex flex-wrap gap-2 justify-center sm:justify-start">
-          <button
+          <NeuButton
+            variant="primary"
             disabled={busy}
             onClick={() => { setTxType('INCOME'); setIsTransactionModalOpen(true); }}
-            className="px-5 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-60"
           >
             Lançar Entrada
-          </button>
-          <button
+          </NeuButton>
+          <NeuButton
             disabled={busy}
             onClick={() => { setTxType('EXPENSE'); setIsTransactionModalOpen(true); }}
-            className="px-5 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 disabled:opacity-60"
           >
             Lançar Saída
-          </button>
+          </NeuButton>
         </div>
-      </div>
+      </NeuCard>
 
       <Modal isOpen={isTransactionModalOpen} onClose={() => setIsTransactionModalOpen(false)}>
         <TransactionForm

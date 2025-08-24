@@ -1,3 +1,4 @@
+// src/pages/Staff.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import {
@@ -12,13 +13,13 @@ import {
 
 import ResourceTable from '../components/dashboard/ResourceTable';
 import Modal from '../components/dashboard/Modal';
-import StaffForm from '../components/forms/StaffForm';
+import StaffForm from '../components/staff/StaffForm'; // ✅ caminho corrigido
 import api from '../services/api';
 
-
 import { asArray } from '../utils/asArray';
+
 /**
- * Página de Colaboradores — versão “parruda”
+ * Página de Colaboradores
  * - Busca com debounce (nome/email)
  * - Filtros por função e visibilidade
  * - Toggle de visibilidade inline (PATCH dedicado)
@@ -27,6 +28,12 @@ import { asArray } from '../utils/asArray';
  */
 
 const ROLES = ['OWNER', 'ADMIN', 'MANAGER', 'STAFF', 'BARBER', 'HAIRDRESSER'];
+
+const normalizeList = (data) => {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.items)) return data.items;
+  return [];
+};
 
 const toCSV = (rows) => {
   const cols = [
@@ -52,14 +59,6 @@ const toCSV = (rows) => {
   return [header, ...lines].join('\n');
 };
 
-const debounce = (fn, ms = 400) => {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
-  };
-};
-
 const Staff = () => {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,10 +75,11 @@ const Staff = () => {
     setLoading(true);
     try {
       const response = await api.get('/staff');
-      setStaff(Array.isArray(response.data) ? response.data : []);
+      setStaff(normalizeList(response.data));
     } catch (error) {
       console.error(error);
       toast.error('Não foi possível carregar os colaboradores.');
+      setStaff([]);
     } finally {
       setLoading(false);
     }
@@ -89,10 +89,10 @@ const Staff = () => {
     fetchStaff();
   }, [fetchStaff]);
 
+  // Debounce “limpo” da busca
   useEffect(() => {
-    const apply = debounce((v) => setQ(v), 400);
-    apply(search);
-    return () => apply('');
+    const id = setTimeout(() => setQ(search), 400);
+    return () => clearTimeout(id);
   }, [search]);
 
   const filtered = useMemo(() => {
@@ -136,9 +136,8 @@ const Staff = () => {
         setSelectedStaff(null);
         return `Colaborador ${isEditing ? 'atualizado' : 'criado'} com sucesso!`;
       },
-      error:
-        (err) =>
-          err?.response?.data?.message || 'Não foi possível salvar o colaborador.',
+      error: (err) =>
+        err?.response?.data?.message || 'Não foi possível salvar o colaborador.',
     });
   };
 
@@ -155,7 +154,7 @@ const Staff = () => {
     });
   };
 
-  // === Toggle usando endpoint dedicado (resolve seu erro) ===
+  // Toggle usando endpoint dedicado
   const handleToggleVisible = async (row) => {
     const next = !row.showInBooking;
     const id = row.id;

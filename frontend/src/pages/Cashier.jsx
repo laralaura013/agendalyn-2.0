@@ -1,4 +1,3 @@
-// src/pages/Cashier.jsx
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   RefreshCcw,
@@ -513,6 +512,7 @@ const Cashier = () => {
           </div>
           {isOpen && (
             <div className="flex gap-2">
+              {/* Compacto: apenas botões de lançamento */}
               <CashierControll session={legacySession} setSession={setLegacySession} />
             </div>
           )}

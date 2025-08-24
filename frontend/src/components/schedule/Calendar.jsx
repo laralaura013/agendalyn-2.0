@@ -1,4 +1,4 @@
-// ✅ ARQUIVO: src/components/schedule/Calendar.jsx
+// src/components/schedule/Calendar.jsx
 import React, { useMemo } from "react";
 import { Calendar as BigCalendar, dateFnsLocalizer } from "react-big-calendar";
 import format from "date-fns/format";
@@ -8,31 +8,31 @@ import getDay from "date-fns/getDay";
 import ptBR from "date-fns/locale/pt-BR";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
+/** Localização (pt-BR) */
 const locales = { "pt-BR": ptBR };
-
 const localizer = dateFnsLocalizer({
   format,
   parse,
-  startOfWeek,
+  startOfWeek: (d) => startOfWeek(d, { locale: ptBR }),
   getDay,
   locales,
 });
 
-// Paleta base para colorir por profissional
+/** Paleta base para colorir por profissional */
 const COLORS = [
-  "#9333ea",
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#6366f1",
-  "#ec4899",
-  "#14b8a6",
-  "#8b5cf6",
-  "#f43f5e",
+  "#9333ea", // purple
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#6366f1", // indigo
+  "#ec4899", // pink
+  "#14b8a6", // teal
+  "#8b5cf6", // violet
+  "#f43f5e", // rose
 ];
 
-// hash simples determinístico pra escolher a cor
+/** Hash simples determinístico pra escolher a cor a partir do professionalId */
 function colorFromStaffId(staffId) {
   if (!staffId) return COLORS[0];
   const key = String(staffId);
@@ -44,13 +44,13 @@ export default function Calendar({
   events = [],
   onSelectSlot,
   onSelectEvent,
-  // sincronização com Schedule.jsx (controlado)
+  // controlado pelo container (Schedule.jsx)
   view,          // "day" | "week" | "month"
   date,          // Date
   onView,        // (v) => void
   onNavigate,    // (d) => void
 }) {
-  // Mensagens e formatos 24h memorizados
+  /** Mensagens em PT-BR */
   const messages = useMemo(
     () => ({
       next: "Próximo",
@@ -69,16 +69,14 @@ export default function Calendar({
     []
   );
 
+  /** Formatos 24h */
   const formats = useMemo(
     () => ({
-      // Cabeçalhos
       dayHeaderFormat: (d, culture, lz) => lz.format(d, "EEEE, dd 'de' MMMM", culture),
       dayRangeHeaderFormat: ({ start, end }, culture, lz) =>
         `${lz.format(start, "dd/MM", culture)} — ${lz.format(end, "dd/MM", culture)}`,
       agendaHeaderFormat: ({ start, end }, culture, lz) =>
         `${lz.format(start, "dd/MM", culture)} — ${lz.format(end, "dd/MM", culture)}`,
-
-      // 24h
       timeGutterFormat: (d, culture, lz) => lz.format(d, "HH:mm", culture),
       eventTimeRangeFormat: ({ start, end }, culture, lz) =>
         `${lz.format(start, "HH:mm", culture)} — ${lz.format(end, "HH:mm", culture)}`,
@@ -89,8 +87,46 @@ export default function Calendar({
     []
   );
 
+  /** Estilo dos eventos (bloqueio x agendamento por profissional) */
+  const eventPropGetter = (event) => {
+    if (event?.resource?.type === "BLOCK") {
+      return {
+        style: {
+          backgroundColor: "#60a5fa", // sky-400
+          borderColor: "#60a5fa",
+          color: "#0b1324",
+          borderRadius: "10px",
+          border: 0,
+          padding: "2px 6px",
+          fontWeight: 600,
+          boxShadow:
+            "inset 6px 6px 12px var(--dark-shadow), inset -6px -6px 12px var(--light-shadow)",
+        },
+      };
+    }
+    const staffId = event?.resource?.user?.id ?? event?.resource?.userId ?? null;
+    const color = colorFromStaffId(staffId);
+    return {
+      style: {
+        backgroundColor: color,
+        color: "#fff",
+        borderRadius: "10px",
+        border: 0,
+        padding: "2px 6px",
+        fontWeight: 500,
+        boxShadow: "4px 4px 10px rgba(0,0,0,0.08)",
+      },
+    };
+  };
+
+  /** Leve feedback sobre slots/células */
+  const slotPropGetter = () => ({
+    className: "rbc-slot-neu",
+    style: { transition: "background 0.12s ease" },
+  });
+
   return (
-    <div className="bg-white p-4 rounded-lg shadow-lg" style={{ height: "75vh" }}>
+    <div className="rbc-neu-wrapper" style={{ minHeight: 520 }}>
       <BigCalendar
         localizer={localizer}
         culture="pt-BR"
@@ -98,6 +134,7 @@ export default function Calendar({
         startAccessor="start"
         endAccessor="end"
         selectable
+        popup
         onSelectSlot={onSelectSlot}
         onSelectEvent={onSelectEvent}
         // controlado pelo contêiner
@@ -106,7 +143,6 @@ export default function Calendar({
         onView={onView}
         onNavigate={onNavigate}
         // UX
-        popup
         views={["day", "week", "month"]}
         step={30}
         timeslots={2}
@@ -116,7 +152,6 @@ export default function Calendar({
         messages={messages}
         formats={formats}
         dayLayoutAlgorithm="no-overlap"
-        // Tooltip PT-BR: cliente/serviço ou motivo do bloqueio
         tooltipAccessor={(event) => {
           const r = event?.resource || {};
           if (r?.type === "BLOCK") {
@@ -126,38 +161,77 @@ export default function Calendar({
           const service = r?.service?.name ?? "";
           return [client, service].filter(Boolean).join(" - ") || event?.title || "";
         }}
-        // Estilização por evento
-        eventPropGetter={(event) => {
-          // bloqueios em azul
-          if (event?.resource?.type === "BLOCK") {
-            return {
-              style: {
-                backgroundColor: "#60a5fa",
-                borderColor: "#60a5fa",
-                color: "#0b1324",
-                borderRadius: "6px",
-                opacity: 0.95,
-                fontWeight: 600,
-              },
-            };
-          }
-
-          // demais eventos: cor por profissional
-          const staffId = event?.resource?.user?.id ?? event?.resource?.userId ?? null;
-          const color = colorFromStaffId(staffId);
-
-          return {
-            style: {
-              backgroundColor: color,
-              borderRadius: "6px",
-              opacity: 0.95,
-              color: "white",
-              border: 0,
-              fontWeight: 500,
-            },
-          };
-        }}
+        eventPropGetter={eventPropGetter}
+        slotPropGetter={slotPropGetter}
       />
+
+      {/* Ajustes visuais p/ tema neumórfico + dark (usa variáveis do seu neumorphism.css) */}
+      <style>{`
+        .rbc-neu-wrapper .rbc-calendar {
+          background: transparent;
+          color: var(--text-color);
+        }
+        /* toolbar do react-big-calendar não é usada (você tem toolbar própria) */
+        .rbc-neu-wrapper .rbc-toolbar { display: none; }
+
+        /* Cabeçalhos, grades e bordas suaves */
+        .rbc-neu-wrapper .rbc-time-view,
+        .rbc-neu-wrapper .rbc-month-view,
+        .rbc-neu-wrapper .rbc-agenda-view {
+          background: var(--bg-color);
+          border-radius: 16px;
+        }
+        .rbc-neu-wrapper .rbc-header {
+          color: var(--text-color);
+          background: transparent;
+          border-bottom: none;
+          font-weight: 600;
+        }
+        .rbc-neu-wrapper .rbc-time-header,
+        .rbc-neu-wrapper .rbc-time-content,
+        .rbc-neu-wrapper .rbc-month-row,
+        .rbc-neu-wrapper .rbc-agenda-table {
+          background: var(--bg-color);
+        }
+        .rbc-neu-wrapper .rbc-time-content > * + *,
+        .rbc-neu-wrapper .rbc-day-slot .rbc-time-slot,
+        .rbc-neu-wrapper .rbc-month-row + .rbc-month-row,
+        .rbc-neu-wrapper .rbc-day-bg + .rbc-day-bg,
+        .rbc-neu-wrapper .rbc-agenda-table tr + tr {
+          border-color: rgba(163, 177, 198, 0.35); /* var(--dark-shadow) translúcida */
+        }
+
+        /* Gutter (coluna de horas) */
+        .rbc-neu-wrapper .rbc-time-gutter .rbc-timeslot-group {
+          color: var(--text-color);
+        }
+
+        /* Hoje destacado sutilmente */
+        .rbc-neu-wrapper .rbc-today {
+          background: radial-gradient(120% 120% at 10% 10%, rgba(255,255,255,0.7), transparent 70%);
+        }
+
+        /* Hover nas células (efeito 'levemente pressionado') */
+        .rbc-neu-wrapper .rbc-day-slot .rbc-time-slot:hover,
+        .rbc-neu-wrapper .rbc-month-row .rbc-date-cell:hover {
+          background: linear-gradient(145deg, var(--light-shadow), var(--bg-color));
+          opacity: .85;
+        }
+
+        /* Seleção */
+        .rbc-neu-wrapper .rbc-slot-selection {
+          background-color: rgba(124, 58, 237, 0.15);
+          border: 1px dashed rgba(124,58,237,.6);
+        }
+
+        /* Agenda view */
+        .rbc-neu-wrapper .rbc-agenda-view table.rbc-agenda-table {
+          box-shadow:
+            inset 8px 8px 16px var(--dark-shadow),
+            inset -8px -8px 16px var(--light-shadow);
+          border-radius: 16px;
+        }
+      `}</style>
     </div>
   );
 }

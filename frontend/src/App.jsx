@@ -14,11 +14,13 @@ import ClientLayout from "./components/layouts/ClientLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import ClientProtectedRoute from "./components/auth/ClientProtectedRoute";
 
+/* Público */
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import BookingPage from "./pages/BookingPage";
 
+/* Portal do Cliente */
 import ClientLoginPage from "./pages/ClientLoginPage";
 import ClientRegisterPage from "./pages/ClientRegisterPage";
 import ClientDashboardPage from "./pages/ClientDashboardPage";
@@ -27,6 +29,7 @@ import ClientPackagesPage from "./pages/ClientPackagesPage";
 import ClientHistoryPage from "./pages/ClientHistoryPage";
 import ClientNoticesPage from "./pages/ClientNoticesPage";
 
+/* Admin */
 import Dashboard from "./pages/Dashboard";
 import Schedule from "./pages/Schedule";
 import Clients from "./pages/Clients";
@@ -47,18 +50,28 @@ import SettingsPage from "./pages/SettingsPage";
 import CommissionsPage from "./pages/CommissionsPage";
 import WaitlistPage from "./pages/WaitlistPage";
 
+/* Financeiro */
 import PayablesPage from "./pages/finance/PayablesPage";
 import ReceivablesPage from "./pages/finance/ReceivablesPage";
 import FinanceCategoriesPage from "./pages/finance/FinanceCategoriesPage";
 import SuppliersPage from "./pages/finance/SuppliersPage";
 import PaymentMethodsPage from "./pages/finance/PaymentMethodsPage";
+
+/* Configurações específicas */
 import CancellationReasonsPage from "./pages/settings/CancellationReasonsPage";
 import ClientOriginsPage from "./pages/settings/ClientOriginsPage";
+
+/* Relatórios */
 import BirthdaysReportPage from "./pages/reports/BirthdaysReportPage";
 import CashflowReportPage from "./pages/reports/CashflowReportPage";
 
-// ✅ importa o novo Menu
+/* Menu (novo) */
 import Menu from "./pages/Menu";
+
+/* Fallback simples p/ rotas não mapeadas */
+const NotFound = () => (
+  <div className="p-6 text-sm text-gray-600">Página não encontrada.</div>
+);
 
 function AdminLayoutWrapper() {
   const { isMobile } = useAppShellMode();
@@ -97,7 +110,7 @@ function App() {
             <Route path="/portal/login/:companyId" element={<ClientLoginPage />} />
             <Route path="/portal/register/:companyId" element={<ClientRegisterPage />} />
 
-            {/* Painel Admin */}
+            {/* Painel Admin (protegido) */}
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<AdminLayoutWrapper />}>
                 <Route index element={<Dashboard />} />
@@ -130,10 +143,13 @@ function App() {
                 <Route path="cancellation-reasons" element={<CancellationReasonsPage />} />
                 <Route path="client-origins" element={<ClientOriginsPage />} />
 
-                {/* ✅ nova rota do Menu */}
+                {/* Menu */}
                 <Route path="menu" element={<Menu />} />
               </Route>
             </Route>
+
+            {/* Fallback */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </ErrorBoundary>

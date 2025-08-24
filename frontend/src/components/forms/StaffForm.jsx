@@ -94,7 +94,12 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
     }));
 
     if (initialData.workSchedule && Object.keys(initialData.workSchedule).length) {
-      setWorkSchedule(deepClone(initialData.workSchedule));
+      // mescla com defaults para garantir todos os dias
+      const merged = buildDefaultSchedule();
+      Object.entries(initialData.workSchedule).forEach(([k, v]) => {
+        merged[k] = { ...merged[k], ...v };
+      });
+      setWorkSchedule(deepClone(merged));
     }
   }, [initialData]);
 
@@ -502,7 +507,6 @@ const StaffForm = ({ initialData, onSave, onCancel }) => {
               Opções complementares (não obrigatórias). Campos vazios não serão enviados.
             </p>
           </div>
-          {/* Mantido apenas informativo para evitar duplicidade de campos */}
         </div>
       )}
 

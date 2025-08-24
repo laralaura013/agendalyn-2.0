@@ -1,10 +1,10 @@
-// src/components/cashier/TransactionForm.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api from '../../services/api'; 
+import api from '../../services/api';
 import { asArray } from '../../utils/asArray';
-// <-- caminho corrigido (duas pastas acima)
+import NeuButton from '../ui/NeuButton';
+import NeuCard from '../ui/NeuCard';
 
 // transforma "1.234,56" -> 1234.56
 const toNumber = (v) => {
@@ -86,149 +86,148 @@ const TransactionForm = ({ type: typeProp = 'INCOME', onSave, onCancel }) => {
   };
 
   return (
-    <form onSubmit={submit} className="p-4">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold">Lançamento no Caixa</h2>
-        <div className="flex items-center gap-2">
-          {typeProp ? (
-            <span
-              className={`px-2 py-1 text-xs font-bold rounded-full ${
-                type === 'INCOME'
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-red-100 text-red-800'
-              }`}
-              title="Tipo definido pelo contexto"
-            >
-              {type === 'INCOME' ? 'Entrada' : 'Saída'}
-            </span>
-          ) : (
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="border rounded-md px-2 py-1 text-sm"
-            >
-              {asArray(TYPE_OPTIONS).map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
-
-      {/* Valor */}
-      <div className="mb-3">
-        <label className="block text-sm font-medium text-gray-700">Valor (R$)</label>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={amountText}
-          onChange={(e) => setAmountText(e.target.value)}
-          className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
-          placeholder="Ex.: 25,50"
-        />
-        <div className="text-xs text-gray-500 mt-1">
-          Dica: aceitamos “1.234,56” ou “1234.56”.
-        </div>
-      </div>
-
-      {/* Descrição */}
-      <div className="mb-3">
-        <label className="block text-sm font-medium text-gray-700">Descrição</label>
-        <input
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
-          placeholder={type === 'INCOME' ? 'Ex.: Venda balcão' : 'Ex.: Compra de insumos'}
-        />
-      </div>
-
-      {/* Método de pagamento (opcional) */}
-      <div className="mb-3">
-        <label className="block text-sm font-medium text-gray-700">
-          Método de pagamento (opcional)
-        </label>
-        <select
-          value={paymentMethodId}
-          onChange={(e) => setPaymentMethodId(e.target.value)}
-          className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
-        >
-          <option value="">Selecione…</option>
-          {asArray(methods).map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Avançado */}
-      <div className="mb-3">
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((v) => !v)}
-          className="inline-flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
-        >
-          {advancedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          Opções avançadas
-        </button>
-
-        {advancedOpen && (
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Origem (opcional)
-              </label>
-              <select
-                value={sourceType}
-                onChange={(e) => setSourceType(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
+    <form onSubmit={submit} className="p-0">
+      <NeuCard className="p-4">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-[var(--text-color)]">Lançamento no Caixa</h2>
+          <div className="flex items-center gap-2">
+            {typeProp ? (
+              <span
+                className={`px-2 py-1 text-xs font-bold rounded-full ${
+                  type === 'INCOME'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+                title="Tipo definido pelo contexto"
               >
-                <option value="">Nenhuma</option>
-                <option value="RECEIVABLE">Recebível</option>
-                <option value="PAYABLE">Pagável</option>
+                {type === 'INCOME' ? 'Entrada' : 'Saída'}
+              </span>
+            ) : (
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="border rounded-md px-2 py-1 text-sm"
+              >
+                {asArray(TYPE_OPTIONS).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
-              <div className="text-xs text-gray-500 mt-1">
-                Use quando este lançamento estiver vinculado a um documento financeiro.
+            )}
+          </div>
+        </div>
+
+        {/* Valor */}
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-[var(--text-color)]">Valor (R$)</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={amountText}
+            onChange={(e) => setAmountText(e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
+            placeholder="Ex.: 25,50"
+          />
+          <div className="text-xs text-[var(--text-color)] opacity-70 mt-1">
+            Dica: aceitamos “1.234,56” ou “1234.56”.
+          </div>
+        </div>
+
+        {/* Descrição */}
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-[var(--text-color)]">Descrição</label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
+            placeholder={type === 'INCOME' ? 'Ex.: Venda balcão' : 'Ex.: Compra de insumos'}
+          />
+        </div>
+
+        {/* Método de pagamento (opcional) */}
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-[var(--text-color)]">
+            Método de pagamento (opcional)
+          </label>
+          <select
+            value={paymentMethodId}
+            onChange={(e) => setPaymentMethodId(e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
+          >
+            <option value="">Selecione…</option>
+            {asArray(methods).map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Avançado */}
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            className="inline-flex items-center gap-2 text-sm text-[var(--text-color)]"
+          >
+            {advancedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            Opções avançadas
+          </button>
+
+          {advancedOpen && (
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-color)]">
+                  Origem (opcional)
+                </label>
+                <select
+                  value={sourceType}
+                  onChange={(e) => setSourceType(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
+                >
+                  <option value="">Nenhuma</option>
+                  <option value="RECEIVABLE">Recebível</option>
+                  <option value="PAYABLE">Pagável</option>
+                </select>
+                <div className="text-xs text-[var(--text-color)] opacity-70 mt-1">
+                  Use quando este lançamento estiver vinculado a um documento financeiro.
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-color)]">
+                  ID da origem (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={sourceId}
+                  onChange={(e) => setSourceId(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
+                  placeholder="Ex.: 10293"
+                />
               </div>
             </div>
+          )}
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                ID da origem (opcional)
-              </label>
-              <input
-                type="text"
-                value={sourceId}
-                onChange={(e) => setSourceId(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border rounded-md text-sm"
-                placeholder="Ex.: 10293"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Ações */}
-      <div className="flex items-center justify-end gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border hover:bg-gray-50"
-        >
-          <X size={16} /> Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={busy}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-        >
-          <Save size={16} /> Salvar lançamento
-        </button>
-      </div>
+        {/* Ações */}
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <NeuButton onClick={onCancel} className="inline-flex items-center gap-2">
+            <X size={16} /> Cancelar
+          </NeuButton>
+          <NeuButton
+            type="submit"
+            variant="primary"
+            disabled={busy}
+            className="inline-flex items-center gap-2 disabled:opacity-60"
+          >
+            <Save size={16} /> Salvar lançamento
+          </NeuButton>
+        </div>
+      </NeuCard>
     </form>
   );
 };

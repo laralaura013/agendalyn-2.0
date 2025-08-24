@@ -4,20 +4,16 @@ import { X } from 'lucide-react';
 
 const Modal = ({ isOpen, onClose, children }) => {
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
+    if (!isOpen) return;
 
-      const handleEsc = (e) => {
-        if (e.key === 'Escape') onClose();
-      };
+    document.body.style.overflow = 'hidden';
+    const handleEsc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', handleEsc);
 
-      window.addEventListener('keydown', handleEsc);
-
-      return () => {
-        document.body.style.overflow = '';
-        window.removeEventListener('keydown', handleEsc);
-      };
-    }
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleEsc);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -28,18 +24,19 @@ const Modal = ({ isOpen, onClose, children }) => {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="modal-title"
     >
       <div
-        className="bg-white w-full max-w-xl rounded-2xl shadow-xl p-6 relative transform transition-all duration-300 animate-modal-enter"
+        className="neu-card w-full max-w-xl rounded-2xl p-6 relative transition-all"
         onClick={(e) => e.stopPropagation()}
+        style={{ background: 'var(--bg-color)', color: 'var(--text-color)' }}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
+          className="absolute top-4 right-4 rounded-full p-2 neumorphic-interactive hover:opacity-80"
           aria-label="Fechar modal"
+          title="Fechar"
         >
-          <X size={24} />
+          <X size={20} />
         </button>
         {children}
       </div>

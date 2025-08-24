@@ -20,12 +20,15 @@ import {
   CheckSquare,
   Square,
   MessageCircle,
-  XCircle
+  XCircle,
 } from "lucide-react";
 import api from "../services/api";
+import NeuCard from "../components/ui/NeuCard";
+import NeuButton from "../components/ui/NeuButton";
+import "../styles/neumorphism.css";
 
+import { asArray } from "../utils/asArray";
 
-import { asArray } from '../utils/asArray';
 const fmtPhone = (v) => {
   const s = String(v || "").replace(/\D/g, "");
   if (!s) return "—";
@@ -116,9 +119,22 @@ export default function Clients() {
   };
 
   const clearFilters = () => {
-    setQ(""); setStatus(""); setTag(""); setUf(""); setCity(""); setIncludeDeleted(false);
+    setQ("");
+    setStatus("");
+    setTag("");
+    setUf("");
+    setCity("");
+    setIncludeDeleted(false);
     setPage(1);
-    fetchClients({ page: 1, q: "", status: undefined, tag: undefined, uf: undefined, city: undefined, includeDeleted: undefined });
+    fetchClients({
+      page: 1,
+      q: "",
+      status: undefined,
+      tag: undefined,
+      uf: undefined,
+      city: undefined,
+      includeDeleted: undefined,
+    });
   };
 
   const handleSoftDelete = async (id) => {
@@ -143,7 +159,7 @@ export default function Clients() {
   const handleBulkSoftDelete = async () => {
     if (selected.size === 0) return;
     if (!window.confirm(`Mover ${selected.size} cliente(s) para a lixeira?`)) return;
-    await toast.promise(api.post('/clients/bulk/soft-delete', { ids: Array.from(selected) }), {
+    await toast.promise(api.post("/clients/bulk/soft-delete", { ids: Array.from(selected) }), {
       loading: "Movendo...",
       success: "Clientes movidos para a lixeira.",
       error: "Falha ao mover.",
@@ -154,7 +170,7 @@ export default function Clients() {
 
   const handleBulkRestore = async () => {
     if (selected.size === 0) return;
-    await toast.promise(api.post('/clients/bulk/restore', { ids: Array.from(selected) }), {
+    await toast.promise(api.post("/clients/bulk/restore", { ids: Array.from(selected) }), {
       loading: "Restaurando...",
       success: "Clientes restaurados.",
       error: "Falha ao restaurar.",
@@ -173,7 +189,9 @@ export default function Clients() {
         ...(city ? { city } : {}),
         ...(includeDeleted ? { includeDeleted: "1" } : {}),
       });
-      const { data } = await api.get(`/clients/export.csv?${params.toString()}`, { responseType: "blob" });
+      const { data } = await api.get(`/clients/export.csv?${params.toString()}`, {
+        responseType: "blob",
+      });
       const blob = new Blob([data], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -194,15 +212,18 @@ export default function Clients() {
     const file = e.target.files?.[0];
     if (!file) return;
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
     try {
-      await toast.promise(api.post('/clients/import.csv', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      }), {
-        loading: "Importando...",
-        success: "Importação concluída!",
-        error: "Falha ao importar CSV.",
-      });
+      await toast.promise(
+        api.post("/clients/import.csv", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        }),
+        {
+          loading: "Importando...",
+          success: "Importação concluída!",
+          error: "Falha ao importar CSV.",
+        }
+      );
       e.target.value = "";
       fetchClients();
     } catch {
@@ -232,7 +253,7 @@ export default function Clients() {
     }
     const loserId = winnerId === a ? b : a;
 
-    await toast.promise(api.post('/clients/merge', { winnerId, loserId }), {
+    await toast.promise(api.post("/clients/merge", { winnerId, loserId }), {
       loading: "Mesclando...",
       success: "Clientes mesclados.",
       error: (e) => e?.response?.data?.message || "Falha ao mesclar.",
@@ -242,121 +263,153 @@ export default function Clients() {
   };
 
   return (
-    <div className="min-h-screen px-4 pt-4 pb-20 sm:px-6 md:px-8">
+    <div className="space-y-4 neu-surface">
       {/* Header / ações */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h1 className="text-2xl md:text-3xl font-bold">Clientes</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl md:text-3xl font-bold text-[var(--text-color)]">Clientes</h1>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => fetchClients()} className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center gap-2">
+          <NeuButton onClick={() => fetchClients()} className="flex items-center gap-2">
             <RefreshCw size={18} /> Atualizar
-          </button>
+          </NeuButton>
 
           {/* Import CSV */}
-          <label className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center gap-2 cursor-pointer">
+          <label className="neu-btn cursor-pointer inline-flex items-center gap-2">
             <Upload size={18} /> Importar CSV
             <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} />
           </label>
 
-          <button onClick={handleExport} className="px-3 py-2 rounded bg-white border hover:bg-gray-50 flex items-center gap-2">
+          <NeuButton onClick={handleExport} className="flex items-center gap-2">
             <Download size={18} /> Exportar CSV
-          </button>
+          </NeuButton>
 
-          <button onClick={handleNew} className="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2">
+          <NeuButton variant="primary" onClick={handleNew} className="flex items-center gap-2">
             <UserPlus size={18} /> Novo Cliente
-          </button>
+          </NeuButton>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="bg-white border rounded-lg p-3 mb-3">
+      <NeuCard className="p-3">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
           <div className="relative md:col-span-2">
             <input
-              className="w-full border rounded-lg px-3 py-2 pl-9"
+              className="neu-input pl-9 w-full"
               placeholder="Buscar por nome, e-mail, telefone, CPF ou cidade/UF"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             />
-            <Search size={16} className="absolute left-3 top-2.5 text-gray-500" />
+            <Search size={16} className="absolute left-3 top-2.5 opacity-60" />
           </div>
-          <select className="border rounded-lg px-3 py-2" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select
+            className="neu-select"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
             <option value="">Status (todos)</option>
             <option value="active">Ativo</option>
             <option value="inactive">Inativo</option>
           </select>
-          <input className="border rounded-lg px-3 py-2" placeholder="Tag" value={tag} onChange={(e) => setTag(e.target.value)} />
-          <input className="border rounded-lg px-3 py-2 uppercase" placeholder="UF" value={uf} maxLength={2} onChange={(e) => setUf(e.target.value.toUpperCase())} />
-          <input className="border rounded-lg px-3 py-2" placeholder="Cidade" value={city} onChange={(e) => setCity(e.target.value)} />
+          <input
+            className="neu-input"
+            placeholder="Tag"
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+          />
+          <input
+            className="neu-input uppercase"
+            placeholder="UF"
+            value={uf}
+            maxLength={2}
+            onChange={(e) => setUf(e.target.value.toUpperCase())}
+          />
+          <input
+            className="neu-input"
+            placeholder="Cidade"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
         </div>
         <div className="flex items-center gap-3 mt-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={includeDeleted} onChange={(e) => setIncludeDeleted(e.target.checked)} />
+          <label className="flex items-center gap-2 text-sm text-[var(--text-color)]">
+            <input
+              type="checkbox"
+              checked={includeDeleted}
+              onChange={(e) => setIncludeDeleted(e.target.checked)}
+            />
             Incluir lixeira
           </label>
-          <button onClick={handleSearch} className="px-3 py-1.5 rounded bg-white border hover:bg-gray-50 flex items-center gap-2">
+          <NeuButton onClick={handleSearch} className="flex items-center gap-2">
             <LinkIcon size={16} /> Aplicar
-          </button>
-          <button onClick={clearFilters} className="px-3 py-1.5 rounded bg-white border hover:bg-gray-50 flex items-center gap-2">
+          </NeuButton>
+          <NeuButton onClick={clearFilters} className="flex items-center gap-2">
             <XCircle size={16} /> Limpar
-          </button>
+          </NeuButton>
         </div>
-      </div>
+      </NeuCard>
 
       {/* Barra de ações em massa */}
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <button
+      <div className="flex flex-wrap items-center gap-2">
+        <NeuButton
           onClick={handleBulkSoftDelete}
           disabled={selected.size === 0}
-          className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+          className="flex items-center gap-2 disabled:opacity-50"
         >
           <Trash2 size={16} /> Excluir selecionados
-        </button>
-        <button
+        </NeuButton>
+        <NeuButton
           onClick={handleBulkRestore}
           disabled={selected.size === 0}
-          className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+          className="flex items-center gap-2 disabled:opacity-50"
         >
           <RotateCcw size={16} /> Restaurar selecionados
-        </button>
+        </NeuButton>
 
         <div className="ml-auto flex items-center gap-2">
-          <button
+          <NeuButton
             onClick={handleMerge}
             disabled={mergeIds.length !== 2}
-            className="px-3 py-1.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
-            title={mergeIds.length === 2 ? `Mesclar ${mergeIds[0]} + ${mergeIds[1]}` : "Selecione 2 para mesclar"}
+            className="flex items-center gap-2 disabled:opacity-50"
+            title={
+              mergeIds.length === 2
+                ? `Mesclar ${mergeIds[0]} + ${mergeIds[1]}`
+                : "Selecione 2 para mesclar"
+            }
           >
             <GitMerge size={16} /> Mesclar selecionados (2)
-          </button>
+          </NeuButton>
         </div>
       </div>
 
       {/* Lista */}
-      <div className="bg-white border rounded-lg overflow-hidden">
+      <NeuCard className="p-0 overflow-hidden">
         {loading ? (
-          <div className="p-4 text-gray-500 text-sm">Carregando clientes…</div>
+          <div className="p-4 text-sm text-[var(--text-color)] opacity-80">
+            Carregando clientes…
+          </div>
         ) : items.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">Nenhum cliente encontrado.</div>
+          <div className="p-6 text-center text-[var(--text-color)] opacity-80">
+            Nenhum cliente encontrado.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr className="text-left">
+              <thead className="border-b">
+                <tr className="text-left text-[var(--text-color)]">
                   <th className="px-4 py-3">
                     <div className="w-4 h-4" />
                   </th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Cliente</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Contato</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">CPF</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Nascimento</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Sexo</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Cidade/UF</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Última visita</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Atendimentos</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">Status</th>
-                  <th className="px-4 py-3 font-medium text-gray-600">WhatsApp</th>
-                  <th className="px-4 py-3 font-medium text-gray-600 w-40">Ações</th>
+                  <th className="px-4 py-3 font-medium">Cliente</th>
+                  <th className="px-4 py-3 font-medium">Contato</th>
+                  <th className="px-4 py-3 font-medium">CPF</th>
+                  <th className="px-4 py-3 font-medium">Nascimento</th>
+                  <th className="px-4 py-3 font-medium">Sexo</th>
+                  <th className="px-4 py-3 font-medium">Cidade/UF</th>
+                  <th className="px-4 py-3 font-medium">Última visita</th>
+                  <th className="px-4 py-3 font-medium">Atendimentos</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">WhatsApp</th>
+                  <th className="px-4 py-3 font-medium w-40">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -369,50 +422,96 @@ export default function Clients() {
                         <button
                           onClick={() => toggleSelect(c.id)}
                           title={isSelected ? "Desmarcar" : "Selecionar"}
-                          className="p-1.5 rounded border hover:bg-gray-50"
+                          className="neu-btn px-2 py-1"
                         >
                           {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
                         </button>
                         <button
                           onClick={() => addMergeId(c.id)}
-                          title={mergeSelected ? "Remover da mesclagem" : "Selecionar para mesclar"}
-                          className={`ml-2 p-1.5 rounded border hover:bg-gray-50 ${mergeSelected ? "bg-purple-50 border-purple-300" : ""}`}
+                          title={
+                            mergeSelected
+                              ? "Remover da mesclagem"
+                              : "Selecionar para mesclar"
+                          }
+                          className={`neu-btn ml-2 px-2 py-1 ${
+                            mergeSelected ? "ring-1 ring-purple-400" : ""
+                          }`}
                         >
                           <GitMerge size={16} />
                         </button>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-[var(--text-color)]">
                         <div className="flex items-center gap-3">
                           {c.avatarUrl ? (
-                            <img src={c.avatarUrl} alt={c.name} className="w-8 h-8 rounded-full object-cover" />
+                            <img
+                              src={c.avatarUrl}
+                              alt={c.name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-gray-200" />
+                            <div className="w-8 h-8 rounded-full neu-card-inset" />
                           )}
                           <div className="flex flex-col">
                             <span className="font-medium">{c.name || "—"}</span>
                             {c.tags && c.tags.length > 0 && (
-                              <span className="text-[11px] text-purple-700">{c.tags.join(", ")}</span>
+                              <span className="text-[11px] text-purple-700 dark:text-purple-300">
+                                {c.tags.join(", ")}
+                              </span>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="text-xs text-gray-700">{c.email || "—"}</div>
-                        <div className="text-xs text-gray-600">{fmtPhone(c.phone)}</div>
+                      <td className="px-4 py-3 text-[var(--text-color)]">
+                        <div className="text-xs">{c.email || "—"}</div>
+                        <div className="text-xs opacity-80">{fmtPhone(c.phone)}</div>
                       </td>
-                      <td className="px-4 py-3">{c.cpf || "—"}</td>
-                      <td className="px-4 py-3">{fmtDate(c.birthDate)}</td>
-                      <td className="px-4 py-3">
-                        {c.gender === "MALE" ? "Masculino" : c.gender === "FEMALE" ? "Feminino" : c.gender === "OTHER" ? "Outro" : "—"}
+                      <td className="px-4 py-3 text-[var(--text-color)]">
+                        {c.cpf || "—"}
                       </td>
-                      <td className="px-4 py-3">{c.city ? `${c.city} / ${c.state || ""}` : "—"}</td>
-                      <td className="px-4 py-3">{fmtDate(c.lastVisit)}</td>
-                      <td className="px-4 py-3">{c.appointmentsCount ?? 0}</td>
+                      <td className="px-4 py-3 text-[var(--text-color)]">
+                        {fmtDate(c.birthDate)}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-color)]">
+                        {c.gender === "MALE"
+                          ? "Masculino"
+                          : c.gender === "FEMALE"
+                          ? "Feminino"
+                          : c.gender === "OTHER"
+                          ? "Outro"
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-color)]">
+                        {c.city ? `${c.city} / ${c.state || ""}` : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-color)]">
+                        {fmtDate(c.lastVisit)}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-color)]">
+                        {c.appointmentsCount ?? 0}
+                      </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${c.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600"}`}>
-                          {c.isActive ? (<><ToggleRight size={14} /> Ativo</>) : (<><ToggleLeft size={14} /> Inativo</>)}
+                        <span
+                          className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                            c.isActive
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                              : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-300"
+                          }`}
+                        >
+                          {c.isActive ? (
+                            <>
+                              <ToggleRight size={14} /> Ativo
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft size={14} /> Inativo
+                            </>
+                          )}
                         </span>
-                        {c.deletedAt && <div className="text-[11px] text-rose-600 mt-1">Lixeira</div>}
+                        {c.deletedAt && (
+                          <div className="text-[11px] text-rose-600 dark:text-rose-300 mt-1">
+                            Lixeira
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {waLink(c.phone, c.name) ? (
@@ -420,9 +519,11 @@ export default function Clients() {
                             href={waLink(c.phone, c.name)}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded border hover:bg-gray-50 text-green-700"
+                            className="neu-btn text-emerald-700 dark:text-emerald-300 px-2 py-1 text-xs"
                           >
-                            <MessageCircle size={14} /> Abrir
+                            <span className="inline-flex items-center gap-1">
+                              <MessageCircle size={14} /> Abrir
+                            </span>
                           </a>
                         ) : (
                           "—"
@@ -430,15 +531,27 @@ export default function Clients() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <button onClick={() => handleEdit(c.id)} className="p-1.5 rounded border hover:bg-gray-50" title="Editar">
+                          <button
+                            onClick={() => handleEdit(c.id)}
+                            className="neu-btn px-2 py-1"
+                            title="Editar"
+                          >
                             <Edit size={16} />
                           </button>
                           {c.deletedAt ? (
-                            <button onClick={() => handleRestore(c.id)} className="p-1.5 rounded border hover:bg-gray-50 text-emerald-700" title="Restaurar">
+                            <button
+                              onClick={() => handleRestore(c.id)}
+                              className="neu-btn px-2 py-1 text-emerald-700 dark:text-emerald-300"
+                              title="Restaurar"
+                            >
                               <RotateCcw size={16} />
                             </button>
                           ) : (
-                            <button onClick={() => handleSoftDelete(c.id)} className="p-1.5 rounded border hover:bg-gray-50 text-rose-600" title="Mover p/ lixeira">
+                            <button
+                              onClick={() => handleSoftDelete(c.id)}
+                              className="neu-btn px-2 py-1 text-rose-600 dark:text-rose-300"
+                              title="Mover p/ lixeira"
+                            >
                               <Trash2 size={16} />
                             </button>
                           )}
@@ -451,48 +564,85 @@ export default function Clients() {
             </table>
 
             {/* Paginação */}
-            <div className="flex items-center justify-between p-3 border-t text-sm">
-              <div>
+            <div className="flex items-center justify-between p-3 border-t">
+              <div className="text-sm text-[var(--text-color)]">
                 {filteredCount} de {total} clientes
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-2 py-1 border rounded disabled:opacity-50">
+                <NeuButton
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="!px-2 !py-1 disabled:opacity-50"
+                  aria-label="Anterior"
+                >
                   <ChevronLeft size={16} />
-                </button>
-                <span>Página {page} / {totalPages}</span>
-                <button onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages} className="px-2 py-1 border rounded disabled:opacity-50">
+                </NeuButton>
+                <span className="text-sm text-[var(--text-color)]">
+                  Página {page} / {totalPages}
+                </span>
+                <NeuButton
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page >= totalPages}
+                  className="!px-2 !py-1 disabled:opacity-50"
+                  aria-label="Próximo"
+                >
                   <ChevronRight size={16} />
-                </button>
+                </NeuButton>
               </div>
             </div>
 
             {/* Cards mobile (opcional) */}
             <div className="sm:hidden p-2 space-y-2">
               {asArray(items).map((c) => (
-                <div key={`m-${c.id}`} className={`border rounded p-3 ${c.deletedAt ? "opacity-60" : ""}`}>
-                  <div className="font-medium">{c.name || "—"}</div>
-                  <div className="text-xs text-gray-600">{c.email || "—"} • {fmtPhone(c.phone)}</div>
-                  <div className="text-xs text-gray-600">{c.city ? `${c.city}/${c.state || ""}` : "—"}</div>
-                  <div className="text-xs text-gray-600">Última: {fmtDate(c.lastVisit)} • Atend.: {c.appointmentsCount ?? 0}</div>
+                <NeuCard key={`m-${c.id}`} className={`p-3 ${c.deletedAt ? "opacity-60" : ""}`}>
+                  <div className="font-medium text-[var(--text-color)]">
+                    {c.name || "—"}
+                  </div>
+                  <div className="text-xs text-[var(--text-color)] opacity-80">
+                    {c.email || "—"} • {fmtPhone(c.phone)}
+                  </div>
+                  <div className="text-xs text-[var(--text-color)] opacity-80">
+                    {c.city ? `${c.city}/${c.state || ""}` : "—"}
+                  </div>
+                  <div className="text-xs text-[var(--text-color)] opacity-80">
+                    Última: {fmtDate(c.lastVisit)} • Atend.: {c.appointmentsCount ?? 0}
+                  </div>
                   <div className="flex gap-2 mt-2">
-                    <button onClick={() => handleEdit(c.id)} className="px-2 py-1 text-xs rounded border hover:bg-gray-50">Editar</button>
+                    <NeuButton onClick={() => handleEdit(c.id)} className="!px-2 !py-1 text-xs">
+                      Editar
+                    </NeuButton>
                     {c.deletedAt ? (
-                      <button onClick={() => handleRestore(c.id)} className="px-2 py-1 text-xs rounded border hover:bg-gray-50 text-emerald-700">Restaurar</button>
+                      <NeuButton
+                        onClick={() => handleRestore(c.id)}
+                        className="!px-2 !py-1 text-xs text-emerald-700 dark:text-emerald-300"
+                      >
+                        Restaurar
+                      </NeuButton>
                     ) : (
-                      <button onClick={() => handleSoftDelete(c.id)} className="px-2 py-1 text-xs rounded border hover:bg-gray-50 text-rose-600">Lixeira</button>
+                      <NeuButton
+                        onClick={() => handleSoftDelete(c.id)}
+                        className="!px-2 !py-1 text-xs text-rose-600 dark:text-rose-300"
+                      >
+                        Lixeira
+                      </NeuButton>
                     )}
                     {waLink(c.phone, c.name) && (
-                      <a href={waLink(c.phone, c.name)} target="_blank" rel="noreferrer" className="px-2 py-1 text-xs rounded border hover:bg-gray-50 text-green-700">
+                      <a
+                        href={waLink(c.phone, c.name)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="neu-btn px-2 py-1 text-xs text-emerald-700 dark:text-emerald-300"
+                      >
                         WhatsApp
                       </a>
                     )}
                   </div>
-                </div>
+                </NeuCard>
               ))}
             </div>
           </div>
         )}
-      </div>
+      </NeuCard>
     </div>
   );
 }

@@ -1,52 +1,54 @@
-/* ===== Tema Neumórfico =====
- * Agora com suporte a Claro/Escuro via [data-theme]
- * Basta trocar document.documentElement.dataset.theme = 'dark' | 'light'
-*/
+/* ==========================================================================
+   Tema Neumórfico – claro/escuro
+   Ative o modo escuro com: <html data-theme="dark"> ou <body data-theme="dark">
+   ========================================================================== */
 
-/* ---------- LIGHT (padrão) ---------- */
-:root {
+/* ---------- Tokens (Claro) ---------- */
+:root{
   --bg-color: #e0e5ec;
-  --surface-1: #e8edf4;
   --light-shadow: #ffffff;
   --dark-shadow: #a3b1c6;
 
-  --text-color: #2b3445;
+  --text-color: #5a677c;
   --text-color-muted: #8a99b1;
-  --grid-color: #d6dee8;
 
-  --accent-color: #7c3aed;         /* roxo suave p/ destaques */
-  --accent-strong: #5b21b6;
-  --ok: #10b981;
-  --warn: #f59e0b;
-  --danger: #ef4444;
+  --accent-color: #355E3B;             /* Verde musgo escuro (brand) */
+  --accent-contrast: #ffffff;
+
+  --border-color: #cfd8e3;             /* bordas sutis neutras */
+  --muted-bg: #eef2f7;                 /* superfícies internas/hover */
+  --ring-color: rgba(53, 94, 59, 0.35);/* focus ring baseado no accent */
 }
 
-/* ---------- DARK ---------- */
-:root[data-theme="dark"] {
-  /* base “navy” */
-  --bg-color: #0f172a;             /* slate-900 */
-  --surface-1: #111a31;            /* leve variação para dentro de cartões */
-  --light-shadow: #1a2236;         /* destaque claro (de cima/esq) */
-  --dark-shadow: #060a12;          /* sombra escura (baixo/dir) */
+/* ---------- Tokens (Escuro) ---------- */
+[data-theme="dark"]{
+  --bg-color: #1c2432;                 /* fundo dark (slate/blue-ink) */
+  --light-shadow: #252f41;             /* sombra clara (leve mais clara que bg) */
+  --dark-shadow: #131a26;              /* sombra escura */
+  --text-color: #d7deea;
+  --text-color-muted: #9aa6b8;
+  --accent-color: #60a672;             /* verde suavizado pro dark */
+  --accent-contrast: #0b1320;
 
-  --text-color: #e5e7eb;
-  --text-color-muted: #94a3b8;
-  --grid-color: #1e293b;
-
-  --accent-color: #a78bfa;         /* roxo claro p/ dark */
-  --accent-strong: #7c3aed;
-  --ok: #34d399;
-  --warn: #fbbf24;
-  --danger: #f87171;
+  --border-color: #2a3242;
+  --muted-bg: #20293a;
+  --ring-color: rgba(96, 166, 114, 0.45);
 }
 
-/* ---------- Superfícies ---------- */
-.neu-surface {
+/* Transição suave ao alternar tema */
+html, body{
   background: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color .25s ease, color .25s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* bloco com relevo “para fora” */
-.neumorphic {
+/* ==========================================================================
+   Blocos Neumórficos
+   ========================================================================== */
+
+/* relevo “para fora” */
+.neumorphic{
   background: var(--bg-color);
   border-radius: 20px;
   box-shadow:
@@ -54,40 +56,59 @@
     -8px -8px 16px var(--light-shadow);
 }
 
-/* bloco “pressionado/para dentro” */
-.neumorphic-inset {
+/* relevo “para dentro” (pressionado) */
+.neumorphic-inset{
   background: var(--bg-color);
-  border-radius: 16px;
+  border-radius: 20px;
   box-shadow:
     inset 8px 8px 16px var(--dark-shadow),
     inset -8px -8px 16px var(--light-shadow);
 }
 
-/* hover sutil */
-.hover\:shadow-neu-hover:hover {
+.neumorphic-interactive{
+  transition: box-shadow .2s ease, color .2s ease, transform .06s ease, opacity .2s ease;
+}
+.neumorphic-interactive:hover{
   box-shadow:
     6px 6px 12px var(--dark-shadow),
     -6px -6px 12px var(--light-shadow);
 }
-
-.neumorphic-interactive {
-  transition: box-shadow .2s ease, color .2s ease, transform .08s ease, opacity .15s ease;
-}
-
-.neumorphic-interactive:active {
+.neumorphic-interactive:active{
   transform: translateY(0.5px);
 }
-
-/* estado ativo: pressionado */
 .neumorphic-interactive.active,
-.neumorphic-interactive:active {
+.neumorphic-interactive:active{
   box-shadow:
     inset 6px 6px 12px var(--dark-shadow),
     inset -6px -6px 12px var(--light-shadow);
 }
+.neumorphic-interactive.active .nav-text{
+  color: var(--accent-color);
+  font-weight: 600;
+}
 
-/* ---------- Cards ---------- */
-.neu-card {
+/* Hover utilitária (nome preservado p/ compat.) */
+.hover\:shadow-neu-hover:hover{
+  box-shadow:
+    6px 6px 12px var(--dark-shadow),
+    -6px -6px 12px var(--light-shadow);
+}
+
+/* Sidebar arredondada (nome preservado p/ compat.) */
+.sidebar-neu{
+  border-radius: 0 25px 25px 0;
+  padding: 1rem;
+}
+
+/* ==========================================================================
+   Superfícies / Cards
+   ========================================================================== */
+
+.neu-surface{
+  background: var(--bg-color);
+}
+
+.neu-card{
   background: var(--bg-color);
   border-radius: 20px;
   box-shadow:
@@ -95,7 +116,7 @@
     -8px -8px 16px var(--light-shadow);
 }
 
-.neu-card-inset {
+.neu-card-inset{
   background: var(--bg-color);
   border-radius: 20px;
   box-shadow:
@@ -103,71 +124,256 @@
     inset -8px -8px 16px var(--light-shadow);
 }
 
-/* ---------- Botões / Chips ---------- */
-.neu-btn {
+/* Variante com borda sutil (quando preferir borda a sombra) */
+.neu-border{
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--bg-color);
+}
+
+/* ==========================================================================
+   Botões / Chips
+   ========================================================================== */
+
+.neu-btn{
   background: var(--bg-color);
   border-radius: 14px;
   padding: .625rem 1rem; /* 10px 16px */
+  color: var(--text-color);
+  font-weight: 600;
   box-shadow:
     6px 6px 12px var(--dark-shadow),
     -6px -6px 12px var(--light-shadow);
-  color: var(--text-color);
-  font-weight: 700;
-  letter-spacing: .1px;
-  transition: box-shadow .15s ease, transform .05s ease, opacity .15s ease, color .15s ease;
+  transition: box-shadow .15s ease, transform .06s ease, opacity .15s ease, color .2s ease, background-color .2s ease;
+  border: 0;
+  cursor: pointer;
 }
-
-.neu-btn:hover {
+.neu-btn:hover{
   box-shadow:
     4px 4px 10px var(--dark-shadow),
     -4px -4px 10px var(--light-shadow);
 }
-
-.neu-btn:active {
+.neu-btn:active{
   box-shadow:
     inset 6px 6px 12px var(--dark-shadow),
     inset -6px -6px 12px var(--light-shadow);
   transform: translateY(0.5px);
 }
 
-.neu-btn-primary { color: var(--accent-color); }
-.neu-btn-danger  { color: var(--danger); }
+.neu-btn[disabled],
+.neu-btn:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+}
 
-.neu-chip {
+/* primário: usa a cor de acento no texto (e ring) */
+.neu-btn-primary{
+  color: var(--accent-color);
+}
+
+/* “perigo”: só muda a cor do texto p/ não perder o relevo */
+.neu-btn-danger{
+  color: #b03a2e;
+}
+
+.neu-chip{
   background: var(--bg-color);
   border-radius: 999px;
   padding: .35rem .7rem;
   box-shadow:
     4px 4px 8px var(--dark-shadow),
     -4px -4px 8px var(--light-shadow);
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--text-color);
   font-size: .8rem;
+  transition: transform .08s ease, opacity .15s ease;
+}
+.neu-chip:hover{
+  transform: translateY(-1px);
+}
+
+/* Botão com estado "ativo" (toggle) */
+.neu-btn.is-active{
+  box-shadow:
+    inset 6px 6px 12px var(--dark-shadow),
+    inset -6px -6px 12px var(--light-shadow);
+  color: var(--accent-color);
+}
+
+/* ==========================================================================
+   Campos de formulário
+   ========================================================================== */
+
+/* Wrapper opcional para agrupar label+campo */
+.field-neu{
+  display: grid;
+  gap: .35rem;
+}
+
+/* Inputs/Selects/Areas com estética do tema */
+.input-neu,
+.select-neu,
+.textarea-neu{
+  width: 100%;
+  font-size: .95rem;
+  padding: .6rem .8rem;
+  border-radius: 12px;
+  background: var(--bg-color);
   color: var(--text-color);
-  opacity: .95;
+  border: 1px solid var(--border-color);
+  box-shadow:
+    inset 2px 2px 4px var(--dark-shadow),
+    inset -2px -2px 4px var(--light-shadow);
+  transition: box-shadow .15s ease, border-color .15s ease, background-color .2s ease, color .2s ease;
+  outline: none;
 }
 
-/* ---------- Tipografia utilitária ---------- */
-.text-base-color   { color: var(--text-color); }
-.text-muted-color  { color: var(--text-color-muted); }
-.text-accent       { color: var(--accent-color); }
-.text-accent-strong{ color: var(--accent-strong); }
-.text-ok           { color: var(--ok); }
-.text-warn         { color: var(--warn); }
-.text-danger       { color: var(--danger); }
-
-/* ---------- Sidebar (curvatura lateral) ---------- */
-.sidebar-neu {
-  border-radius: 0 25px 25px 0;
-  padding: 1rem;
+.input-neu::placeholder,
+.textarea-neu::placeholder{
+  color: var(--text-color-muted);
 }
 
-/* ajuda os inputs dentro de cartões “inset” no dark */
-:root[data-theme="dark"] input,
-:root[data-theme="dark"] select,
-:root[data-theme="dark"] textarea {
+.input-neu:focus,
+.select-neu:focus,
+.textarea-neu:focus{
+  border-color: var(--accent-color);
+  box-shadow:
+    0 0 0 3px var(--ring-color),
+    inset 2px 2px 4px var(--dark-shadow),
+    inset -2px -2px 4px var(--light-shadow);
+}
+
+/* estados desabilitados */
+.input-neu:disabled,
+.select-neu:disabled,
+.textarea-neu:disabled{
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Títulos, textos e helpers
+   ========================================================================== */
+
+.text-muted{ color: var(--text-color-muted); }
+.text-accent{ color: var(--accent-color); }
+
+/* para superfícies “muted” internas (listas, painéis) */
+.surface-muted{
+  background: var(--muted-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+}
+
+/* Divider sutil */
+.hr-neu{
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border-color), transparent);
+  border: 0;
+}
+
+/* ==========================================================================
+   Tabelas
+   ========================================================================== */
+
+.table-neu{
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-color);
   color: var(--text-color);
-  background: transparent;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.table-neu thead{
+  background: var(--muted-bg);
+}
+.table-neu th,
+.table-neu td{
+  padding: .6rem .75rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  font-size: .925rem;
+}
+.table-neu tr:hover td{
+  background: color-mix(in srgb, var(--muted-bg) 85%, transparent);
 }
 
-/* grid dos gráficos usa a variável (Chart.js lê via JS) */
-:root { --chart-grid: var(--grid-color); --chart-text: var(--text-color-muted); }
+/* ==========================================================================
+   Modal / Drawer básicos (quando não usar componente)
+   ========================================================================== */
+
+.modal-neu{
+  background: var(--bg-color);
+  color: var(--text-color);
+  border-radius: 20px;
+  box-shadow:
+    10px 10px 20px var(--dark-shadow),
+    -10px -10px 20px var(--light-shadow);
+}
+
+.drawer-neu{
+  background: var(--bg-color);
+  color: var(--text-color);
+  box-shadow:
+    -10px 0 20px var(--dark-shadow),
+    0 0 0 1px var(--border-color) inset;
+}
+
+/* ==========================================================================
+   Scrollbar / Utilidades
+   ========================================================================== */
+
+.no-scrollbar::-webkit-scrollbar{ width: 0; height: 0; }
+.no-scrollbar{ scrollbar-width: none; }
+
+::-webkit-scrollbar{
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track{
+  background: var(--bg-color);
+}
+::-webkit-scrollbar-thumb{
+  background: var(--border-color);
+  border-radius: 8px;
+  border: 2px solid var(--bg-color);
+}
+::-webkit-scrollbar-thumb:hover{
+  background: color-mix(in srgb, var(--border-color) 80%, var(--text-color) 20%);
+}
+
+/* ==========================================================================
+   Compat: classes já existentes (mantidas)
+   ========================================================================== */
+
+.neumorphic-interactive.active .nav-text{ color: var(--accent-color); font-weight: 600; }
+
+/* As classes abaixo já existiam na sua base e continuam válidas: */
+.neu-btn-primary{ color: var(--accent-color); }
+.neu-btn-danger{ color: #b03a2e; }
+
+/* Borda utilitária para inputs “padrão tailwind” quando você não usar input-neu */
+.border-neu{ border: 1px solid var(--border-color); }
+
+/* Pequenos badges */
+.badge{
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .75rem;
+  font-weight: 700;
+  padding: .25rem .55rem;
+  border-radius: 999px;
+  background: var(--muted-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+}
+
+/* Estados (cores não agressivas para manter o look neumórfico) */
+.badge-emerald{ color: #0f5132; background: #d1fae5; border-color: #a7f3d0; }
+.badge-amber{   color: #7a4b00; background: #fef3c7; border-color: #fde68a; }
+.badge-rose{    color: #7f1d1d; background: #ffe4e6; border-color: #fecdd3; }
+
+/* ==========================================================================
+   Fim
+   ========================================================================== */
