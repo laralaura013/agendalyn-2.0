@@ -173,14 +173,59 @@ const getSafeUser = () => {
   }
 };
 
-/* ========================== Tabs ========================== */
+/* ========================== ErrorBoundary para evitar tela branca ========================== */
+class SettingsErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("[Settings] crash:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
+          <div className="max-w-3xl mx-auto p-6">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <p className="font-semibold text-red-700">Ops! Algo quebrou ao renderizar as Configurações.</p>
+              <p className="text-sm text-red-700/80 mt-1">
+                Clique em <b>Limpar URL</b> para remover parâmetros de retorno do Google, ou recarregue.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => window.location.replace(window.location.pathname)}
+                  className="px-3 py-1.5 rounded-lg border bg-white text-sm"
+                >
+                  Limpar URL
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-3 py-1.5 rounded-lg bg-[#4a544a] text-white text-sm"
+                >
+                  Recarregar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ========================== Abas ========================== */
 const GeneralSettingsTab = ({ companyForm, setCompanyForm, saveCompany }) => (
   <div className="space-y-6">
     <Section title="Informações da Empresa" icon={Building} desc="Esses dados aparecem no agendamento e em recibos.">
       <form onSubmit={saveCompany} className="space-y-4">
         <div>
           <Label>Nome da empresa</Label>
-          <Input
+        <Input
             type="text"
             value={companyForm.name}
             onChange={(e) => setCompanyForm((s) => ({ ...s, name: e.target.value }))}
@@ -445,52 +490,33 @@ const IntegrationsTab = ({ staffId, googleConnected, setGoogleConnected, googleE
   );
 };
 
-/* ========================== ErrorBoundary para evitar tela branca ========================== */
-class SettingsErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, info) {
-    console.error("[Settings] crash:", error, info);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen" style={{ backgroundColor: theme.colors.background }}>
-          <div className="max-w-3xl mx-auto p-6">
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="font-semibold text-red-700">Ops! Algo quebrou ao renderizar as Configurações.</p>
-              <p className="text-sm text-red-700/80 mt-1">
-                Clique em <b>Limpar URL</b> para remover parâmetros de retorno do Google, ou recarregue.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => window.location.replace(window.location.pathname)}
-                  className="px-3 py-1.5 rounded-lg border bg-white text-sm"
-                >
-                  Limpar URL
-                </button>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="px-3 py-1.5 rounded-lg bg-[#4a544a] text-white text-sm"
-                >
-                  Recarregar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+/* ========================== Gate de retorno do OAuth ========================== */
+const OAuthReturnGate = ({ onFinalize }) => {
+  const [working, setWorking] = useState(false);
 
-/* ========================== Página ========================== */
+  useEffect(() => {
+    (async () => {
+      setWorking(true);
+      try {
+        await onFinalize();
+      } finally {
+        setWorking(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="flex items-center justify-center h-[60vh]" style={{ backgroundColor: theme.colors.background }}>
+      <div className="flex items-center gap-3" style={{ color: theme.colors.textBody }}>
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <p className="text-lg">Finalizando conexão com o Google...</p>
+      </div>
+    </div>
+  );
+};
+
+/* ========================== Página (inner) ========================== */
 const SettingsPageInner = () => {
   const [activeTab, setActiveTab] = useState("general");
   const [loading, setLoading] = useState(true);
@@ -544,28 +570,55 @@ const SettingsPageInner = () => {
     window.history.replaceState({}, "", clean);
   };
 
-  /* -------- Finaliza OAuth do Google se voltou com ?code/state ou marcador -------- */
-  const finalizeGoogleOAuthIfNeeded = useCallback(async () => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      const state = params.get("state");
-      const googleMarker = params.get("google"); // ex.: pending/success/error
-      if (!code && !googleMarker) return;
+  /* -------- Detecta se é retorno do OAuth -------- */
+  const oauthParams = useMemo(() => {
+    // pega tanto search (?code=...) quanto hash (#state=...)
+    const s = new URLSearchParams(window.location.search);
+    const h = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+    const code = s.get("code") || h.get("code");
+    const state = s.get("state") || h.get("state");
+    const error = s.get("error") || h.get("error");
+    const googleMarker = s.get("google") || h.get("google"); // opcional
+    return { code, state, error, googleMarker };
+  }, []);
 
-      // tenta finalizar no backend (múltiplos endpoints possíveis)
-      if (code) {
-        const tries = [
-          () => api.post("/integrations/google/oauth/callback", { code, state }),
-          () => api.post("/integrations/google/exchange", { code, state }),
-          () => api.get(`/integrations/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || "")}`),
-        ];
-        for (const t of tries) {
-          try { await t(); break; } catch { /* tenta próximo */ }
+  const isOAuthReturn = !!(oauthParams.code || oauthParams.error || oauthParams.googleMarker);
+
+  /* -------- Finaliza OAuth do Google -------- */
+  const finalizeGoogleOAuthIfNeeded = useCallback(async () => {
+    const { code, state, error } = oauthParams;
+    if (error) {
+      console.warn("Google OAuth erro:", error);
+      toast.error("Conexão cancelada no Google.");
+      clearUrlParams();
+      return;
+    }
+    if (!code) {
+      clearUrlParams();
+      return;
+    }
+    try {
+      console.log("[OAuth] Recebi code/state, iniciando troca…");
+      const attempts = [
+        () => api.post("/integrations/google/oauth/callback", { code, state }),
+        () => api.post("/integrations/google/exchange", { code, state }),
+        () =>
+          api.get(
+            `/integrations/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || "")}`
+          ),
+      ];
+      let ok = false;
+      for (const t of attempts) {
+        try {
+          await t();
+          ok = true;
+          break;
+        } catch (e) {
+          // tenta o próximo
         }
       }
-
-      await fetchGoogleStatus();
+      if (!ok) throw new Error("Nenhum endpoint de callback aceitou o code.");
+      await fetchGoogleStatus(); // atualiza estado visual
       toast.success("Google Calendar conectado!");
     } catch (e) {
       console.error("Finalize Google OAuth error:", e);
@@ -573,8 +626,8 @@ const SettingsPageInner = () => {
     } finally {
       clearUrlParams();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oauthParams]);
 
   /* -------- Fetchers -------- */
   const fetchCompanyProfile = useCallback(async () => {
@@ -613,15 +666,11 @@ const SettingsPageInner = () => {
   useEffect(() => {
     let mounted = true;
     (async () => {
+      // Se é retorno do OAuth, não renderiza nada além do Gate
+      if (isOAuthReturn) return;
       setLoading(true);
       try {
-        await Promise.all([
-          fetchCompanyProfile(),
-          fetchGoogleStatus(),
-          fetchWhatsSettings(),
-          fetchMetaStatus(),
-        ]);
-        await finalizeGoogleOAuthIfNeeded(); // trata retorno do Google e limpa URL
+        await Promise.all([fetchCompanyProfile(), fetchGoogleStatus(), fetchWhatsSettings(), fetchMetaStatus()]);
       } catch (e) {
         console.error(e);
         toast.error("Falha ao carregar configurações.");
@@ -629,8 +678,10 @@ const SettingsPageInner = () => {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
-  }, [fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus, finalizeGoogleOAuthIfNeeded]);
+    return () => {
+      mounted = false;
+    };
+  }, [isOAuthReturn, fetchCompanyProfile, fetchGoogleStatus, fetchWhatsSettings, fetchMetaStatus]);
 
   /* -------- Ações -------- */
   const saveCompany = async (e) => {
@@ -735,6 +786,11 @@ const SettingsPageInner = () => {
       </button>
     );
   };
+
+  // Gate: se voltou do Google com code/erro → só finaliza OAuth e evita tela branca
+  if (isOAuthReturn) {
+    return <OAuthReturnGate onFinalize={finalizeGoogleOAuthIfNeeded} />;
+  }
 
   if (loading) {
     return (
