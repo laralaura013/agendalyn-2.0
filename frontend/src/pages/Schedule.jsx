@@ -13,6 +13,8 @@ import {
   Filter,
   X,
   CheckCircle2,
+  Users as UsersIcon,
+  CalendarDays,
 } from "lucide-react";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
@@ -99,7 +101,8 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true);
   const [blocks, setBlocks] = useState([]);
 
-  const [view, setView] = useState("day");
+  const [view, setView] = useState("day"); // dia/semana/mês (Calendar)
+  const [layout, setLayout] = useState("agenda"); // "agenda" | "profissionais"  ← NOVO MODO
   const [date, setDate] = useState(() => new Date());
   const [selectedPro, setSelectedPro] = useState(null);
 
@@ -436,6 +439,23 @@ export default function Schedule() {
 
   const combinedEvents = useMemo(() => [...events, ...blockEvents], [events, blockEvents]);
 
+  // → Apontamentos em formato para o modo "Profissionais"
+  const staffAppointments = useMemo(() => {
+    return asArray(events)
+      .map((ev) => ev?.resource)
+      .filter(Boolean)
+      .map((apt) => ({
+        id: apt.id,
+        clientName: apt.client?.name ?? "Cliente",
+        serviceName: apt.service?.name ?? "Serviço",
+        startsAt: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
+        endsAt: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
+        staffId: apt.professionalId ?? apt.staffId ?? apt.userId ?? null,
+        color: "#9333ea22",
+      }))
+      .filter((a) => a.staffId);
+  }, [events]);
+
   const handlePickAvailableSlot = useCallback(
     (hhmm) => {
       const [h, m] = String(hhmm || "").split(":").map((x) => parseInt(x, 10));
@@ -467,6 +487,14 @@ export default function Schedule() {
     fetchAvailableSlots(date, selectedPro, DEFAULT_SLOT_MINUTES, ac.signal);
   }, [date, selectedPro, fetchAvailableSlots]);
 
+  // Clique em coluna no modo "Profissionais"
+  const handleCreateOnColumn = useCallback((pro, start, end) => {
+    setSelectedPro(pro?.id || pro); // pré-seleciona o barbeiro
+    setSelectedEvent(null);
+    setSelectedSlot({ start, end });
+    setIsModalOpen(true);
+  }, []);
+
   /* ---------- Recebe o clique do FAB global ---------- */
   useEffect(() => {
     const handler = () => openEmptyModal();
@@ -492,7 +520,7 @@ export default function Schedule() {
           <NeuButton onClick={goPrev} className="!px-2 !py-2" aria-label="Anterior">
             <ChevronLeft className="w-5 h-5" />
           </NeuButton>
-        <div className="text-base font-semibold capitalize text-[var(--text-color)]">
+          <div className="text-base font-semibold capitalize text-[var(--text-color)]">
             {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date)}
           </div>
           <NeuButton onClick={goNext} className="!px-2 !py-2" aria-label="Próximo">
@@ -528,6 +556,8 @@ export default function Schedule() {
 
           <div className="flex items-center gap-2">
             <ViewToggle value={view} onChange={setView} />
+            {/* Toggle do layout (NÃO altera seu design; só troca o componente renderizado) */}
+            <LayoutToggle value={layout} onChange={setLayout} />
             <NeuButton
               onClick={() => {
                 setOpenSlots(true);
@@ -552,28 +582,54 @@ export default function Schedule() {
       <NeuCard className="hidden md:flex items-center justify-between px-4 py-2">
         <span className="font-medium capitalize text-[var(--text-color)]">{pageTitle}</span>
         <span className="opacity-80 text-[var(--text-color)]">
-          {asArray(staff).find((p) => p.id === selectedPro)?.name ?? ""}
+          {layout === "profissionais"
+            ? "Visão por profissionais"
+            : asArray(staff).find((p) => p.id === selectedPro)?.name ?? ""}
         </span>
       </NeuCard>
 
       {/* ====== grid ====== */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Calendário */}
+        {/* Calendário / Staff view */}
         <div className="col-span-12 xl:col-span-9 2xl:col-span-10">
           <NeuCard className="p-3 md:p-4">
             {loading ? (
               <p className="text-sm text-[var(--text-color)] opacity-80 p-2">Carregando dados da agenda...</p>
             ) : (
               <div className="neu-card-inset rounded-2xl p-2 md:p-3">
-                <Calendar
-                  events={combinedEvents}
-                  onSelectSlot={handleSelectSlot}
-                  onSelectEvent={handleSelectEvent}
-                  view={view}
-                  date={date}
-                  onView={(v) => setView(v)}
-                  onNavigate={(d) => setDate(d)}
-                />
+                {layout === "profissionais" ? (
+                  <StaffColumnView
+                    date={date}
+                    staff={asArray(staff).map((s) => ({
+                      id: s.id,
+                      name: s.name,
+                      avatarUrl: s.avatarUrl || s.photoUrl || s.avatar,
+                    }))}
+                    appointments={staffAppointments}
+                    slotMinutes={DEFAULT_SLOT_MINUTES}
+                    workStartHour={7}
+                    workEndHour={20}
+                    onEmptySlotClick={handleCreateOnColumn}
+                    onAppointmentClick={(apt) => {
+                      const found = events.find((ev) => ev?.resource?.id === apt.id);
+                      if (found) {
+                        setSelectedEvent(found.resource);
+                        setSelectedSlot(null);
+                        setIsModalOpen(true);
+                      }
+                    }}
+                  />
+                ) : (
+                  <Calendar
+                    events={combinedEvents}
+                    onSelectSlot={handleSelectSlot}
+                    onSelectEvent={handleSelectEvent}
+                    view={view}
+                    date={date}
+                    onView={(v) => setView(v)}
+                    onNavigate={(d) => setDate(d)}
+                  />
+                )}
               </div>
             )}
           </NeuCard>
@@ -703,6 +759,8 @@ export default function Schedule() {
           staff={staff}
           onSave={handleSave}
           onDelete={handleDelete}
+          // dica: se seu AppointmentModal permitir valor inicial de profissional,
+          // use selectedPro como default (já está sendo setado ao clicar em coluna).
         />
       )}
 
@@ -812,6 +870,28 @@ function ViewToggle({ value, onChange }) {
           className={`px-3 py-1.5 text-sm ${value === opt.id ? "neu-btn neu-btn-primary" : "neu-btn"}`}
         >
           {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+function LayoutToggle({ value, onChange }) {
+  const opts = [
+    { id: "agenda", label: "Agenda", icon: CalendarDays },
+    { id: "profissionais", label: "Profissionais", icon: UsersIcon },
+  ];
+  return (
+    <div className="inline-flex items-center rounded overflow-hidden">
+      {opts.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          className={`px-3 py-1.5 text-sm flex items-center gap-1 ${
+            value === id ? "neu-btn neu-btn-primary" : "neu-btn"
+          }`}
+        >
+          <Icon className="w-4 h-4" />
+          {label}
         </button>
       ))}
     </div>
@@ -1102,6 +1182,165 @@ function MobileDaysStrip({ date, onChangeDate }) {
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+ * StaffColumnView (visão em colunas por profissional)
+ * Mantido aqui dentro para facilitar colar 1 arquivo só.
+ * =======================================================*/
+function StaffColumnView({
+  date,
+  staff,
+  appointments,
+  slotMinutes = 30,
+  workStartHour = 7,
+  workEndHour = 20,
+  onEmptySlotClick,
+  onAppointmentClick,
+}) {
+  const containerRef = useRef(null);
+
+  const dayStart = useMemo(() => {
+    const d = new Date(date);
+    d.setHours(workStartHour, 0, 0, 0);
+    return d;
+  }, [date, workStartHour]);
+
+  const dayEnd = useMemo(() => {
+    const d = new Date(date);
+    d.setHours(workEndHour, 0, 0, 0);
+    return d;
+  }, [date, workEndHour]);
+
+  const totalMinutes = useMemo(() => (dayEnd - dayStart) / 60000, [dayStart, dayEnd]);
+  const rows = useMemo(() => Math.ceil(totalMinutes / slotMinutes), [totalMinutes, slotMinutes]);
+
+  const timeLabels = useMemo(() => {
+    const out = [];
+    for (let i = 0; i <= rows; i++) {
+      const mins = i * slotMinutes;
+      const d = new Date(dayStart.getTime() + mins * 60000);
+      out.push(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    }
+    return out;
+  }, [dayStart, rows, slotMinutes]);
+
+  const apptsByStaff = useMemo(() => {
+    const map = {};
+    for (const s of asArray(staff)) map[s.id] = [];
+    for (const a of asArray(appointments)) {
+      if (a.staffId && map[a.staffId]) map[a.staffId].push(a);
+    }
+    return map;
+  }, [appointments, staff]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // scroll inicial ~09:00
+    const target = new Date(dayStart);
+    target.setHours(9, 0, 0, 0);
+    const pct = (target - dayStart) / (dayEnd - dayStart);
+    el.scrollTop = Math.max(0, pct * el.scrollHeight - 80);
+  }, [dayStart, dayEnd]);
+
+  const topPct = (d) => {
+    const mins = (d - dayStart) / 60000;
+    return Math.max(0, (mins / totalMinutes) * 100);
+  };
+  const heightPct = (start, end) => {
+    const mins = Math.max(5, (end - start) / 60000);
+    return Math.max(2.5, (mins / totalMinutes) * 100);
+  };
+
+  const handleColumnClick = (e, s) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const pct = y / rect.height;
+    const minsFromStart = Math.round((pct * totalMinutes) / slotMinutes) * slotMinutes;
+    const start = new Date(dayStart.getTime() + minsFromStart * 60000);
+    const end = new Date(start.getTime() + slotMinutes * 60000);
+    onEmptySlotClick?.(s, start, end);
+  };
+
+  return (
+    <div className="w-full h-[72vh] md:h-[78vh] flex flex-col">
+      {/* Cabeçalho com avatares (sticky) */}
+      <div className="grid" style={{ gridTemplateColumns: `120px repeat(${asArray(staff).length}, minmax(220px, 1fr))` }}>
+        <div />
+        {asArray(staff).map((s) => (
+          <div key={s.id} className="sticky top-0 z-20 bg-white/80 backdrop-blur rounded-xl px-3 py-3 flex items-center gap-3 border shadow-sm">
+            <img
+              src={s.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=9333ea&color=fff`}
+              alt={s.name}
+              className="w-9 h-9 rounded-full object-cover ring-2 ring-violet-300"
+            />
+            <div className="leading-tight">
+              <div className="font-medium text-gray-800">{s.name}</div>
+              <div className="text-xs text-gray-500">Agenda do dia</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Grade */}
+      <div ref={containerRef} className="relative flex-1 overflow-auto rounded-2xl border bg-white shadow-inner">
+        <div
+          className="grid"
+          style={{ gridTemplateColumns: `120px repeat(${asArray(staff).length}, minmax(220px, 1fr))`, height: "1800px" }}
+        >
+          {/* Coluna de horários */}
+          <div className="relative border-r">
+            {timeLabels.map((t, i) => (
+              <div key={i} className="absolute left-0 w-full pr-2 text-right text-xs text-gray-400" style={{ top: `${(i / timeLabels.length) * 100}%` }}>
+                {t}
+                <div className="h-px bg-gray-100 mt-2" />
+              </div>
+            ))}
+          </div>
+
+          {/* Colunas dos profissionais */}
+          {asArray(staff).map((s) => (
+            <div key={s.id} className="relative border-r cursor-crosshair" onClick={(e) => handleColumnClick(e, s)}>
+              {/* linhas de fundo */}
+              {timeLabels.map((_, i) => (
+                <div key={i} className="absolute left-0 w-full h-px bg-gray-100" style={{ top: `${(i / timeLabels.length) * 100}%` }} />
+              ))}
+
+              {/* agendamentos */}
+              {asArray(apptsByStaff[s.id]).map((a) => {
+                const start = new Date(a.startsAt);
+                const end = new Date(a.endsAt);
+                const top = topPct(start);
+                const height = heightPct(start, end);
+                return (
+                  <div
+                    key={a.id}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      onAppointmentClick?.(a);
+                    }}
+                    className="absolute left-2 right-2 rounded-xl shadow-sm border hover:shadow-md transition"
+                    style={{ top: `${top}%`, height: `${height}%`, background: a.color || "#9333ea22" }}
+                  >
+                    <div className="text-[11px] font-medium px-2 pt-1 text-gray-800 truncate">
+                      {a.clientName}
+                    </div>
+                    <div className="text-[10px] px-2 text-gray-600 truncate">
+                      {a.serviceName}
+                    </div>
+                    <div className="text-[10px] px-2 pb-1 text-gray-500">
+                      {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}–{end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
