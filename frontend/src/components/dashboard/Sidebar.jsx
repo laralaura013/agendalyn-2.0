@@ -97,9 +97,9 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
           >
             {collapsed ? (
-              <span className="inline-block">{/* › */}›</span>
+              <span className="inline-block">›</span>
             ) : (
-              <span className="inline-block">{/* ‹ */}‹</span>
+              <span className="inline-block">‹</span>
             )}
           </button>
         </div>
@@ -138,6 +138,9 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
 
           <Title className="mt-6">Relatórios</Title>
           <ul className="space-y-2">
+            {/* NOVO: Performance */}
+            <li><Item to="/dashboard/performance" icon={BarChart3} label="Performance" /></li>
+
             <li><Item to="/dashboard/reports" icon={FileBarChart} label="Relatórios" /></li>
             <li><Item to="/dashboard/reports/birthdays" icon={BarChart3} label="Aniversariantes" /></li>
             <li><Item to="/dashboard/reports/cashflow" icon={BarChart3} label="Fluxo de Caixa" /></li>
