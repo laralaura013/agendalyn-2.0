@@ -115,6 +115,17 @@ async function tryGet(paths = [], config) {
   throw lastErr;
 }
 
+/** ========= PARSER DE DATA COMO HORA LOCAL (corrige fuso deslocado) =========
+ * Remove 'Z' ou offsets (+HH:MM / -HH:MM) no final da string antes de parsear,
+ * para que o parseISO interprete a data como LOCAL (sem converter fuso).
+ */
+const parseApiDateAsLocal = (value) => {
+  if (value instanceof Date) return new Date(value);
+  if (typeof value !== "string") return new Date(value);
+  const cleaned = value.replace(/(Z|[+\-]\d{2}:\d{2})$/, "");
+  return parseISO(cleaned);
+};
+
 /* ====================== Componente ====================== */
 export default function Schedule() {
   const [events, setEvents] = useState([]);
@@ -227,8 +238,8 @@ export default function Schedule() {
           return {
             id: apt.id,
             title: `${apt.client?.name ?? "Cliente"} - ${apt.service?.name ?? "Serviço"}`,
-            start: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
-            end: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
+            start: parseApiDateAsLocal(apt.start),
+            end: parseApiDateAsLocal(apt.end),
             resource: apt,
             backgroundColor: colors?.soft,
             borderColor: colors?.base,
@@ -506,8 +517,8 @@ export default function Schedule() {
           id: apt.id,
           clientName: apt.client?.name ?? "Cliente",
           serviceName: apt.service?.name ?? "Serviço",
-          startsAt: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
-          endsAt: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
+          startsAt: parseApiDateAsLocal(apt.start),
+          endsAt: parseApiDateAsLocal(apt.end),
           staffId,
           color: colors?.soft,
           borderColor: colors?.base,
@@ -1318,6 +1329,7 @@ function StaffColumnView({
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const pct = y / rect.height;
+    the:
     const minsFromStart = Math.round((pct * totalMinutes) / slotMinutes) * slotMinutes;
     const start = new Date(dayStart.getTime() + minsFromStart * 60000);
     const end = new Date(start.getTime() + slotMinutes * 60000);
