@@ -6,6 +6,48 @@ import toast from "react-hot-toast";
 import NeuButton from "../ui/NeuButton";
 import { asArray } from "../../utils/asArray";
 
+/* ================== Helpers de Data/Hora (LOCAL, sem Z) ================== */
+// Remove "Z" ou offset final e interpreta como local
+const parseApiDateAsLocal = (value) => {
+  if (value instanceof Date) return new Date(value);
+  if (typeof value !== "string") return new Date(value);
+  const cleaned = value.replace(/(Z|[+\-]\d{2}:\d{2})$/, "");
+  // new Date('YYYY-MM-DDTHH:mm:ss') é interpretado como local pelo JS
+  return new Date(cleaned);
+};
+
+// YYYY-MM-DD (local)
+const toYMDLocal = (d) => {
+  if (!(d instanceof Date)) d = new Date(d);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+// HH:mm (local)
+const toHM = (d) => {
+  if (!(d instanceof Date)) d = new Date(d);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+};
+
+// YYYY-MM-DDTHH:mm:ss (LOCAL, sem Z)
+const toLocalISOStringNoZ = (d) => {
+  if (!(d instanceof Date)) d = new Date(d);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  return `${y}-${m}-${day}T${hh}:${mm}:${ss}`;
+};
+
+// Soma minutos
+const addMinutes = (d, mins) => new Date(d.getTime() + mins * 60000);
+
 /** =================== ClientSelect (com busca e paginação leve) =================== */
 function ClientSelect({ value, onChange, initialClients = [] }) {
   const [query, setQuery] = useState("");
@@ -125,15 +167,24 @@ const AppointmentModal = ({
   onSave,               // opcional (Schedule pode controlar salvar)
   onDelete,             // opcional (Schedule pode controlar excluir)
 }) => {
+  const DEFAULT_DURATION = 60; // minutos caso serviço não tenha duração
+
   const [formData, setFormData] = useState({
     clientId: "",
     serviceId: "",
     professionalId: "",
     start: new Date(),
-    end: new Date(new Date().getTime() + 60 * 60 * 1000),
+    end: addMinutes(new Date(), DEFAULT_DURATION),
     notes: "",
     status: "SCHEDULED",
   });
+
+  // mapa de serviços por id (para pegar duração)
+  const serviceById = useMemo(() => {
+    const m = {};
+    asArray(services).forEach((s) => (m[s.id] = s));
+    return m;
+  }, [services]);
 
   // Pré-preenche ao abrir
   useEffect(() => {
@@ -142,17 +193,31 @@ const AppointmentModal = ({
         clientId: event.clientId || "",
         serviceId: event.serviceId || "",
         professionalId: event.userId || "", // backend usa userId
-        start: new Date(event.start),
-        end: new Date(event.end),
+        start: parseApiDateAsLocal(event.start),
+        end: parseApiDateAsLocal(event.end),
         notes: event.notes || "",
         status: event.status || "SCHEDULED",
       });
     } else {
       const start = slot?.start ? new Date(slot.start) : new Date();
-      const end = slot?.end ? new Date(slot.end) : new Date(start.getTime() + 60 * 60 * 1000);
+      // se já tem serviço escolhido, usa sua duração; senão default
+      const dur =
+        (slot?.durationMinutes ||
+          serviceById?.[formData.serviceId]?.duration ||
+          DEFAULT_DURATION) | 0;
+      const end = addMinutes(start, dur || DEFAULT_DURATION);
       setFormData((prev) => ({ ...prev, start, end }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, slot]);
+
+  // Quando trocar serviço, recalcula "end" usando a duração
+  useEffect(() => {
+    const s = serviceById[formData.serviceId];
+    if (!s) return;
+    const dur = Number(s.duration || DEFAULT_DURATION);
+    setFormData((p) => ({ ...p, end: addMinutes(p.start, dur) }));
+  }, [formData.serviceId, serviceById]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -163,17 +228,21 @@ const AppointmentModal = ({
 
   const handleDateChange = (e) => {
     const date = e.target.value; // YYYY-MM-DD
-    const time = formData.start.toTimeString().split(" ")[0]; // HH:mm:ss
+    const time = toHM(formData.start); // HH:mm
     const newStart = new Date(`${date}T${time}`);
-    const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
+    const dur =
+      Number(serviceById?.[formData.serviceId]?.duration) || DEFAULT_DURATION;
+    const newEnd = addMinutes(newStart, dur);
     setFormData((p) => ({ ...p, start: newStart, end: newEnd }));
   };
 
   const handleTimeChange = (e) => {
     const time = e.target.value; // HH:mm
-    const date = formData.start.toISOString().split("T")[0]; // YYYY-MM-DD
+    const date = toYMDLocal(formData.start); // YYYY-MM-DD
     const newStart = new Date(`${date}T${time}`);
-    const newEnd = new Date(newStart.getTime() + 60 * 60 * 1000);
+    const dur =
+      Number(serviceById?.[formData.serviceId]?.duration) || DEFAULT_DURATION;
+    const newEnd = addMinutes(newStart, dur);
     setFormData((p) => ({ ...p, start: newStart, end: newEnd }));
   };
 
@@ -181,8 +250,9 @@ const AppointmentModal = ({
     clientId: formData.clientId,
     serviceId: formData.serviceId,
     userId: formData.professionalId || null, // backend usa userId
-    start: formData.start.toISOString(),
-    end: formData.end.toISOString(),
+    // >>> Envio LOCAL, sem Z (evita shift de fuso)
+    start: toLocalISOStringNoZ(formData.start),
+    end: toLocalISOStringNoZ(formData.end),
     notes: formData.notes || "",
     status: formData.status || "SCHEDULED",
   });
@@ -209,7 +279,7 @@ const AppointmentModal = ({
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDeleteClick = async (id) => {
     try {
       if (onDelete) {
         await onDelete(id);
@@ -248,7 +318,7 @@ const AppointmentModal = ({
             </label>
             <input
               type="date"
-              value={formData.start.toISOString().split("T")[0]}
+              value={toYMDLocal(formData.start)}
               onChange={handleDateChange}
               className="w-full px-3 py-2 text-sm border rounded-md"
               style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
@@ -261,7 +331,7 @@ const AppointmentModal = ({
             </label>
             <input
               type="time"
-              value={formData.start.toTimeString().substring(0, 5)}
+              value={toHM(formData.start)}
               onChange={handleTimeChange}
               className="w-full px-3 py-2 text-sm border rounded-md"
               style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
@@ -290,6 +360,11 @@ const AppointmentModal = ({
               </option>
             ))}
           </select>
+          {formData.serviceId && (
+            <p className="mt-2 text-xs opacity-70" style={{ color: "var(--text-color)" }}>
+              Duração: {serviceById?.[formData.serviceId]?.duration || DEFAULT_DURATION} min
+            </p>
+          )}
         </div>
 
         {/* Profissional */}
@@ -343,7 +418,7 @@ const AppointmentModal = ({
           <textarea
             name="notes"
             value={formData.notes}
-            onChange={handleChange}
+            onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
             rows={2}
             className="w-full px-3 py-2 text-sm border rounded-md"
             style={{ background: "var(--bg-color)", color: "var(--text-color)" }}
@@ -354,7 +429,7 @@ const AppointmentModal = ({
         <div className="flex justify-between items-center pt-2">
           {event ? (
             <NeuButton
-              onClick={() => handleDelete(event.id)}
+              onClick={() => handleDeleteClick(event.id)}
               className="!px-3 !py-2"
               title="Excluir agendamento"
             >
