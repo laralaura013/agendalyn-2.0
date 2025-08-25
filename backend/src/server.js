@@ -45,6 +45,9 @@ import paymentMethodRoutes from './routes/paymentMethodRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import metaRoutes from './routes/metaRoutes.js';
 
+// *** NOVO: Analytics (Performance) ***
+import analyticsRoutes from './routes/analyticsRoutes.js';
+
 dotenv.config();
 
 const app = express();
@@ -182,6 +185,9 @@ app.use('/api/exports', exportRoutes);
 
 // Pagamentos
 app.use('/api/payment-methods', paymentMethodRoutes);
+
+// *** NOVO: Analytics (Performance) ***
+app.use('/api/analytics', analyticsRoutes);
 
 /* ------------------------------------------------------------------ *
  * Healthchecks & utilitários

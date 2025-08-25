@@ -68,6 +68,9 @@ import CashflowReportPage from "./pages/reports/CashflowReportPage";
 /* Menu (novo) */
 import Menu from "./pages/Menu";
 
+/* Performance (NOVA PÁGINA) */
+import PerformancePage from "./pages/PerformancePage";
+
 /* Fallback simples p/ rotas não mapeadas */
 const NotFound = () => (
   <div className="p-6 text-sm text-gray-600">Página não encontrada.</div>
@@ -105,7 +108,6 @@ function App() {
     document.head.appendChild(style);
 
     return () => {
-      // limpa o style injetado ao desmontar (opcional)
       const s = document.querySelector('style[data-force-light="true"]');
       if (s) s.remove();
     };
@@ -177,6 +179,9 @@ function App() {
 
                 {/* Menu */}
                 <Route path="menu" element={<Menu />} />
+
+                {/* Performance (NOVA ROTA) */}
+                <Route path="performance" element={<PerformancePage />} />
               </Route>
             </Route>
 

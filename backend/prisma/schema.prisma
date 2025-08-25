@@ -1,4 +1,4 @@
-generator client { 
+generator client {
   provider = "prisma-client-js"
 }
 
@@ -52,6 +52,7 @@ model Company {
   users           User[]
   scheduleBlocks  ScheduleBlock[]
   waitlists       Waitlist[]
+  reviews         Review[]          // <— para NPS/avaliações
 
   // SPRINT 1
   suppliers           Supplier[]
@@ -71,7 +72,7 @@ model User {
   role          Role     @default(STAFF)
   commission    Decimal? @db.Decimal(5, 2)
   workSchedule  Json?
-  phone         String?  @unique                // <— ÚNICO
+  phone         String?  @unique
   nickname      String?
   companyId     String
   createdAt     DateTime @default(now())
@@ -87,9 +88,10 @@ model User {
   scheduleBlocks       ScheduleBlock[]
   waitlists            Waitlist[]
   googleIntegration    GoogleIntegration?
+  reviews              Review[]              // avaliações recebidas
 
   @@index([companyId])
-  @@unique([companyId, email])               // <— ÚNICO por empresa (multi-tenant)
+  @@unique([companyId, email])
 }
 
 model Service {
@@ -108,6 +110,7 @@ model Service {
   packages     Package[]     @relation("PackageServices")
   availableTo  User[]        @relation("ServiceToUser")
   waitlists    Waitlist[]
+  reviews      Review[]      // avaliações do serviço
 
   @@index([companyId])
 }
@@ -157,6 +160,7 @@ model Client {
   orders           Order[]
   waitlists        Waitlist[]
   Receivable       Receivable[]
+  reviews          Review[]
 
   @@unique([companyId, email])
   @@unique([companyId, cpf])
@@ -194,6 +198,7 @@ model Appointment {
   @@index([companyId, start])
   @@index([userId, start])
   @@index([clientId, start])
+  @@index([companyId, status, start]) // <— ajuda em analytics
 }
 
 model Order {
@@ -224,6 +229,7 @@ model Order {
   @@index([companyId])
   @@index([clientId])
   @@index([userId])
+  @@index([companyId, status, createdAt]) // <— ajuda em analytics
 }
 
 model OrderItem {
@@ -499,6 +505,29 @@ model GoogleIntegration {
   updatedAt DateTime @updatedAt
 }
 
+/* ========= NOVO: Avaliações (para NPS/qualidade) ========= */
+model Review {
+  id        String   @id @default(cuid())
+  companyId String
+  clientId  String?
+  userId    String?  // profissional atendente
+  serviceId String?
+  rating    Int      // 1..5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  client  Client? @relation(fields: [clientId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+  service Service? @relation(fields: [serviceId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([companyId, userId, createdAt])
+  @@index([companyId, serviceId, createdAt])
+}
+
+/* ====================== ENUMS ======================= */
+
 enum Role {
   OWNER
   ADMIN
@@ -513,6 +542,7 @@ enum AppointmentStatus {
   CONFIRMED
   CANCELED
   COMPLETED
+  NO_SHOW   // <— ADICIONADO para KPI de faltas
 }
 
 enum OrderStatus {

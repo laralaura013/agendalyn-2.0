@@ -1,307 +1,266 @@
 // src/controllers/appointmentController.js
-const { PrismaClient } = require('@prisma/client')
-const prisma = new PrismaClient()
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
-/**
- * Utils
- * ------------------------------------------------------------------ */
-
-/** yyyy-mm-dd -> { start: Date at 00:00, end: Date at 23:59:59.999 }  (em local time) */
-function dayBounds(ymd) {
-  const [y, m, d] = String(ymd).split('-').map(n => parseInt(n, 10))
-  const start = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0)
-  const end   = new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999)
-  return { start, end }
-}
-
-/** yyyy-mm-dd -> Date local 00:00 */
-function atStartOfDay(ymd) {
-  const [y, m, d] = String(ymd).split('-').map(n => parseInt(n, 10))
-  return new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0)
-}
-
-/** yyyy-mm-dd -> Date local 23:59:59.999 */
-function atEndOfDay(ymd) {
-  const [y, m, d] = String(ymd).split('-').map(n => parseInt(n, 10))
-  return new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999)
-}
-
-/**
- * Se vier string ISO com Z (UTC), o Date já fica correto. Se vier "YYYY-MM-DDTHH:mm"
- * tratamos como horário LOCAL (sem aplicar fuso na criação).
+/** Helpers de data
+ * Front envia ISO (com Z). Guardamos UTC (OK).
+ * Para qualquer payload sem timezone (edge cases), tratamos como hora local e convertemos p/ UTC.
  */
-function parseAsLocalOrIso(value) {
-  if (value instanceof Date) return value
-  if (typeof value !== 'string') return new Date(value)
-  // ISO completo? deixa o JS tratar
-  if (/\dT\d/.test(value) && /Z|[+\-]\d{2}:\d{2}$/.test(value)) return new Date(value)
-  // "YYYY-MM-DDTHH:mm" (sem Z) -> criar como local
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value)) {
-    const [datePart, timePart] = value.split('T')
-    const [y, m, d] = datePart.split('-').map(n => parseInt(n, 10))
-    const [hh, mm = '0', ss = '0'] = timePart.split(':')
-    return new Date(y, (m || 1) - 1, d || 1, parseInt(hh,10) || 0, parseInt(mm,10) || 0, parseInt(ss,10) || 0, 0)
-  }
-  // "YYYY-MM-DD" -> começo do dia local
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return atStartOfDay(value)
-  return new Date(value)
+function toDateFromPossiblyLocalISO(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const s = String(value);
+  // se vier sem Z/offset, interpretamos como local e deixamos o Date fazer a conversão p/ UTC internamente
+  const isOffset = /Z|[+\-]\d{2}:\d{2}$/.test(s);
+  return isOffset ? new Date(s) : new Date(s + 'Z'); // fallback seguro
 }
 
-/** Inclui relações padrão para o front */
-const defaultInclude = {
-  client:  { select: { id: true, name: true, phone: true, avatarUrl: true } },
-  service: { select: { id: true, name: true, duration: true, price: true } },
-  user:    { select: { id: true, name: true, nickname: true, role: true } },
+function ensureCompanyFilter(where = {}, companyId) {
+  return { ...where, companyId };
 }
 
-/**
- * GET /appointments
- * Query params aceitos:
- * - date=YYYY-MM-DD                (um dia)
- * - date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
- * - professionalId                 (mapeia para userId)
- * - clientId, serviceId, status
- * - take, skip                     (pagina)
+/** GET /appointments
+ * Query:
+ *  - date (YYYY-MM-DD)  -> dia específico
+ *  - date_from & date_to (YYYY-MM-DD) -> intervalo
+ *  - professionalId (userId)
  */
-async function list(req, res) {
+export const listAppointments = async (req, res) => {
   try {
-    const {
-      date,
-      date_from,
-      date_to,
-      professionalId,
-      clientId,
-      serviceId,
-      status,
-      take,
-      skip,
-    } = req.query
+    const companyId = req.user?.companyId || req.companyId || req.query.companyId;
+    if (!companyId) return res.status(400).json({ message: 'companyId é obrigatório' });
 
-    const where = {}
+    const { date, date_from, date_to, professionalId } = req.query;
 
-    // Filtro por período
+    let range = {};
     if (date) {
-      const { start, end } = dayBounds(date)
-      where.start = { gte: start, lte: end }
-    } else if (date_from || date_to) {
-      if (date_from) where.start = Object.assign(where.start || {}, { gte: atStartOfDay(date_from) })
-      if (date_to)   where.start = Object.assign(where.start || {}, { lte: atEndOfDay(date_to) })
+      const start = new Date(`${date}T00:00:00.000Z`);
+      const end = new Date(`${date}T23:59:59.999Z`);
+      range = { gte: start, lte: end };
+    } else if (date_from && date_to) {
+      const start = new Date(`${date_from}T00:00:00.000Z`);
+      const end = new Date(`${date_to}T23:59:59.999Z`);
+      range = { gte: start, lte: end };
     }
 
-    // Filtros adicionais
-    if (professionalId) where.userId = String(professionalId)
-    if (clientId)       where.clientId = String(clientId)
-    if (serviceId)      where.serviceId = String(serviceId)
-    if (status)         where.status = status
+    const where = ensureCompanyFilter(
+      {
+        ...(Object.keys(range).length ? { start: range } : {}),
+        ...(professionalId ? { userId: professionalId } : {}),
+        NOT: { status: { in: ['CANCELED'] } },
+      },
+      companyId
+    );
 
-    const takeNum = take ? Math.min(parseInt(take, 10) || 0, 200) : 200
-    const skipNum = skip ? parseInt(skip, 10) || 0 : 0
+    const items = await prisma.appointment.findMany({
+      where,
+      include: {
+        client: { select: { id: true, name: true, phone: true } },
+        service: { select: { id: true, name: true, duration: true } },
+        user: { select: { id: true, name: true } },
+      },
+      orderBy: [{ start: 'asc' }],
+    });
 
-    const [items, total] = await Promise.all([
-      prisma.appointment.findMany({
-        where,
-        orderBy: { start: 'asc' },
-        take: takeNum,
-        skip: skipNum,
-        include: defaultInclude,
-      }),
-      prisma.appointment.count({ where }),
-    ])
-
-    // Se quiser retornar as datas "sem Z" (local) para evitar o deslocamento no front,
-    // descomente o bloco abaixo. OBS: Pode impactar outras integrações.
-    /*
-    const normalized = items.map(it => ({
-      ...it,
-      start: toLocalIsoNoZ(it.start),
-      end:   toLocalIsoNoZ(it.end),
-    }))
-    return res.json({ items: normalized, total })
-    */
-
-    return res.json({ items, total })
+    res.json(items);
   } catch (err) {
-    console.error('[appointments.list] error:', err)
-    return res.status(500).json({ message: 'Erro ao listar agendamentos.' })
+    console.error('listAppointments error', err);
+    res.status(500).json({ message: 'Erro ao listar agendamentos' });
   }
-}
+};
 
-/**
- * GET /appointments/:id
- */
-async function getById(req, res) {
+export const getAppointment = async (req, res) => {
   try {
-    const { id } = req.params
-    const item = await prisma.appointment.findUnique({
-      where: { id },
-      include: defaultInclude,
-    })
-    if (!item) return res.status(404).json({ message: 'Agendamento não encontrado.' })
-    return res.json(item)
+    const companyId = req.user?.companyId || req.companyId || req.query.companyId;
+    const { id } = req.params;
+    const item = await prisma.appointment.findFirst({
+      where: { id, companyId },
+      include: {
+        client: true,
+        service: true,
+        user: true,
+      },
+    });
+    if (!item) return res.status(404).json({ message: 'Agendamento não encontrado' });
+    res.json(item);
   } catch (err) {
-    console.error('[appointments.getById] error:', err)
-    return res.status(500).json({ message: 'Erro ao buscar agendamento.' })
+    console.error('getAppointment error', err);
+    res.status(500).json({ message: 'Erro ao buscar agendamento' });
   }
-}
+};
 
-/**
- * POST /appointments
- * Body esperado (mínimo):
- * {
- *   start: "YYYY-MM-DDTHH:mm" | ISO,
- *   end:   "YYYY-MM-DDTHH:mm" | ISO,      // OU: durationMin + start
- *   durationMin?: number,
- *   userId: string,        // (barbeiro/profissional)
- *   serviceId: string,
- *   clientId: string,
- *   notes?: string,
- *   status?: "SCHEDULED" | "CONFIRMED" | "CANCELED" | "COMPLETED"
- * }
- */
-async function create(req, res) {
+export const createAppointment = async (req, res) => {
   try {
+    const companyId = req.user?.companyId || req.companyId || req.body.companyId;
+    if (!companyId) return res.status(400).json({ message: 'companyId é obrigatório' });
+
     const {
+      clientId,
+      serviceId,
+      userId, // profissional
       start,
       end,
-      durationMin,
-      userId,
-      serviceId,
-      clientId,
       notes,
-      status,
-      companyId, // opcional se você injeta via middleware multi-tenant
-    } = req.body
+      status = 'SCHEDULED',
+    } = req.body;
 
-    if (!start) return res.status(400).json({ message: 'Campo "start" é obrigatório.' })
-    if (!userId) return res.status(400).json({ message: 'Campo "userId" é obrigatório.' })
-    if (!serviceId) return res.status(400).json({ message: 'Campo "serviceId" é obrigatório.' })
-    if (!clientId) return res.status(400).json({ message: 'Campo "clientId" é obrigatório.' })
+    const missing = [];
+    if (!clientId) missing.push('clientId');
+    if (!serviceId) missing.push('serviceId');
+    if (!userId) missing.push('userId');
+    if (!start) missing.push('start');
+    if (!end) missing.push('end');
+    if (missing.length) return res.status(400).json({ message: 'Campos obrigatórios faltando', missing });
 
-    const startDt = parseAsLocalOrIso(start)
-    let endDt = end ? parseAsLocalOrIso(end) : null
+    const startDate = toDateFromPossiblyLocalISO(start);
+    const endDate = toDateFromPossiblyLocalISO(end);
 
-    if (!endDt) {
-      const dur = parseInt(durationMin, 10)
-      if (!dur || dur <= 0) {
-        // buscar duração do serviço como fallback
-        const svc = await prisma.service.findUnique({ where: { id: serviceId }, select: { duration: true } })
-        const minutes = svc?.duration || 30
-        endDt = new Date(startDt.getTime() + minutes * 60000)
-      } else {
-        endDt = new Date(startDt.getTime() + dur * 60000)
-      }
+    // valida conflito básico no mesmo userId
+    const clash = await prisma.appointment.findFirst({
+      where: {
+        companyId,
+        userId,
+        status: { notIn: ['CANCELED'] },
+        // overlap: (start < newEnd) && (end > newStart)
+        start: { lt: endDate },
+        end: { gt: startDate },
+      },
+    });
+    if (clash) {
+      return res.status(409).json({ message: 'Conflito de horário para o profissional selecionado.' });
     }
 
     const created = await prisma.appointment.create({
       data: {
-        start: startDt,
-        end: endDt,
-        notes: notes || null,
-        status: status || 'SCHEDULED',
-        service: { connect: { id: serviceId } },
-        user:    { connect: { id: userId } },
-        client:  { connect: { id: clientId } },
-        company: companyId ? { connect: { id: companyId } } : undefined,
+        companyId,
+        clientId,
+        serviceId,
+        userId,
+        start: startDate,
+        end: endDate,
+        notes: notes || '',
+        status,
       },
-      include: defaultInclude,
-    })
+    });
 
-    return res.status(201).json(created)
+    res.status(201).json(created);
   } catch (err) {
-    console.error('[appointments.create] error:', err)
-    return res.status(500).json({ message: 'Erro ao criar agendamento.' })
+    console.error('createAppointment error', err);
+    res.status(500).json({ message: 'Erro ao criar agendamento' });
   }
-}
+};
 
-/**
- * PUT /appointments/:id
- * Body: mesmos campos do POST (parciais)
- */
-async function update(req, res) {
+export const updateAppointment = async (req, res) => {
   try {
-    const { id } = req.params
+    const companyId = req.user?.companyId || req.companyId || req.body.companyId;
+    const { id } = req.params;
+
     const {
+      clientId,
+      serviceId,
+      userId,
       start,
       end,
-      durationMin,
-      userId,
-      serviceId,
-      clientId,
       notes,
       status,
-      cancelReasonId,
-    } = req.body
+    } = req.body;
 
-    // montar objeto de update dinamicamente
-    const data = {}
-    if (notes !== undefined) data.notes = notes
-    if (status) data.status = status
-    if (cancelReasonId !== undefined) data.cancelReason = cancelReasonId ? { connect: { id: cancelReasonId } } : { disconnect: true }
-    if (userId)    data.user    = { connect: { id: userId } }
-    if (serviceId) data.service = { connect: { id: serviceId } }
-    if (clientId)  data.client  = { connect: { id: clientId } }
+    const startDate = start ? toDateFromPossiblyLocalISO(start) : undefined;
+    const endDate = end ? toDateFromPossiblyLocalISO(end) : undefined;
 
-    // tratar datas/duração
-    let startDt = start ? parseAsLocalOrIso(start) : undefined
-    let endDt   = end   ? parseAsLocalOrIso(end)   : undefined
-    if (startDt && !endDt && durationMin) {
-      endDt = new Date(startDt.getTime() + (parseInt(durationMin, 10) || 30) * 60000)
+    // opcional: checar conflito se start/end/userId alterarem
+    if (startDate && endDate && userId) {
+      const clash = await prisma.appointment.findFirst({
+        where: {
+          companyId,
+          userId,
+          id: { not: id },
+          status: { notIn: ['CANCELED'] },
+          start: { lt: endDate },
+          end: { gt: startDate },
+        },
+      });
+      if (clash) {
+        return res.status(409).json({ message: 'Conflito de horário para o profissional selecionado.' });
+      }
     }
-    if (startDt) data.start = startDt
-    if (endDt)   data.end   = endDt
 
     const updated = await prisma.appointment.update({
       where: { id },
-      data,
-      include: defaultInclude,
-    })
-    return res.json(updated)
-  } catch (err) {
-    console.error('[appointments.update] error:', err)
-    if (err?.code === 'P2025') {
-      return res.status(404).json({ message: 'Agendamento não encontrado.' })
-    }
-    return res.status(500).json({ message: 'Erro ao atualizar agendamento.' })
-  }
-}
+      data: {
+        ...(clientId ? { clientId } : {}),
+        ...(serviceId ? { serviceId } : {}),
+        ...(userId ? { userId } : {}),
+        ...(startDate ? { start: startDate } : {}),
+        ...(endDate ? { end: endDate } : {}),
+        ...(typeof notes === 'string' ? { notes } : {}),
+        ...(status ? { status } : {}),
+      },
+    });
 
-/**
- * DELETE /appointments/:id
- */
-async function remove(req, res) {
+    res.json(updated);
+  } catch (err) {
+    console.error('updateAppointment error', err);
+    if (err?.code === 'P2025') {
+      return res.status(404).json({ message: 'Agendamento não encontrado' });
+    }
+    res.status(500).json({ message: 'Erro ao atualizar agendamento' });
+  }
+};
+
+export const deleteAppointment = async (req, res) => {
   try {
-    const { id } = req.params
-    await prisma.appointment.delete({ where: { id } })
-    return res.json({ ok: true })
+    const { id } = req.params;
+    await prisma.appointment.delete({ where: { id } });
+    res.json({ ok: true });
   } catch (err) {
-    console.error('[appointments.remove] error:', err)
+    console.error('deleteAppointment error', err);
     if (err?.code === 'P2025') {
-      return res.status(404).json({ message: 'Agendamento não encontrado.' })
+      return res.status(404).json({ message: 'Agendamento não encontrado' });
     }
-    return res.status(500).json({ message: 'Erro ao excluir agendamento.' })
+    res.status(500).json({ message: 'Erro ao excluir agendamento' });
   }
-}
+};
 
-module.exports = {
-  list,
-  getById,
-  create,
-  update,
-  remove,
-}
+/** Opcional: slots públicos (simples) — ajuste conforme sua regra */
+export const listAvailableSlots = async (req, res) => {
+  try {
+    const companyId = req.user?.companyId || req.companyId || req.query.companyId;
+    const { date, staffId, duration = 30 } = req.query;
+    if (!date) return res.status(400).json({ message: 'date é obrigatório (YYYY-MM-DD)' });
 
-/**
- * (Opcional) Helper para retornar ISO local SEM 'Z'
- * Útil se você quiser padronizar o retorno "sem fuso" no backend.
- */
-function toLocalIsoNoZ(date) {
-  const d = (date instanceof Date) ? date : new Date(date)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  const ss = String(d.getSeconds()).padStart(2, '0')
-  const ms = String(d.getMilliseconds()).padStart(3, '0')
-  return `${y}-${m}-${day}T${hh}:${mm}:${ss}.${ms}`
-}
+    const dayStart = new Date(`${date}T00:00:00.000Z`);
+    const dayEnd = new Date(`${date}T23:59:59.999Z`);
+
+    const where = ensureCompanyFilter(
+      {
+        start: { gte: dayStart, lte: dayEnd },
+        ...(staffId ? { userId: staffId } : {}),
+        status: { notIn: ['CANCELED'] },
+      },
+      companyId
+    );
+
+    const appts = await prisma.appointment.findMany({ where, orderBy: [{ start: 'asc' }] });
+
+    // Regra fake de trabalho 08-18
+    const workStart = new Date(`${date}T08:00:00.000Z`);
+    const workEnd = new Date(`${date}T18:00:00.000Z`);
+    const stepMs = Number(duration) * 60 * 1000;
+
+    const slots = [];
+    for (let t = +workStart; t + stepMs <= +workEnd; t += stepMs) {
+      const s = new Date(t);
+      const e = new Date(t + stepMs);
+      const clash = appts.some(a => (+new Date(a.start) < +e) && (+new Date(a.end) > +s));
+      if (!clash) {
+        // devolve em HH:mm no FUSO LOCAL do servidor; o front já lida com exibição
+        slots.push(s.toISOString().substring(11, 16)); // "HH:MM"
+      }
+    }
+    res.json(slots);
+  } catch (err) {
+    console.error('listAvailableSlots error', err);
+    res.status(500).json({ message: 'Erro ao calcular slots' });
+  }
+};
