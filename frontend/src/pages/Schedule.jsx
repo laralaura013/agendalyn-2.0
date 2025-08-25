@@ -26,6 +26,34 @@ import "../styles/neumorphism.css";
 
 const DEFAULT_SLOT_MINUTES = 30;
 
+/* ====================== Cores por barbeiro ====================== */
+const STAFF_COLORS = [
+  "#6366F1", // indigo
+  "#10B981", // emerald
+  "#F59E0B", // amber
+  "#EF4444", // red
+  "#06B6D4", // cyan
+  "#8B5CF6", // violet
+  "#84CC16", // lime
+  "#F97316", // orange
+  "#14B8A6", // teal
+  "#3B82F6", // blue
+];
+const hexToRgba = (hex, alpha = 0.18) => {
+  const h = hex.replace("#", "");
+  const n = parseInt(h, 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+const hashToIndex = (id) => {
+  const s = String(id ?? "");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % STAFF_COLORS.length;
+};
+
 /* ====================== Helpers ====================== */
 const isAbort = (err) =>
   err?.name === "CanceledError" || err?.code === "ERR_CANCELED" || err?.message === "canceled";
@@ -102,7 +130,7 @@ export default function Schedule() {
   const [blocks, setBlocks] = useState([]);
 
   const [view, setView] = useState("day"); // dia/semana/mês (Calendar)
-  const [layout, setLayout] = useState("agenda"); // "agenda" | "profissionais"  ← NOVO MODO
+  const [layout, setLayout] = useState("agenda"); // "agenda" | "profissionais"
   const [date, setDate] = useState(() => new Date());
   const [selectedPro, setSelectedPro] = useState(null);
 
@@ -163,6 +191,27 @@ export default function Schedule() {
     setStaff(firstArray(stRes));
   }, []);
 
+  /* --------- Mapa/cores de staff --------- */
+  const staffById = useMemo(() => {
+    const m = {};
+    asArray(staff).forEach((s) => (m[s.id] = s));
+    return m;
+  }, [staff]);
+
+  const getStaffColor = useCallback(
+    (staffId) => {
+      const pref = staffById[staffId]?.color; // se vier do backend
+      const base = pref || STAFF_COLORS[hashToIndex(staffId)];
+      return {
+        base,
+        soft: hexToRgba(base, 0.18),
+        border: hexToRgba(base, 0.65),
+        text: "#0b1324",
+      };
+    },
+    [staffById]
+  );
+
   const fetchAppointments = useCallback(
     async (signal) => {
       try {
@@ -172,13 +221,20 @@ export default function Schedule() {
           const st = String(apt.status || "").toUpperCase();
           return !["CANCELED", "DELETED", "REMOVED"].includes(st);
         });
-        const formatted = rows.map((apt) => ({
-          id: apt.id,
-          title: `${apt.client?.name ?? "Cliente"} - ${apt.service?.name ?? "Serviço"}`,
-          start: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
-          end: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
-          resource: apt,
-        }));
+        const formatted = rows.map((apt) => {
+          const staffId = apt.professionalId ?? apt.staffId ?? apt.userId ?? null;
+          const colors = staffId ? getStaffColor(staffId) : null;
+          return {
+            id: apt.id,
+            title: `${apt.client?.name ?? "Cliente"} - ${apt.service?.name ?? "Serviço"}`,
+            start: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
+            end: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
+            resource: apt,
+            backgroundColor: colors?.soft,
+            borderColor: colors?.base,
+            textColor: colors?.text,
+          };
+        });
         setEvents(formatted);
       } catch (error) {
         if (isAbort(error)) return;
@@ -186,7 +242,7 @@ export default function Schedule() {
         toast.error("Erro ao carregar os agendamentos.");
       }
     },
-    [date, buildRangeParams]
+    [date, buildRangeParams, getStaffColor]
   );
 
   const fetchBlocks = useCallback(
@@ -220,7 +276,6 @@ export default function Schedule() {
           .map((s) => (typeof s === "string" ? s : s?.formatted || s?.time))
           .filter(Boolean);
 
-        // fallback: algumas APIs só retornam slot com serviceId
         if (items.length === 0 && services?.[0]?.id) {
           res = await api.get("/public/available-slots", {
             params: { ...baseParams, serviceId: services[0].id },
@@ -439,22 +494,28 @@ export default function Schedule() {
 
   const combinedEvents = useMemo(() => [...events, ...blockEvents], [events, blockEvents]);
 
-  // → Apontamentos em formato para o modo "Profissionais"
+  // → Agendamentos em formato para o modo "Profissionais" (com cores)
   const staffAppointments = useMemo(() => {
     return asArray(events)
       .map((ev) => ev?.resource)
       .filter(Boolean)
-      .map((apt) => ({
-        id: apt.id,
-        clientName: apt.client?.name ?? "Cliente",
-        serviceName: apt.service?.name ?? "Serviço",
-        startsAt: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
-        endsAt: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
-        staffId: apt.professionalId ?? apt.staffId ?? apt.userId ?? null,
-        color: "#9333ea22",
-      }))
+      .map((apt) => {
+        const staffId = apt.professionalId ?? apt.staffId ?? apt.userId ?? null;
+        const colors = staffId ? getStaffColor(staffId) : null;
+        return {
+          id: apt.id,
+          clientName: apt.client?.name ?? "Cliente",
+          serviceName: apt.service?.name ?? "Serviço",
+          startsAt: typeof apt.start === "string" ? parseISO(apt.start) : new Date(apt.start),
+          endsAt: typeof apt.end === "string" ? parseISO(apt.end) : new Date(apt.end),
+          staffId,
+          color: colors?.soft,
+          borderColor: colors?.base,
+          textColor: colors?.text,
+        };
+      })
       .filter((a) => a.staffId);
-  }, [events]);
+  }, [events, getStaffColor]);
 
   const handlePickAvailableSlot = useCallback(
     (hhmm) => {
@@ -489,7 +550,7 @@ export default function Schedule() {
 
   // Clique em coluna no modo "Profissionais"
   const handleCreateOnColumn = useCallback((pro, start, end) => {
-    setSelectedPro(pro?.id || pro); // pré-seleciona o barbeiro
+    setSelectedPro(pro?.id || pro);
     setSelectedEvent(null);
     setSelectedSlot({ start, end });
     setIsModalOpen(true);
@@ -556,7 +617,7 @@ export default function Schedule() {
 
           <div className="flex items-center gap-2">
             <ViewToggle value={view} onChange={setView} />
-            {/* Toggle do layout (NÃO altera seu design; só troca o componente renderizado) */}
+            {/* Toggle do layout */}
             <LayoutToggle value={layout} onChange={setLayout} />
             <NeuButton
               onClick={() => {
@@ -759,8 +820,6 @@ export default function Schedule() {
           staff={staff}
           onSave={handleSave}
           onDelete={handleDelete}
-          // dica: se seu AppointmentModal permitir valor inicial de profissional,
-          // use selectedPro como default (já está sendo setado ao clicar em coluna).
         />
       )}
 
@@ -1189,7 +1248,6 @@ function MobileDaysStrip({ date, onChangeDate }) {
 
 /* =========================================================
  * StaffColumnView (visão em colunas por profissional)
- * Mantido aqui dentro para facilitar colar 1 arquivo só.
  * =======================================================*/
 function StaffColumnView({
   date,
@@ -1324,7 +1382,13 @@ function StaffColumnView({
                       onAppointmentClick?.(a);
                     }}
                     className="absolute left-2 right-2 rounded-xl shadow-sm border hover:shadow-md transition"
-                    style={{ top: `${top}%`, height: `${height}%`, background: a.color || "#9333ea22" }}
+                    style={{
+                      top: `${top}%`,
+                      height: `${height}%`,
+                      background: a.color || "#9333ea22",
+                      borderColor: a.borderColor || "transparent",
+                      borderWidth: "1px",
+                    }}
                   >
                     <div className="text-[11px] font-medium px-2 pt-1 text-gray-800 truncate">
                       {a.clientName}
