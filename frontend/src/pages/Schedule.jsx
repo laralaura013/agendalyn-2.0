@@ -1329,7 +1329,6 @@ function StaffColumnView({
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const pct = y / rect.height;
-    the:
     const minsFromStart = Math.round((pct * totalMinutes) / slotMinutes) * slotMinutes;
     const start = new Date(dayStart.getTime() + minsFromStart * 60000);
     const end = new Date(start.getTime() + slotMinutes * 60000);
