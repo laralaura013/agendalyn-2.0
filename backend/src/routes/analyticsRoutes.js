@@ -1,5 +1,6 @@
 // backend/src/routes/analyticsRoutes.js
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import {
   getPerformance,
   getBarberBreakdown,
@@ -8,8 +9,30 @@ import {
 
 const router = express.Router();
 
-// Exige usuário autenticado (assumindo que um auth middleware anterior popula req.user)
+/**
+ * Autenticação:
+ * - Se um middleware anterior já populou req.user, usamos.
+ * - Se não, tentamos decodificar Authorization: Bearer <token> com JWT_SECRET.
+ */
 router.use((req, res, next) => {
+  try {
+    if (!req.user) {
+      const auth = req.headers.authorization || '';
+      if (auth.startsWith('Bearer ')) {
+        const token = auth.slice(7);
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        // Esperado no token: id, companyId, role
+        req.user = {
+          id: payload.id,
+          companyId: payload.companyId,
+          role: payload.role,
+        };
+      }
+    }
+  } catch (e) {
+    // token inválido/expirado -> segue para o 401 abaixo
+  }
+
   if (!req.user?.id || !req.user?.companyId) {
     return res.status(401).json({ message: 'Não autenticado.' });
   }
@@ -21,7 +44,6 @@ const STAFFS = ['STAFF', 'BARBER', 'HAIRDRESSER'];
 
 /** ------------------------------------------------------------------ **
  * /api/analytics/performance
- * Admins veem a empresa toda; Staff/Barber/Hairdresser veem apenas o próprio userId
  ** ------------------------------------------------------------------ */
 router.get('/performance', (req, res, next) => {
   const role = req.user.role;
@@ -37,7 +59,6 @@ router.get('/performance', (req, res, next) => {
 
 /** ------------------------------------------------------------------ **
  * /api/analytics/barbers
- * Admins: ranking completo; Staff/Barber/Hairdresser: somente seus próprios números
  ** ------------------------------------------------------------------ */
 router.get('/barbers', (req, res, next) => {
   const role = req.user.role;
@@ -53,7 +74,6 @@ router.get('/barbers', (req, res, next) => {
 
 /** ------------------------------------------------------------------ **
  * /api/analytics/projection
- * Admins: projeção da empresa; Staff/Barber/Hairdresser: projeção do próprio
  ** ------------------------------------------------------------------ */
 router.get('/projection', (req, res, next) => {
   const role = req.user.role;
