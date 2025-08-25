@@ -1,16 +1,18 @@
-# Configurações de build para o projeto na Netlify
-[build]
-  # Onde a Netlify deve procurar os arquivos do frontend
-  base = "frontend/"
-  
-  # O comando para construir o site
-  command = "npm run build"
-  
-  # A pasta que contém o site final a ser publicado
-  # CORREÇÃO: Usamos "dist/" em vez de "frontend/dist/" porque o "base" já é "frontend/"
-  publish = "dist/"
+# netlify.toml (na raiz do repositório)
 
-# Regra de redirecionamento para garantir que o React Router funcione
+[build]
+  # Monorepo: o app está dentro de "frontend"
+  base = "frontend"
+  # O build do Vite/React
+  command = "npm ci && npm run build"
+  # Saída do Vite relativa ao base
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+# SPA fallback para React Router
 [[redirects]]
   from = "/*"
   to = "/index.html"

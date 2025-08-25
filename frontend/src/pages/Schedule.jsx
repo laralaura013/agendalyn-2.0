@@ -14,7 +14,6 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import Calendar from "../components/schedule/Calendar";
 import AppointmentModal from "../components/schedule/AppointmentModal";
@@ -68,6 +67,7 @@ function firstArray(res) {
   if (Array.isArray(d)) return d;
   if (Array.isArray(d?.items)) return d.items;
   if (Array.isArray(d?.results)) return d.results;
+  if (Array.isArray(d?.rows)) return d.rows;
   return [];
 }
 
@@ -117,7 +117,6 @@ export default function Schedule() {
   const [waitlistLoading, setWaitlistLoading] = useState(false);
 
   const loadedOnceRef = useRef(false);
-  const navigate = useNavigate();
 
   /* --------- Params por visão --------- */
   const buildRangeParams = useCallback(
@@ -138,9 +137,18 @@ export default function Schedule() {
     [view, selectedPro]
   );
 
+  /* --------- Normalizador de serviços --------- */
+  const normalizeServices = (rawList) =>
+    asArray(rawList).map((s) => ({
+      id: s.id,
+      name: s.name,
+      duration: s.duration ?? s.durationMinutes ?? null,
+      price: s.price ?? 0,
+      active: s.active ?? true,
+    }));
+
   /* --------- Loads --------- */
   const loadShared = useCallback(async (signal) => {
-    // tenta múltiplas rotas e normaliza o shape
     const [cRes, sRes, stRes] = await Promise.all([
       tryGet(["/clients/min", "/clients"], { params: { take: 100 }, signal }),
       tryGet(["/services", "/api/services", "/dashboard/services"], { params: { take: 200 }, signal }),
@@ -148,15 +156,7 @@ export default function Schedule() {
     ]);
 
     setClients(firstArray(cRes));
-    setServices(
-      firstArray(sRes).map((s) => ({
-        id: s.id,
-        name: s.name,
-        price: Number(s.price ?? 0),
-        duration: s.duration ?? s.durationMinutes ?? null,
-        active: s.active ?? true,
-      }))
-    );
+    setServices(normalizeServices(firstArray(sRes)));
     setStaff(firstArray(stRes));
   }, []);
 
@@ -492,7 +492,7 @@ export default function Schedule() {
           <NeuButton onClick={goPrev} className="!px-2 !py-2" aria-label="Anterior">
             <ChevronLeft className="w-5 h-5" />
           </NeuButton>
-          <div className="text-base font-semibold capitalize text-[var(--text-color)]">
+        <div className="text-base font-semibold capitalize text-[var(--text-color)]">
             {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date)}
           </div>
           <NeuButton onClick={goNext} className="!px-2 !py-2" aria-label="Próximo">
@@ -699,7 +699,7 @@ export default function Schedule() {
           event={selectedEvent}
           slot={selectedSlot}
           clients={clients}
-          services={services}  {/* <— agora vem normalizado como array sempre */}
+          services={services}
           staff={staff}
           onSave={handleSave}
           onDelete={handleDelete}
