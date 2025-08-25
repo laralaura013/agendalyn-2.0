@@ -16,7 +16,7 @@ function parseRange({ from, to }) {
 
 function linearRegression(y) {
   const n = y.length;
-  if (!n) return { a:0, b:0 };
+  if (!n) return { a: 0, b: 0 };
   const xs = Array.from({ length: n }, (_, i) => i + 1);
   const sumX = xs.reduce((a,b)=>a+b,0);
   const sumY = y.reduce((a,b)=>a+b,0);
@@ -80,14 +80,19 @@ export async function performanceOverview(params) {
     const totalRevenue = orders.reduce((s,o)=>s+num(o.total),0);
     const completed = appts.filter(a=>a.status==='COMPLETED').length;
     const scheduled = appts.filter(a=>['SCHEDULED','COMPLETED','NO_SHOW'].includes(a.status)).length;
-    const noshow = appts.filter(a=>a.status==='NO_SHOW').length;
+    const noshow =   appts.filter(a=>a.status==='NO_SHOW').length;
     const canceled = appts.filter(a=>a.status==='CANCELED').length;
-    const ticketMedio = completed ? totalRevenue / completed : (orders.length ? totalRevenue / orders.length : 0);
+    const ticketMedio = completed > 0
+      ? totalRevenue / completed
+      : (orders.length ? totalRevenue / orders.length : 0);
 
     // Ocupação REAL (somatório de todos os profissionais envolvidos no período)
     const userIds = [...new Set(appts.map(a => a.userId).filter(Boolean))];
     const staffList = userIds.length
-      ? await prisma.user.findMany({ where: { id: { in: userIds }, companyId }, select: { id:true, workSchedule:true } })
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds }, companyId },
+          select: { id:true, workSchedule:true }
+        })
       : [];
     const minutesBooked = appts
       .filter(a=>['SCHEDULED','COMPLETED','NO_SHOW'].includes(a.status))
@@ -130,7 +135,10 @@ export async function performanceOverview(params) {
     const serviceIds = Object.keys({ ...byServiceRevenue, ...byServiceCounts });
     let servicesMeta = {};
     if (serviceIds.length) {
-      const services = await prisma.service.findMany({ where: { id: { in: serviceIds } }, select: { id:true, name:true } });
+      const services = await prisma.service.findMany({
+        where: { id: { in: serviceIds } },
+        select: { id:true, name:true }
+      });
       servicesMeta = Object.fromEntries(services.map(s=>[s.id, s]));
     }
 
@@ -139,7 +147,12 @@ export async function performanceOverview(params) {
       const c = byServiceCounts[id]?.count || 0;
       const comp = byServiceCounts[id]?.completed || 0;
       const ticket = comp ? (r / comp) : 0;
-      return { serviceId:id, name: servicesMeta[id]?.name || id, category: '—', revenue:r, count:c, completed:comp, ticketMedio: ticket };
+      return {
+        serviceId:id,
+        name: servicesMeta[id]?.name || id,
+        category: '—',
+        revenue:r, count:c, completed:comp, ticketMedio: ticket
+      };
     }).sort((a,b)=> b.revenue - a.revenue).slice(0,10);
 
     // Coortes de retenção (1ª visita no mês)
@@ -147,7 +160,12 @@ export async function performanceOverview(params) {
     const endNow = endOfMonth(new Date());
     const firstApptByClient = await prisma.appointment.groupBy({
       by: ['clientId'],
-      where: { companyId, start: { gte: start12, lte: endNow }, status: { in: ['COMPLETED','SCHEDULED','NO_SHOW'] } },
+      where: {
+        companyId,
+        start: { gte: start12, lte: endNow },
+        status: { in: ['COMPLETED','SCHEDULED','NO_SHOW'] },
+        ...(userId ? { userId } : {}),
+      },
       _min: { start: true }
     });
 
@@ -161,7 +179,12 @@ export async function performanceOverview(params) {
 
     const clientIds12 = firstApptByClient.map(r=>r.clientId).filter(Boolean);
     const apptsAll = clientIds12.length ? await prisma.appointment.findMany({
-      where: { companyId, clientId: { in: clientIds12 }, status: { in: ['COMPLETED','SCHEDULED'] } },
+      where: {
+        companyId,
+        clientId: { in: clientIds12 },
+        status: { in: ['COMPLETED','SCHEDULED'] },
+        ...(userId ? { userId } : {}),
+      },
       select: { clientId:true, start:true }
     }) : [];
 
@@ -222,10 +245,10 @@ export async function performanceOverview(params) {
 }
 
 export async function barberBreakdown(params) {
-  // params: { companyId, from?, to? }
+  // params: { companyId, from?, to?, userId? }
   const keyParams = { ...params };
   return cacheWrap('analytics:barbers', keyParams, 60_000, async () => {
-    const { companyId, from, to } = params;
+    const { companyId, from, to, userId } = params;
     const { start, end } = parseRange({ from, to });
 
     // Apontamentos por profissional
@@ -234,6 +257,7 @@ export async function barberBreakdown(params) {
         companyId,
         start: { gte: start, lte: end },
         status: { in: ['SCHEDULED','COMPLETED','NO_SHOW'] },
+        ...(userId ? { userId } : {}),
       },
       select: { userId:true, status:true, start:true, end:true }
     });
@@ -246,7 +270,7 @@ export async function barberBreakdown(params) {
       };
       byUser[a.userId].appointments += 1;
       if (a.status === 'COMPLETED') byUser[a.userId].completed += 1;
-      if (a.status === 'NO_SHOW') byUser[a.userId].noshow += 1;
+      if (a.status === 'NO_SHOW')  byUser[a.userId].noshow += 1;
       byUser[a.userId].minutesBooked += Math.max(0, (new Date(a.end) - new Date(a.start))/60000);
     });
 
@@ -256,6 +280,7 @@ export async function barberBreakdown(params) {
         companyId,
         status: 'FINISHED',
         createdAt: { gte: start, lte: end },
+        ...(userId ? { userId } : {}),
       },
       select: { userId:true, total:true }
     });
@@ -276,7 +301,7 @@ export async function barberBreakdown(params) {
       s.id, minutesAvailableForRange(s.workSchedule, start, end)
     ]));
 
-    const rows = Object.values(byUser).map(s => {
+    let rows = Object.values(byUser).map(s => {
       const minutesAvailable = availMap[s.userId] || 0;
       const occupancy = minutesAvailable ? (s.minutesBooked / minutesAvailable) : 0;
       const revenue = revenueMap[s.userId] || 0;
@@ -284,6 +309,11 @@ export async function barberBreakdown(params) {
       const noshowRate = s.appointments ? (s.noshow / s.appointments) : 0;
       return { ...s, name: nameMap[s.userId], revenue, ticketMedio, occupancy, noshowRate };
     });
+
+    // Se veio userId (perfil BARBER/STAFF), restringe ao próprio
+    if (userId) {
+      rows = rows.filter(r => r.userId === userId);
+    }
 
     return rows.sort((a,b)=> b.revenue - a.revenue);
   });

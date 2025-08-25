@@ -1,43 +1,36 @@
-// src/components/performance/Heatmap.jsx
-import React, { useMemo } from 'react';
+import React from "react";
 
-const DOW = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-
-export default function Heatmap({ data }) {
-  // data: [7][24] contagens
-  const max = useMemo(() => {
-    if (!data?.length) return 0;
-    return data.reduce((m,row)=> Math.max(m, ...row), 0);
-  }, [data]);
-
-  if (!data?.length) return <p className="text-sm opacity-70">Sem dados.</p>;
+export default function Heatmap({ matrix = [] }) {
+  const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const maxVal = Math.max(1, ...matrix.flat().map((v) => Number(v || 0)));
 
   return (
-    <div className="overflow-auto">
-      <table className="text-xs min-w-[640px]">
-        <thead>
-          <tr>
-            <th className="p-1 text-left">Dia/Hora</th>
-            {Array.from({length:24},(_,h)=><th key={h} className="p-1 text-center">{h}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, idx)=>(
-            <tr key={idx}>
-              <td className="p-1 pr-3">{DOW[idx]}</td>
-              {row.map((val,h)=> {
-                const intensity = max ? (val / max) : 0;
-                const bg = `rgba(147,51,234,${0.12 + 0.6*intensity})`; // roxo com alpha
-                return (
-                  <td key={h} className="p-1">
-                    <div className="h-6 w-6 rounded" style={{ background: bg }} title={`${val}`}></div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="inline-grid" style={{ gridTemplateColumns: "64px repeat(24, minmax(16px, 1fr))", gap: 6 }}>
+      <div />
+      {Array.from({ length: 24 }, (_, h) => (
+        <div key={`h-${h}`} className="text-[10px] text-muted-color text-center">{h}</div>
+      ))}
+      {days.map((d, row) => (
+        <React.Fragment key={d}>
+          <div className="text-xs text-muted-color pr-2 flex items-center justify-end">{d}</div>
+          {Array.from({ length: 24 }, (_, col) => {
+            const v = Number(matrix?.[row]?.[col] || 0);
+            const alpha = v === 0 ? 0.06 : Math.min(0.95, v / maxVal);
+            return (
+              <div
+                key={`${row}-${col}`}
+                className="rounded-md neu-heat"
+                style={{
+                  height: 20,
+                  background: `rgba(124,58,237,${alpha})`,
+                  boxShadow: v ? "inset 2px 2px 4px rgba(0,0,0,0.15), inset -2px -2px 4px rgba(255,255,255,0.15)" : undefined,
+                }}
+                title={`${d} ${col}h — ${v} agendamento(s)`}
+              />
+            );
+          })}
+        </React.Fragment>
+      ))}
     </div>
   );
 }

@@ -1,324 +1,523 @@
-// src/pages/PerformancePage.jsx
-import React, { useEffect, useMemo, useState } from 'react';
-import { fetchPerformance, fetchProjection, fetchBarbers } from '../services/analyticsService';
-import toast from 'react-hot-toast';
-import MetricCard from '../components/performance/MetricCard';
-import Heatmap from '../components/performance/Heatmap';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarRange, RefreshCw, Users, TrendingUp, BarChart3, Zap, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { motion } from "framer-motion";
+import api from "../services/api";
+import NeuCard from "../components/ui/NeuCard";
+import NeuButton from "../components/ui/NeuButton";
+import "../styles/neumorphism.css";
+import Chart from "chart.js/auto";
+import { asArray } from "../utils/asArray";
 
-import {
-  CalendarDays, Users, TrendingUp, XCircle, Activity, Target, Filter, BarChart3, Clock
-} from 'lucide-react';
+/* ======= Util p/ ler variáveis CSS do tema ======= */
+const readCSSVar = (name) =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-import { Line, Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, TimeScale
-} from 'chart.js';
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, TimeScale);
+const useThemeColors = () => {
+  const get = () => ({
+    text: readCSSVar("--text-color"),
+    textMuted: readCSSVar("--text-color-muted"),
+    grid: readCSSVar("--chart-grid"),
+    accent: readCSSVar("--accent-color"),
+  });
+  const [colors, setColors] = useState(get);
+  useEffect(() => {
+    const handler = () => setColors(get());
+    window.addEventListener("theme:changed", handler);
+    return () => window.removeEventListener("theme:changed", handler);
+  }, []);
+  return colors;
+};
 
-const toBRL = (v) => Number(v||0).toLocaleString('pt-BR',{ style:'currency', currency:'BRL' });
-const pct = (v) => `${(Number(v||0)*100).toFixed(1)}%`;
+const fmtBRL = (v) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));
+
+const iso = (d) => d.toISOString().slice(0, 10);
+
+/** Calcula período anterior com mesmo número de dias (terminando no dia imediatamente anterior a "from") */
+function previousRange(fromStr, toStr) {
+  const from = new Date(fromStr);
+  const to = new Date(toStr);
+  const days = Math.max(1, Math.floor((to - from) / 86400000) + 1);
+  const prevTo = new Date(from); prevTo.setDate(prevTo.getDate() - 1);
+  const prevFrom = new Date(prevTo); prevFrom.setDate(prevFrom.getDate() - (days - 1));
+  return { prevFrom: iso(prevFrom), prevTo: iso(prevTo) };
+}
 
 export default function PerformancePage() {
-  const [loading, setLoading] = useState(false);
-  const [range, setRange]   = useState({ from: '', to: '' });
-  const [filters, setFilters] = useState({ groupBy:'day', unitId:'', staffId:'', serviceId:'' });
-  const [tab, setTab] = useState('overview'); // overview | barbers | services | retention | heatmap
+  const theme = useThemeColors();
 
-  const [perf, setPerf] = useState(null);
-  const [proj, setProj] = useState(null);
+  /* =================== Filtros =================== */
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+  const [from, setFrom] = useState(iso(firstDay));
+  const [to, setTo] = useState(iso(lastDay));
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+
+  /* =================== Dados =================== */
+  const [overview, setOverview] = useState(null);
+  const [overviewPrev, setOverviewPrev] = useState(null);
   const [barbers, setBarbers] = useState([]);
+  const [projection, setProjection] = useState(null);
 
-  async function loadAll() {
+  const loadAll = async () => {
+    setLoading(true);
+    setErr("");
     try {
-      setLoading(true);
-      const params = {
-        ...filters,
-        from: range.from || undefined,
-        to: range.to || undefined,
-      };
-      const [p, f, b] = await Promise.all([
-        fetchPerformance(params),
-        fetchProjection({ unitId: filters.unitId || undefined, staffId: filters.staffId || undefined, months: 3 }),
-        fetchBarbers(params),
+      const qsNow = `from=${from}&to=${to}&groupBy=day`;
+      const { prevFrom, prevTo } = previousRange(from, to);
+      const qsPrev = `from=${prevFrom}&to=${prevTo}&groupBy=day`;
+
+      const [
+        { data: perfNow },
+        { data: perfPrev },
+        { data: rows },
+        { data: proj },
+      ] = await Promise.all([
+        api.get(`/analytics/performance?${qsNow}`),
+        api.get(`/analytics/performance?${qsPrev}`),
+        api.get(`/analytics/barbers?${qsNow}`),
+        api.get(`/analytics/projection?months=3`),
       ]);
-      setPerf(p); setProj(f); setBarbers(b);
-    } catch (err) {
-      console.error(err);
-      toast.error('Não foi possível carregar a performance.');
+
+      setOverview(perfNow);
+      setOverviewPrev(perfPrev);
+      setBarbers(Array.isArray(rows) ? rows : []);
+      setProjection(proj);
+    } catch (e) {
+      console.error(e);
+      setErr(e?.response?.data?.message || e.message || "Erro ao carregar performance.");
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* =================== KPIs =================== */
+  const totals = overview?.totals || {};
+  const prev = overviewPrev?.totals || {};
+
+  const pct = (a, b) => {
+    const A = Number(a || 0), B = Number(b || 0);
+    if (B <= 0) return 0;
+    return ((A - B) / B) * 100;
+  };
+  const pp = (a, b) => ((Number(a || 0) - Number(b || 0)) * 100); // pontos percentuais
+
+  const revenueVarPct = pct(totals.revenue, prev.revenue);
+  const apptVarPct    = pct(totals.appointments, prev.appointments);
+  const occDeltaPP    = pp(totals.ocupacao, prev.ocupacao);
+  const nsDeltaPP     = pp(totals.noshowRate, prev.noshowRate);
+
+  const kpis = useMemo(() => {
+    return [
+      {
+        label: "Faturamento",
+        value: fmtBRL(totals.revenue || 0),
+        chip: "FINANCEIRO",
+        icon: <BarChart3 className="text-accent" size={22} />,
+        delta: { type: "pct", value: revenueVarPct, isPositiveGood: true },
+      },
+      {
+        label: "Agendamentos",
+        value: totals.appointments || 0,
+        chip: "AGENDA",
+        icon: <CalendarRange className="text-muted-color" size={22} />,
+        delta: { type: "pct", value: apptVarPct, isPositiveGood: true },
+      },
+      {
+        label: "Ocupação",
+        value: `${Math.round((totals.ocupacao || 0) * 100)}%`,
+        chip: "EQUIPE",
+        icon: <TrendingUp className="text-emerald-400" size={22} />,
+        delta: { type: "pp", value: occDeltaPP, isPositiveGood: true },
+      },
+      {
+        label: "No-show",
+        value: `${Math.round((totals.noshowRate || 0) * 100)}%`,
+        chip: "QUALIDADE",
+        icon: <Zap className="text-rose-400" size={22} />,
+        // no-show menor é melhor
+        delta: { type: "pp", value: -nsDeltaPP, isPositiveGood: true, invertShown: true, raw: nsDeltaPP },
+      },
+    ];
+  }, [totals, revenueVarPct, apptVarPct, occDeltaPP, nsDeltaPP]);
+
+  /* =================== Timeseries (Chart.js) =================== */
+  const revCanvasRef = useRef(null);
+  const apptCanvasRef = useRef(null);
+  const revChartRef = useRef(null);
+  const apptChartRef = useRef(null);
+
+  const labels = asArray(overview?.timeseries).map((d) => d?.key ?? "");
+  const revValues = asArray(overview?.timeseries).map((d) => Number(d?.revenue || 0));
+  const apptValues = asArray(overview?.timeseries).map((d) => Number(d?.appointments || 0));
+
+  useEffect(() => {
+    if (!revCanvasRef.current) return;
+    revChartRef.current?.destroy();
+    revChartRef.current = new Chart(revCanvasRef.current, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Faturamento (R$)",
+            data: revValues,
+            backgroundColor: "rgba(124,58,237,0.9)",
+            borderRadius: 8,
+            barThickness: 26,
+          },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { grid: { display: false }, ticks: { color: theme.textMuted } },
+          y: { grid: { color: theme.grid }, ticks: { color: theme.textMuted, callback: (v)=>fmtBRL(v) } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => fmtBRL(ctx.parsed.y) } },
+        },
+      },
+    });
+    return () => revChartRef.current?.destroy();
+  }, [labels, revValues, theme]);
+
+  useEffect(() => {
+    if (!apptCanvasRef.current) return;
+    apptChartRef.current?.destroy();
+    apptChartRef.current = new Chart(apptCanvasRef.current, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Agendamentos",
+            data: apptValues,
+            fill: false,
+            tension: 0.25,
+            borderWidth: 3,
+            borderColor: "rgba(16,185,129,0.9)",
+            pointRadius: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { grid: { display: false }, ticks: { color: theme.textMuted } },
+          y: { grid: { color: theme.grid }, ticks: { color: theme.textMuted } }
+        },
+        plugins: { legend: { display: false } },
+      },
+    });
+    return () => apptChartRef.current?.destroy();
+  }, [labels, apptValues, theme]);
+
+  /* =================== Projeção =================== */
+  const projCanvasRef = useRef(null);
+  const projChartRef = useRef(null);
+  const hist = asArray(projection?.history);
+  const forecast = asArray(projection?.forecast);
+  const projLabels = [...hist.map(h => h.month), ...forecast.map(f => f.month)];
+  const histValues = hist.map(h => Number(h.revenue || 0));
+  const forecastValues = forecast.map(f => Number(f.expectedRevenue || 0));
+  useEffect(() => {
+    if (!projCanvasRef.current) return;
+    projChartRef.current?.destroy();
+    projChartRef.current = new Chart(projCanvasRef.current, {
+      type: "line",
+      data: {
+        labels: projLabels,
+        datasets: [
+          {
+            label: "Histórico (R$)",
+            data: [...histValues, ...Array(forecastValues.length).fill(null)],
+            borderColor: "rgba(59,130,246,0.9)",
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.25,
+          },
+          {
+            label: "Projeção (R$)",
+            data: [...Array(histValues.length).fill(null), ...forecastValues],
+            borderDash: [6, 6],
+            borderColor: "rgba(234,88,12,0.9)",
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.25,
+          },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { grid: { display: false }, ticks: { color: theme.textMuted } },
+          y: { grid: { color: theme.grid }, ticks: { color: theme.textMuted, callback:(v)=>fmtBRL(v) } },
+        },
+        plugins: { legend: { position: "bottom", labels: { color: theme.textMuted } } },
+      },
+    });
+    return () => projChartRef.current?.destroy();
+  }, [projLabels, histValues, forecastValues, theme]);
+
+  /* =================== UI =================== */
+
+  const applyFilters = () => loadAll();
+
+  if (loading) {
+    return <p className="text-center py-20 text-muted-color animate-pulse">Carregando performance…</p>;
+  }
+  if (err) {
+    return <p className="text-center py-20 text-danger">{err}</p>;
   }
 
-  useEffect(()=>{ loadAll(); /* eslint-disable-next-line */ },[]);
+  const heatmap = overview?.heatmap || []; // 7x24
+  const topServices = asArray(overview?.topServices);
+  const hasProjection = hist.length + forecast.length > 0;
 
-  // charts
-  const revenueChart = useMemo(() => {
-    if (!perf?.timeseries?.length) return null;
-    const labels = perf.timeseries.map(t => t.key);
-    const data1 = perf.timeseries.map(t => t.revenue);
-    const data2 = perf.timeseries.map(t => t.appointments);
-    return {
-      labels,
-      datasets: [
-        { label: 'Receita', data: data1 },
-        { label: 'Atendimentos', data: data2 },
-      ]
-    };
-  }, [perf]);
+  const Delta = ({ delta }) => {
+    if (!delta) return null;
+    const val = Number(delta.value || 0);
+    const positive = val > 0;
+    const negative = val < 0;
 
-  const barberChart = useMemo(() => {
-    if (!barbers?.length) return null;
-    const top = barbers.slice(0,10);
-    return {
-      labels: top.map(b => b.name || b.staffId),
-      datasets: [
-        { label: 'Receita', data: top.map(b => b.revenue) },
-        { label: 'Ocupação (%)', data: top.map(b => Math.round((b.occupancy||0)*100)) },
-      ]
-    };
-  }, [barbers]);
+    const good = delta.isPositiveGood ? positive : negative;
+    const bad  = delta.isPositiveGood ? negative : positive;
 
-  const servicesChart = useMemo(() => {
-    const top = perf?.topServices || [];
-    if (!top.length) return null;
-    return {
-      labels: top.map(s => s.name),
-      datasets: [
-        { label: 'Receita', data: top.map(s => s.revenue) },
-        { label: 'Ticket Médio', data: top.map(s => Math.round(s.ticketMedio||0)) },
-      ]
-    };
-  }, [perf]);
+    let cls = "text-muted-color";
+    if (good) cls = "text-ok";
+    if (bad)  cls = "text-danger";
 
-  const cohortsTable = useMemo(() => perf?.cohorts || [], [perf]);
+    const Icon = positive ? ArrowUpRight : negative ? ArrowDownRight : null;
+    const label =
+      delta.type === "pct"
+        ? `${val >= 0 ? "+" : ""}${val.toFixed(1)}%`
+        : `${val >= 0 ? "+" : ""}${val.toFixed(1)} pp`;
 
-  // Tendência rápida (comparação últimos dois pontos)
-  const trend = useMemo(() => {
-    if (!perf?.timeseries?.length) return null;
-    const arr = perf.timeseries;
-    const last = arr[arr.length-1]?.revenue || 0;
-    const prev = arr[arr.length-2]?.revenue || 0;
-    const delta = last - prev;
-    const rate = prev ? (delta/prev) : 0;
-    return { last, delta, rate };
-  }, [perf]);
+    return (
+      <span className={`text-xs inline-flex items-center gap-1 ${cls}`}>
+        {Icon ? <Icon size={14} /> : null}
+        {delta.invertShown ? `${(delta.raw >= 0 ? "+" : "")}${delta.raw.toFixed(1)} pp` : label}
+      </span>
+    );
+  };
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Target className="w-5 h-5 text-purple-500" />
-          <h1 className="text-2xl font-semibold">Performance</h1>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={()=>setTab('overview')} className={`px-3 py-1 rounded ${tab==='overview'?'bg-purple-600 text-white':'bg-zinc-200 dark:bg-zinc-800'}`}>Visão geral</button>
-          <button onClick={()=>setTab('barbers')}  className={`px-3 py-1 rounded ${tab==='barbers'?'bg-purple-600 text-white':'bg-zinc-200 dark:bg-zinc-800'}`}>Barbeiros</button>
-          <button onClick={()=>setTab('services')} className={`px-3 py-1 rounded ${tab==='services'?'bg-purple-600 text-white':'bg-zinc-200 dark:bg-zinc-800'}`}>Serviços</button>
-          <button onClick={()=>setTab('retention')}className={`px-3 py-1 rounded ${tab==='retention'?'bg-purple-600 text-white':'bg-zinc-200 dark:bg-zinc-800'}`}>Retenção</button>
-          <button onClick={()=>setTab('heatmap')}  className={`px-3 py-1 rounded ${tab==='heatmap'?'bg-purple-600 text-white':'bg-zinc-200 dark:bg-zinc-800'}`}>Heatmap</button>
-        </div>
-      </div>
-
+    <div className="space-y-6 neu-surface">
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 bg-white/60 dark:bg-zinc-900/60 rounded-xl p-3 shadow-sm mb-4">
-        <div>
-          <label className="text-sm">De</label>
-          <input type="date" value={range.from} onChange={e=>setRange(r=>({...r, from:e.target.value}))}
-            className="w-full rounded-md border px-2 py-1" />
+      <NeuCard className="p-4">
+        <div className="flex flex-col md:flex-row md:items-end gap-3">
+          <div className="flex-1">
+            <label className="text-xs text-muted-color block mb-1">De</label>
+            <div className="neu-card-inset p-2 rounded-xl">
+              <input
+                type="date" value={from} onChange={(e)=>setFrom(e.target.value)}
+                className="w-full bg-transparent outline-none"
+              />
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-muted-color block mb-1">Até</label>
+            <div className="neu-card-inset p-2 rounded-xl">
+              <input
+                type="date" value={to} onChange={(e)=>setTo(e.target.value)}
+                className="w-full bg-transparent outline-none"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <NeuButton onClick={applyFilters}>
+              <RefreshCw size={16} className="mr-2" /> Aplicar
+            </NeuButton>
+          </div>
         </div>
-        <div>
-          <label className="text-sm">Até</label>
-          <input type="date" value={range.to} onChange={e=>setRange(r=>({...r, to:e.target.value}))}
-            className="w-full rounded-md border px-2 py-1" />
-        </div>
-        <div>
-          <label className="text-sm">Agrupar</label>
-          <select value={filters.groupBy} onChange={e=>setFilters(f=>({...f, groupBy:e.target.value}))}
-            className="w-full rounded-md border px-2 py-1">
-            <option value="day">Dia</option>
-            <option value="week">Semana</option>
-            <option value="month">Mês</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-sm">Unidade</label>
-          <input placeholder="unitId" value={filters.unitId} onChange={e=>setFilters(f=>({...f, unitId:e.target.value}))}
-            className="w-full rounded-md border px-2 py-1" />
-        </div>
-        <div>
-          <label className="text-sm">Profissional</label>
-          <input placeholder="staffId" value={filters.staffId} onChange={e=>setFilters(f=>({...f, staffId:e.target.value}))}
-            className="w-full rounded-md border px-2 py-1" />
-        </div>
-        <div className="flex items-end">
-          <button onClick={loadAll} disabled={loading}
-            className="inline-flex items-center gap-2 rounded-md bg-purple-600 text-white px-3 py-2 hover:bg-purple-700 disabled:opacity-60">
-            <Filter className="w-4 h-4" /> Aplicar
-          </button>
-        </div>
-      </div>
+      </NeuCard>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
-        <MetricCard icon={<TrendingUp />} label="Faturamento" value={toBRL(perf?.totals?.revenue)} hint={trend ? `${trend.delta>=0?'+':''}${toBRL(trend.delta)} (${(trend.rate*100).toFixed(1)}%) vs período anterior` : ''} />
-        <MetricCard icon={<Activity />}    label="Ocupação" value={pct(perf?.totals?.ocupacao)} />
-        <MetricCard icon={<XCircle />}     label="No-show"   value={pct(perf?.totals?.noshowRate)} />
-        <MetricCard icon={<Users />}       label="Novos"     value={perf?.totals?.newClients ?? 0} />
-        <MetricCard icon={<Users />}       label="Recorrentes" value={perf?.totals?.returningClients ?? 0} />
-        <MetricCard icon={<CalendarDays />}label="Ticket médio" value={toBRL(perf?.totals?.ticketMedio)} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {kpis.map((k) => (
+          <motion.div key={k.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
+            <NeuCard className="p-5">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-base-color">{k.label}</div>
+                <div className="neumorphic-inset p-2 rounded-xl">{k.icon}</div>
+              </div>
+              <div className="mt-2 text-3xl font-extrabold text-base-color">{k.value}</div>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="neu-chip px-2 py-1 text-accent-strong">{k.chip}</span>
+                <Delta delta={k.delta} />
+              </div>
+            </NeuCard>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Conteúdo por aba */}
-      {tab === 'overview' && (
-        <>
-          <Card title="Receita x Atendimentos">
-            {revenueChart ? <Line data={revenueChart} /> : <Empty />}
-          </Card>
-
-          <Card title="Projeção de Receita (próx. 3 meses)">
-            {proj?.forecast?.length ? (
-              <ul className="text-sm">
-                {proj.forecast.map(f=>(
-                  <li key={f.month} className="py-1 flex justify-between">
-                    <span>{f.month}</span>
-                    <span className="font-medium">{toBRL(f.expectedRevenue)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : <Empty />}
-          </Card>
-
-          <Card title="Diagnóstico & Ações sugeridas">
-            {perf?.insights?.length ? (
-              <ul className="list-disc pl-5 space-y-1">
-                {perf.insights.map((i,idx)=> <li key={idx}>{i}</li>)}
-              </ul>
-            ) : <p className="text-sm opacity-70">Sem alertas no período.</p>}
-          </Card>
-        </>
-      )}
-
-      {tab === 'barbers' && (
-        <Card title="Ranking de Barbeiros (Top 10)">
-          {barberChart ? <Bar data={barberChart} /> : <Empty />}
-          {!!barbers.length && (
-            <div className="mt-4 overflow-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2">Profissional</th>
-                    <th>Receita</th>
-                    <th>Atend.</th>
-                    <th>Ticket</th>
-                    <th>Ocupação</th>
-                    <th>No-show</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {barbers.map(b=>(
-                    <tr key={b.staffId} className="border-b last:border-0">
-                      <td className="py-2">{b.name}</td>
-                      <td>{toBRL(b.revenue)}</td>
-                      <td>{b.appointments}</td>
-                      <td>{toBRL(b.ticketMedio)}</td>
-                      <td>{pct(b.occupancy)}</td>
-                      <td>{pct(b.noshowRate)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {tab === 'services' && (
-        <Card title="Top Serviços (receita & ticket)">
-          {servicesChart ? <Bar data={servicesChart} /> : <Empty />}
-          {!!perf?.topServices?.length && (
-            <div className="mt-4 overflow-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2">Serviço</th>
-                    <th>Categoria</th>
-                    <th>Receita</th>
-                    <th>Concluídos</th>
-                    <th>Agendados</th>
-                    <th>Ticket Médio</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {perf.topServices.map(s=>(
-                    <tr key={s.serviceId} className="border-b last:border-0">
-                      <td className="py-2">{s.name}</td>
-                      <td>{s.category}</td>
-                      <td>{toBRL(s.revenue)}</td>
-                      <td>{s.completed}</td>
-                      <td>{s.count}</td>
-                      <td>{toBRL(s.ticketMedio)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {tab === 'retention' && (
-        <Card title="Coortes de Retenção (1ª visita por mês)">
-          {!!cohortsTable.length ? (
-            <div className="overflow-auto">
-              <table className="min-w-[560px] text-sm">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="py-2">Mês 1ª visita</th>
-                    <th>Clientes</th>
-                    <th>Retenção 30d</th>
-                    <th>Retenção 60d</th>
-                    <th>Retenção 90d</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cohortsTable.map(c=>(
-                    <tr key={c.month} className="border-b last:border-0">
-                      <td className="py-2">{c.month}</td>
-                      <td>{c.size}</td>
-                      <td>{pct(c.ret30)}</td>
-                      <td>{pct(c.ret60)}</td>
-                      <td>{pct(c.ret90)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : <Empty />}
-        </Card>
-      )}
-
-      {tab === 'heatmap' && (
-        <Card title="Heatmap de Atendimentos por Hora x Dia">
-          {perf?.heatmap ? <Heatmap data={perf.heatmap} /> : <Empty />}
-          <div className="flex items-center gap-2 text-xs text-zinc-500 mt-2">
-            <Clock className="w-4 h-4" /> <span>Quanto mais escuro, maior o volume de atendimentos.</span>
+      {/* Timeseries */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <NeuCard className="p-4 md:p-6">
+          <h2 className="text-lg font-semibold text-base-color mb-4">Faturamento no Período</h2>
+          <div className="neu-card-inset p-3 rounded-2xl h-80">
+            <canvas ref={revCanvasRef} />
           </div>
-        </Card>
-      )}
+        </NeuCard>
+
+        <NeuCard className="p-4 md:p-6">
+          <h2 className="text-lg font-semibold text-base-color mb-4">Agendamentos no Período</h2>
+          <div className="neu-card-inset p-3 rounded-2xl h-80">
+            <canvas ref={apptCanvasRef} />
+          </div>
+        </NeuCard>
+      </div>
+
+      {/* Ranking Barbeiros & Top Serviços */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <NeuCard className="p-4 md:p-6">
+          <h2 className="text-lg font-semibold text-base-color mb-3">Ranking de Barbeiros</h2>
+          <div className="neu-card-inset rounded-2xl">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-color">
+                  <th className="py-3 pl-3">Profissional</th>
+                  <th className="py-3">Receita</th>
+                  <th className="py-3">Comp.</th>
+                  <th className="py-3">No-show</th>
+                  <th className="py-3 pr-3 text-right">Ocup.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {barbers.map((b) => (
+                  <tr key={b.userId} className="border-t border-transparent">
+                    <td className="py-3 pl-3">{b.name || b.userId}</td>
+                    <td className="py-3">{fmtBRL(b.revenue)}</td>
+                    <td className="py-3">{b.completed}</td>
+                    <td className="py-3">{Math.round((b.noshowRate || 0) * 100)}%</td>
+                    <td className="py-3 pr-3 text-right">{Math.round((b.occupancy || 0) * 100)}%</td>
+                  </tr>
+                ))}
+                {!barbers.length && (
+                  <tr>
+                    <td className="py-6 pl-3 text-muted-color" colSpan={5}>Sem dados no período.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </NeuCard>
+
+        <NeuCard className="p-4 md:p-6">
+          <h2 className="text-lg font-semibold text-base-color mb-3">Top Serviços por Receita</h2>
+          <div className="neu-card-inset rounded-2xl">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-color">
+                  <th className="py-3 pl-3">Serviço</th>
+                  <th className="py-3">Receita</th>
+                  <th className="py-3">Comp.</th>
+                  <th className="py-3 pr-3 text-right">Ticket</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topServices.map((s) => (
+                  <tr key={s.serviceId} className="border-t border-transparent">
+                    <td className="py-3 pl-3">{s.name}</td>
+                    <td className="py-3">{fmtBRL(s.revenue)}</td>
+                    <td className="py-3">{s.completed}</td>
+                    <td className="py-3 pr-3 text-right">{fmtBRL(s.ticketMedio)}</td>
+                  </tr>
+                ))}
+                {!topServices.length && (
+                  <tr>
+                    <td className="py-6 pl-3 text-muted-color" colSpan={4}>Sem dados no período.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </NeuCard>
+      </div>
+
+      {/* Heatmap & Projeção */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <NeuCard className="p-4 md:p-6">
+          <h2 className="text-lg font-semibold text-base-color mb-4">Heatmap de Horários</h2>
+          <div className="neu-card-inset p-3 rounded-2xl overflow-x-auto">
+            <HeatmapWidget matrix={overview?.heatmap || []} />
+          </div>
+        </NeuCard>
+
+        <NeuCard className="p-4 md:p-6">
+          <h2 className="text-lg font-semibold text-base-color mb-4">Projeção de Receita (3 meses)</h2>
+          {hasProjection ? (
+            <div className="neu-card-inset p-3 rounded-2xl h-80">
+              <canvas ref={projCanvasRef} />
+            </div>
+          ) : (
+            <div className="neu-card-inset p-6 rounded-2xl text-center text-muted-color">
+              Sem dados suficientes para projeção.
+            </div>
+          )}
+        </NeuCard>
+      </div>
+
+      {/* Insights */}
+      <NeuCard className="p-4 md:p-6">
+        <h2 className="text-lg font-semibold text-base-color mb-3">Insights</h2>
+        <ul className="list-disc pl-5 text-sm text-base-color/90">
+          {asArray(overview?.insights).map((i, idx) => (
+            <li key={idx} className="mb-1">{i}</li>
+          ))}
+          {!asArray(overview?.insights).length && (
+            <li className="text-muted-color">Sem insights no momento.</li>
+          )}
+        </ul>
+      </NeuCard>
     </div>
   );
 }
 
-function Card({ title, children }) {
+/* =============== Heatmap inline (neu) =============== */
+function HeatmapWidget({ matrix = [] }) {
+  // matrix 7x24 (0=dom..6=sáb)
+  const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const maxVal = Math.max(1, ...matrix.flat().map((v) => Number(v || 0)));
+
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 shadow-sm border mb-4">
-      <div className="flex items-center gap-2 mb-2">
-        <BarChart3 className="w-4 h-4 text-purple-500" />
-        <h2 className="font-semibold">{title}</h2>
-      </div>
-      {children}
+    <div className="inline-grid" style={{ gridTemplateColumns: "64px repeat(24, minmax(16px, 1fr))", gap: 6 }}>
+      {/* Header horas */}
+      <div />
+      {Array.from({ length: 24 }, (_, h) => (
+        <div key={`h-${h}`} className="text-[10px] text-muted-color text-center">{h}</div>
+      ))}
+      {days.map((d, row) => (
+        <React.Fragment key={d}>
+          <div className="text-xs text-muted-color pr-2 flex items-center justify-end">{d}</div>
+          {Array.from({ length: 24 }, (_, col) => {
+            const v = Number(matrix?.[row]?.[col] || 0);
+            const alpha = v === 0 ? 0.06 : Math.min(0.95, v / maxVal);
+            return (
+              <div
+                key={`${row}-${col}`}
+                className="rounded-md neu-heat"
+                style={{
+                  height: 20,
+                  background: `rgba(124,58,237,${alpha})`,
+                  boxShadow: v ? "inset 2px 2px 4px rgba(0,0,0,0.15), inset -2px -2px 4px rgba(255,255,255,0.15)" : undefined,
+                }}
+                title={`${d} ${col}h — ${v} agendamento(s)`}
+              />
+            );
+          })}
+        </React.Fragment>
+      ))}
     </div>
   );
 }
-function Empty(){ return <div className="text-sm opacity-70">Sem dados para o período.</div>; }

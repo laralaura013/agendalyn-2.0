@@ -1,15 +1,19 @@
-// src/components/performance/MetricCard.jsx
-import React from 'react';
+import React from "react";
+import NeuCard from "../../components/ui/NeuCard";
 
-export default function MetricCard({ label, value, hint, icon }) {
+export default function MetricCard({ icon, label, value, chip }) {
   return (
-    <div className="bg-white dark:bg-zinc-900 border rounded-xl p-3 shadow-sm">
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        {icon ? <span className="w-4 h-4">{icon}</span> : null}
-        <span>{label}</span>
+    <NeuCard className="p-5">
+      <div className="flex items-center justify-between">
+        <div className="font-semibold text-base-color">{label}</div>
+        <div className="neumorphic-inset p-2 rounded-xl">{icon}</div>
       </div>
-      <div className="mt-1 text-lg font-semibold">{value ?? '—'}</div>
-      {hint ? <div className="text-xs text-zinc-500 mt-1">{hint}</div> : null}
-    </div>
+      <div className="mt-2 text-3xl font-extrabold text-base-color">{value}</div>
+      {chip ? (
+        <div className="mt-3">
+          <span className="neu-chip px-2 py-1 text-accent-strong">{chip}</span>
+        </div>
+      ) : null}
+    </NeuCard>
   );
 }
